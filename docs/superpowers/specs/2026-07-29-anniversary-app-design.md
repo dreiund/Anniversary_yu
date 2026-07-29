@@ -312,7 +312,7 @@ P2 靠前因为"她能参与"是这个 App 的灵魂；P4/P5 相对独立可换�
 ## 12. 开放项
 
 1. **App 显示名**：待定（图标设计同期定）。工作名 Anniversary。
-2. **SwiftData 共享验证**：P0 前查证 iOS 26/27 SwiftData 是否已支持 CKShare 双人共享；支持则以等价现代方案替换 Core Data 写法（决策逻辑不变：只用苹果官方共享机制）。
+2. **SwiftData 共享验证**：~~P0 前查证~~ **已于 2026-07-29 查证关闭**：SwiftData 截至当前仍不支持 CKShare 多用户共享（Apple 论坛 thread/765776、756721 与社区共识一致），维持 Core Data + NSPersistentCloudKitContainer + CKShare 方案。
 3. **开发者账号**：用户需完成付费注册（¥688/年）；P2 前完成即可，P0/P1 无账号也能开发。
 
 ## 13. 明确不做（YAGNI）
