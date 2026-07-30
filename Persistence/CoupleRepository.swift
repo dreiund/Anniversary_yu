@@ -19,7 +19,7 @@ struct CoupleRepository {
         couple.createdAt = now
         couple.anniversaryDate = anniversary
 
-        // 集合无序，roleIndex 持久化"谁是创建者"：0=创建者/我，1=对方
+        // 集合无序，themeColorHex 暂存"谁是创建者"：0=创建者/我，1=对方（P1 迁 roleIndex）
         let me = CDPartner(context: context)
         me.id = UUID()
         me.name = myName

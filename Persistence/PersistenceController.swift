@@ -20,6 +20,7 @@ final class PersistenceController {
         }
         // P0 不开云同步；P2 在此设置 cloudKitContainerOptions 与共享库描述
         description.cloudKitContainerOptions = nil
+        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
         container.persistentStoreDescriptions = [description]
 
         var loadError: Error?

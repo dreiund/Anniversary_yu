@@ -21,4 +21,10 @@ final class PersistenceControllerTests: XCTestCase {
         let pc = PersistenceController(inMemory: true)
         XCTAssertTrue((pc.viewContext.mergePolicy as? NSMergePolicy) === NSMergePolicy.mergeByPropertyObjectTrump)
     }
+
+    func testPersistentHistoryTrackingEnabled() {
+        let pc = PersistenceController(inMemory: true)
+        let opt = pc.container.persistentStoreDescriptions.first?.options[NSPersistentHistoryTrackingKey] as? NSNumber
+        XCTAssertEqual(opt, true)
+    }
 }
