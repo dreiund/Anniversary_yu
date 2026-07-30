@@ -40,7 +40,7 @@ struct DSGallery: View {
                 VStack(spacing: 10) {
                     Button("添加日程") {}.buttonStyle(BluePillButtonStyle())
                     Button("封盘") {}.buttonStyle(BluePillButtonStyle(fullWidth: true))
-                    Button("接受 TA 的邀请") {}.buttonStyle(GhostPillButtonStyle())
+                    Button("接受邀请") {}.buttonStyle(GhostPillButtonStyle())
                     Button("编辑") {}.buttonStyle(DarkUtilityButtonStyle())
                 }
 
