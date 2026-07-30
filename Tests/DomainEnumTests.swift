@@ -21,8 +21,21 @@ final class DomainEnumTests: XCTestCase {
         XCTAssertEqual(EntryVisibility.sharedImmediately.rawValue, 0)
         XCTAssertEqual(EntryVisibility.privateUntilRevealed.rawValue, 1)
 
+        XCTAssertEqual(FlowLevel.none.rawValue, 0)
+        XCTAssertEqual(FlowLevel.light.rawValue, 1)
+        XCTAssertEqual(FlowLevel.medium.rawValue, 2)
+        XCTAssertEqual(FlowLevel.heavy.rawValue, 3)
         XCTAssertEqual(FlowLevel.veryHeavy.rawValue, 4)
+
+        XCTAssertEqual(PainLevel.none.rawValue, 0)
+        XCTAssertEqual(PainLevel.mild.rawValue, 1)
+        XCTAssertEqual(PainLevel.moderate.rawValue, 2)
         XCTAssertEqual(PainLevel.severe.rawValue, 3)
+
+        XCTAssertEqual(CycleColor.brightRed.rawValue, 0)
+        XCTAssertEqual(CycleColor.darkRed.rawValue, 1)
+        XCTAssertEqual(CycleColor.brown.rawValue, 2)
+        XCTAssertEqual(CycleColor.pink.rawValue, 3)
         XCTAssertEqual(CycleColor.other.rawValue, 4)
     }
 
