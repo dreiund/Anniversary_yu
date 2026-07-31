@@ -5,16 +5,19 @@ struct TimelineListView: View {
     @Environment(\.managedObjectContext) private var context
     let meeting: CDMeeting
     @FetchRequest private var momentsFetch: FetchedResults<CDMoment>
+    @FetchRequest private var daysFetch: FetchedResults<CDDateDay>
     @State private var showSeal = false
 
     init(meeting: CDMeeting) {
         self.meeting = meeting
         _momentsFetch = FetchRequest(sortDescriptors: [],
                                      predicate: NSPredicate(format: "dateDay.meeting == %@", meeting))
+        _daysFetch = FetchRequest(sortDescriptors: [],
+                                  predicate: NSPredicate(format: "meeting == %@", meeting))
     }
 
     var body: some View {
-        let _ = momentsFetch.count  // 注册 FetchRequest 依赖：任何 CDMoment 变更触发本视图刷新
+        let _ = (momentsFetch.count, daysFetch.count)  // 注册观察：记忆与约会日（封盘）变更均刷新时间线
         let momentsRepo = MomentRepository(context: context)
         let grouped = momentsRepo.daysWithMoments(in: meeting)
 

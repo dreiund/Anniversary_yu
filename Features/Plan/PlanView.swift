@@ -5,6 +5,10 @@ struct PlanView: View {
     @Environment(\.managedObjectContext) private var context
     let meeting: CDMeeting
     @FetchRequest private var items: FetchedResults<CDPlanItem>
+    @FetchRequest(
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "statusRaw == %d", MeetingStatus.ongoing.rawValue)
+    ) private var ongoingMeetings: FetchedResults<CDMeeting>
     @State private var editingItem: CDPlanItem?
     @State private var showAdd = false
 
@@ -77,11 +81,15 @@ struct PlanView: View {
                 Text("距出发还有 \(days) 天").dsCaption()
             }
             if meeting.statusRaw == MeetingStatus.planned.rawValue {
-                Button("开始见面") {
-                    try? MeetingRepository(context: context).start(meeting, at: Date())
+                if ongoingMeetings.isEmpty {
+                    Button("开始见面") {
+                        try? MeetingRepository(context: context).start(meeting, at: Date())
+                    }
+                    .buttonStyle(BluePillButtonStyle())
+                    .padding(.top, 6)
+                } else {
+                    Text("先结束进行中的见面，再开始这一次").dsFootnote().padding(.top, 6)
                 }
-                .buttonStyle(BluePillButtonStyle())
-                .padding(.top, 6)
             }
         }
     }

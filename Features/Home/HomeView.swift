@@ -8,13 +8,15 @@ struct HomeView: View {
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
     private var meetings: FetchedResults<CDMeeting>
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>
+    @FetchRequest(sortDescriptors: []) private var dateDays: FetchedResults<CDDateDay>
+    @FetchRequest(sortDescriptors: []) private var planItems: FetchedResults<CDPlanItem>
     @State private var showMoodSheet = false
 
     private var couple: CDCouple? { couples.first }
 
     var body: some View {
         ScrollView {
-            let _ = moods.count  // 注册 FetchRequest 依赖：任何 CDDailyMood 变更触发本视图刷新
+            let _ = (moods.count, dateDays.count, planItems.count)  // 注册观察：心情/约会日/计划项变更均刷新首页
             if let couple {
                 VStack(alignment: .leading, spacing: DS.Spacing.md) {
                     header(couple)
