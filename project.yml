@@ -27,6 +27,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: 用于给记忆自动记录当前位置
     scheme:
       testTargets:
         - AnniversaryTests

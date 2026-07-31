@@ -12,6 +12,7 @@ struct MainShell: View {
     @State private var showPanel = false
     @State private var activeSheet: ShellSheet?
     @State private var pendingAction: PanelAction?
+    @State private var showNoMeetingAlert = false
 
     @FetchRequest(
         sortDescriptors: [],
@@ -58,8 +59,8 @@ struct MainShell: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .newMoment:
-                Text("记忆表单 · T12 接线").dsCaption().padding()
+            case .newMoment(let meeting):
+                MomentFormView(mode: .create(meeting))
             case .mood:
                 if let couple = try? CoupleRepository(context: context).fetchCouple() {
                     MoodSheet(couple: couple)
@@ -68,12 +69,17 @@ struct MainShell: View {
                 SealSheet(meeting: meeting)
             }
         }
+        .alert("还没有进行中的见面", isPresented: $showNoMeetingAlert) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("去足迹页开始一次见面，再来记录。")
+        }
     }
 
     private func handle(_ action: PanelAction) {
         switch action {
         case .newMoment:
-            if let meeting = ongoingMeetings.first { activeSheet = .newMoment(meeting) }
+            if let meeting = ongoingMeetings.first { activeSheet = .newMoment(meeting) } else { showNoMeetingAlert = true }
         case .mood:
             activeSheet = .mood
         case .seal:
