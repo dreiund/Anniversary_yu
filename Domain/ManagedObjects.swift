@@ -187,3 +187,5 @@ final class CDPlanItem: NSManagedObject {
     @NSManaged var meeting: CDMeeting?
     @NSManaged var place: CDPlace?
 }
+
+extension CDPlanItem: Identifiable {}
