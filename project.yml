@@ -6,7 +6,6 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    GENERATE_INFOPLIST_FILE: YES
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 0.1.0
     DEVELOPMENT_TEAM: N4YSFLZ44L
@@ -22,21 +21,39 @@ targets:
       - Domain
       - Persistence
       - Support
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Anniversary
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSLocationWhenInUseUsageDescription: 用于给记忆自动记录当前位置
+        CKSharingSupported: true
+        UIBackgroundModes: [remote-notification]
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: App/Anniversary.entitlements
+      properties:
+        com.apple.developer.icloud-services: [CloudKit]
+        com.apple.developer.icloud-container-identifiers: [iCloud.com.fkc.anniversary]
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fkc.anniversary
-        INFOPLIST_KEY_CFBundleDisplayName: Anniversary
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1"
-        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: 用于给记忆自动记录当前位置
     scheme:
       testTargets:
         - AnniversaryTests
+      commandLineArguments:
+        "-InitCloudKitSchema": false
   AnniversaryTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - Tests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Anniversary
