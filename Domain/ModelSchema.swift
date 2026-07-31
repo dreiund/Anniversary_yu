@@ -68,6 +68,7 @@ enum ModelSchema {
             attr("themeColorHex", .stringAttributeType),
             attr("cloudUserID", .stringAttributeType),
             attr("tracksCycle", .booleanAttributeType, optional: false, defaultValue: false),
+            attr("roleIndex", .integer16AttributeType, optional: false, defaultValue: 0),
         ])
 
         let meeting = entity("CDMeeting", CDMeeting.self, [

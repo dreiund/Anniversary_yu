@@ -25,6 +25,7 @@ final class CDPartner: NSManagedObject {
     @NSManaged var themeColorHex: String?
     @NSManaged var cloudUserID: String?
     @NSManaged var tracksCycle: Bool
+    @NSManaged var roleIndex: Int16
     @NSManaged var couple: CDCouple?
 }
 

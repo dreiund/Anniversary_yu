@@ -35,4 +35,16 @@ final class CoupleRepositoryTests: XCTestCase {
         let repo = CoupleRepository(context: pc.viewContext)
         XCTAssertNil(try repo.fetchCouple())
     }
+
+    func testPartnersOrderedByRoleIndexAndCreatorID() throws {
+        let pc = PersistenceController(inMemory: true)
+        let repo = CoupleRepository(context: pc.viewContext)
+        let couple = try repo.bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
+
+        let partners = repo.partners(of: couple)
+        XCTAssertEqual(partners.map(\.roleIndex), [0, 1])
+        XCTAssertEqual(partners.map(\.name), ["阿铖", "小于"])
+        XCTAssertNil(partners[0].themeColorHex)
+        XCTAssertEqual(repo.creatorID(of: couple), partners[0].id)
+    }
 }

@@ -112,4 +112,12 @@ final class ModelSchemaTests: XCTestCase {
         let plans = try ctx.fetch(CDPlanItem.fetchRequest()) as! [CDPlanItem]
         XCTAssertEqual(plans.first?.meeting?.id, meeting.id)
     }
+
+    func testPartnerHasRoleIndexWithDefault() {
+        let partner = model.entitiesByName["CDPartner"]!
+        let attr = partner.attributesByName["roleIndex"]
+        XCTAssertNotNil(attr)
+        XCTAssertFalse(attr!.isOptional)
+        XCTAssertEqual(attr!.defaultValue as? Int16, 0)
+    }
 }
