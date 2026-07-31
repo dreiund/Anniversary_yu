@@ -37,7 +37,7 @@ struct MainShell: View {
             ZStack {
                 switch tab {
                 case .us: NavigationStack { DSGallery() }          // T9 接入 HomeView
-                case .footprints: NavigationStack { Text("足迹 · T10 接入").dsCaption() }
+                case .footprints: NavigationStack { MeetingsView() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
