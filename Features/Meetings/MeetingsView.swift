@@ -96,7 +96,10 @@ struct MeetingsView: View {
         let momentsRepo = MomentRepository(context: context)
         let grouped = momentsRepo.daysWithMoments(in: meeting)
         let momentCount = grouped.reduce(0) { $0 + $1.moments.count }
-        let cover = grouped.first?.moments.first.flatMap { momentsRepo.photosSorted($0).first?.thumbnailData }
+        let cover = grouped
+            .flatMap(\.moments)
+            .compactMap { momentsRepo.photosSorted($0).first?.thumbnailData }
+            .first
 
         return ZStack(alignment: .bottomLeading) {
             if let cover, let ui = UIImage(data: cover) {
