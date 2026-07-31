@@ -15,6 +15,7 @@ struct PlanView: View {
     }
 
     var body: some View {
+        let _ = items.count  // 注册 FetchRequest 依赖：任何 CDPlanItem 变更触发本视图刷新
         let repo = PlanItemRepository(context: context)
         let sections = repo.sections(for: meeting, calendar: .current)
         let stats = repo.stats(for: meeting)
@@ -85,6 +86,12 @@ struct PlanView: View {
         }
     }
 
+    private func authorName(_ id: UUID?) -> String {
+        let repo = CoupleRepository(context: context)
+        guard let id, let couple = try? repo.fetchCouple() else { return "" }
+        return repo.partners(of: couple).first { $0.id == id }?.name ?? ""
+    }
+
     private func planRow(_ item: CDPlanItem, showsDivider: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -113,6 +120,7 @@ struct PlanView: View {
                     }
                 }
                 Spacer()
+                AvatarInitial(name: authorName(item.authorPartnerID), size: 20)
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
             .contentShape(Rectangle())
