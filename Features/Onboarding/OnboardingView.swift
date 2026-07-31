@@ -5,6 +5,7 @@ struct OnboardingView: View {
     @State private var myName = ""
     @State private var partnerName = ""
     @State private var anniversary = Date()
+    @State private var createError: String?
 
     private var canCreate: Bool {
         !myName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -51,14 +52,24 @@ struct OnboardingView: View {
                 }
 
                 Button("创建我们的空间") {
-                    try? CoupleRepository(context: context)
-                        .bootstrapIfNeeded(myName: myName.trimmingCharacters(in: .whitespaces),
-                                           partnerName: partnerName.trimmingCharacters(in: .whitespaces),
-                                           anniversary: anniversary)
+                    do {
+                        _ = try CoupleRepository(context: context)
+                            .bootstrapIfNeeded(myName: myName.trimmingCharacters(in: .whitespaces),
+                                               partnerName: partnerName.trimmingCharacters(in: .whitespaces),
+                                               anniversary: anniversary)
+                    } catch {
+                        createError = "创建失败，请重试"
+                    }
                 }
                 .buttonStyle(BluePillButtonStyle(fullWidth: true))
                 .disabled(!canCreate)
                 .opacity(canCreate ? 1 : 0.4)
+
+                if let createError {
+                    Text(createError)
+                        .font(.system(size: 13))
+                        .foregroundStyle(DS.dsRed)
+                }
 
                 Text("P2 阶段这里会出现「接受 TA 的邀请」").dsFootnote()
             }
