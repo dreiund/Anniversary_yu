@@ -41,7 +41,12 @@ struct TimelineListView: View {
             }
         }
         ForEach(moments, id: \.objectID) { moment in
-            momentCard(moment, repo: repo)
+            NavigationLink {
+                MomentDetailView(moment: moment)
+            } label: {
+                momentCard(moment, repo: repo)
+            }
+            .buttonStyle(.plain)
         }
         if let closed = day.closedAt {
             DarkCard {
