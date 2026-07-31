@@ -51,6 +51,25 @@ enum PreviewData {
             plan.sortIndex = 0
             plan.meeting = meeting
 
+            let meetingRepo = MeetingRepository(context: ctx)
+            let planned = try meetingRepo.createPlanned(
+                couple: couple, title: "上海行", city: "上海",
+                plannedStart: Calendar.current.date(byAdding: .day, value: 12, to: Date()),
+                plannedEnd: Calendar.current.date(byAdding: .day, value: 16, to: Date()))
+
+            let planRepo = PlanItemRepository(context: ctx)
+            let trainDay = Calendar.current.date(byAdding: .day, value: 12, to: Date())!
+            _ = try planRepo.add(to: planned, day: trainDay,
+                                 time: Calendar.current.date(bySettingHour: 14, minute: 0, second: 0, of: trainDay),
+                                 title: "G102 高铁", note: "车票已订 · 靠窗",
+                                 placeText: nil, authorID: repo.partners(of: couple)[0].id)
+            _ = try planRepo.add(to: planned, day: nil, time: nil, title: "带充电宝",
+                                 note: nil, placeText: nil, authorID: repo.partners(of: couple)[0].id)
+
+            _ = try DailyMoodRepository(context: ctx).setMood(
+                couple: couple, authorID: repo.partners(of: couple)[0].id,
+                day: Date(), emoji: "😊", note: nil, calendar: .current)
+
             try ctx.save()
         } catch {
             assertionFailure("PreviewData 构建失败: \(error)")
