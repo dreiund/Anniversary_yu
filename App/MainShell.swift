@@ -1,0 +1,117 @@
+import SwiftUI
+import CoreData
+
+enum AppTab {
+    case us
+    case footprints
+}
+
+struct MainShell: View {
+    @Environment(\.managedObjectContext) private var context
+    @State private var tab: AppTab = .us
+    @State private var showPanel = false
+    @State private var activeSheet: ShellSheet?
+
+    @FetchRequest(
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "statusRaw == %d", MeetingStatus.ongoing.rawValue)
+    ) private var ongoingMeetings: FetchedResults<CDMeeting>
+
+    enum ShellSheet: Identifiable {
+        case newMoment(CDMeeting)
+        case mood
+        case seal(CDMeeting)
+
+        var id: String {
+            switch self {
+            case .newMoment: "newMoment"
+            case .mood: "mood"
+            case .seal: "seal"
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                switch tab {
+                case .us: NavigationStack { DSGallery() }          // T9 接入 HomeView
+                case .footprints: NavigationStack { Text("足迹 · T10 接入").dsCaption() }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            bottomBar
+        }
+        .ignoresSafeArea(.keyboard)
+        .sheet(isPresented: $showPanel) {
+            ActionPanel(hasOngoing: ongoingMeetings.first != nil) { action in
+                showPanel = false
+                handle(action)
+            }
+        }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .newMoment, .mood, .seal:
+                Text("动作占位 · 后续任务接线").dsCaption().padding()  // T9/T12/T13 替换
+            }
+        }
+    }
+
+    private func handle(_ action: PanelAction) {
+        switch action {
+        case .newMoment:
+            if let meeting = ongoingMeetings.first { activeSheet = .newMoment(meeting) }
+        case .mood:
+            activeSheet = .mood
+        case .seal:
+            if let meeting = ongoingMeetings.first { activeSheet = .seal(meeting) }
+        }
+    }
+
+    private var bottomBar: some View {
+        FrostedBottomBar {
+            HStack {
+                tabButton("我们", tab: .us)
+                Spacer()
+                tabButton("足迹", tab: .footprints)
+                Spacer()
+                Button {
+                    showPanel = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                        .background(Circle().fill(DS.actionBlue))
+                        .rotationEffect(.degrees(showPanel ? 45 : 0))
+                        .animation(.easeOut(duration: 0.2), value: showPanel)
+                }
+                .buttonStyle(DSPressEffect())
+                .offset(y: -8)
+                Spacer()
+                disabledTab("小本本")
+                Spacer()
+                disabledTab("她")
+            }
+        }
+    }
+
+    private func tabButton(_ title: String, tab target: AppTab) -> some View {
+        Button {
+            tab = target
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: tab == target ? .semibold : .regular))
+                .foregroundStyle(tab == target ? DS.actionBlue : DS.inkMuted)
+        }
+        .buttonStyle(DSPressEffect())
+    }
+
+    private func disabledTab(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 13))
+            .foregroundStyle(DS.inkMuted)
+            .opacity(0.35)
+    }
+}
