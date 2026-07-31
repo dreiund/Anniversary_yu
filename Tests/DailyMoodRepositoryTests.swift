@@ -6,7 +6,7 @@ final class DailyMoodRepositoryTests: XCTestCase {
         let pc = PersistenceController(inMemory: true)
         let couples = CoupleRepository(context: pc.viewContext)
         let couple = try couples.bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
-        let me = couples.creatorID(of: couple)
+        let me = couples.currentPartnerID(of: couple)
         let repo = DailyMoodRepository(context: pc.viewContext)
         let cal = Calendar(identifier: .gregorian)
         let morning = cal.date(from: DateComponents(year: 2026, month: 7, day: 30, hour: 9))!

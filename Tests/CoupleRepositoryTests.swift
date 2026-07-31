@@ -45,6 +45,6 @@ final class CoupleRepositoryTests: XCTestCase {
         XCTAssertEqual(partners.map(\.roleIndex), [0, 1])
         XCTAssertEqual(partners.map(\.name), ["阿铖", "小于"])
         XCTAssertNil(partners[0].themeColorHex)
-        XCTAssertEqual(repo.creatorID(of: couple), partners[0].id)
+        XCTAssertEqual(repo.currentPartnerID(of: couple), partners[0].id)
     }
 }

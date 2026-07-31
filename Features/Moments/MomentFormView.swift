@@ -190,7 +190,7 @@ struct MomentFormView: View {
     private func doCreate(in meeting: CDMeeting) {
         let couples = CoupleRepository(context: context)
         let couple = try? couples.fetchCouple()
-        let authorID = couple.flatMap { couples.creatorID(of: $0) }
+        let authorID = couple.flatMap { couples.currentPartnerID(of: $0) }
 
         var place: CDPlace?
         if !locationName.trimmingCharacters(in: .whitespaces).isEmpty, let couple {

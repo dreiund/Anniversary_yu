@@ -97,7 +97,7 @@ struct PlanItemFormSheet: View {
                              note: noteValue, placeText: placeValue)
         } else {
             let couples = CoupleRepository(context: context)
-            let authorID = (try? couples.fetchCouple()).flatMap { couples.creatorID(of: $0) }
+            let authorID = (try? couples.fetchCouple()).flatMap { couples.currentPartnerID(of: $0) }
             _ = try? repo.add(to: meeting, day: dayValue, time: timeValue, title: title,
                               note: noteValue, placeText: placeValue, authorID: authorID)
         }

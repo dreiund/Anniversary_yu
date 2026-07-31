@@ -18,7 +18,7 @@ struct MoodSheet: View {
                 if let emoji {
                     let repo = CoupleRepository(context: context)
                     try? DailyMoodRepository(context: context).setMood(
-                        couple: couple, authorID: repo.creatorID(of: couple),
+                        couple: couple, authorID: repo.currentPartnerID(of: couple),
                         day: Date(), emoji: emoji,
                         note: note.isEmpty ? nil : note, calendar: .current)
                 }
@@ -35,7 +35,7 @@ struct MoodSheet: View {
         .onAppear {
             let repo = CoupleRepository(context: context)
             if let existing = DailyMoodRepository(context: context).mood(
-                couple: couple, authorID: repo.creatorID(of: couple), day: Date(), calendar: .current) {
+                couple: couple, authorID: repo.currentPartnerID(of: couple), day: Date(), calendar: .current) {
                 emoji = existing.moodEmoji
                 note = existing.note ?? ""
             }

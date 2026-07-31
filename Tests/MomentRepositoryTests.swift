@@ -14,7 +14,7 @@ final class MomentRepositoryTests: XCTestCase {
         pc = PersistenceController(inMemory: true)
         let couples = CoupleRepository(context: pc.viewContext)
         couple = try couples.bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
-        creatorID = couples.creatorID(of: couple)
+        creatorID = couples.currentPartnerID(of: couple)
         meetings = MeetingRepository(context: pc.viewContext)
         moments = MomentRepository(context: pc.viewContext)
         meeting = try meetings.createPlanned(couple: couple, title: nil, city: "上海", plannedStart: nil, plannedEnd: nil)

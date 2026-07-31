@@ -41,8 +41,29 @@ struct CoupleRepository {
         return set.sorted { $0.roleIndex < $1.roleIndex }
     }
 
-    /// 创建者（单机阶段即"我"）的业务 ID，用作各类记录的 authorID
-    func creatorID(of couple: CDCouple) -> UUID? {
-        partners(of: couple).first?.id
+    /// 本机是否为受邀加入的一方：创建方的 couple 永远在私有库文件里，
+    /// 受邀方的 couple 只会经共享 zone 镜像进共享库文件。
+    /// 纯数据判定——无本地旗标，删 App 重装后依然正确，可脱离 CloudKit 单测。
+    func isParticipantDevice(_ couple: CDCouple) -> Bool {
+        couple.objectID.persistentStore?.url?.lastPathComponent == PersistenceController.sharedStoreFileName
+    }
+
+    /// 本机使用者：创建方设备 = partners[0]，受邀方设备 = partners[1]。
+    /// 全工程写 authorPartnerID 的唯一来源是 currentPartnerID(of:)。
+    func currentPartner(of couple: CDCouple) -> CDPartner? {
+        let list = partners(of: couple)
+        if isParticipantDevice(couple) {
+            return list.count > 1 ? list[1] : nil
+        }
+        return list.first
+    }
+
+    func otherPartner(of couple: CDCouple) -> CDPartner? {
+        guard let mine = currentPartner(of: couple) else { return nil }
+        return partners(of: couple).first { $0.objectID != mine.objectID }
+    }
+
+    func currentPartnerID(of couple: CDCouple) -> UUID? {
+        currentPartner(of: couple)?.id
     }
 }
