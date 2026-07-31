@@ -11,6 +11,7 @@ struct MainShell: View {
     @State private var tab: AppTab = .us
     @State private var showPanel = false
     @State private var activeSheet: ShellSheet?
+    @State private var pendingAction: PanelAction?
 
     @FetchRequest(
         sortDescriptors: [],
@@ -44,10 +45,15 @@ struct MainShell: View {
             bottomBar
         }
         .ignoresSafeArea(.keyboard)
-        .sheet(isPresented: $showPanel) {
-            ActionPanel(hasOngoing: ongoingMeetings.first != nil) { action in
-                showPanel = false
+        .sheet(isPresented: $showPanel, onDismiss: {
+            if let action = pendingAction {
+                pendingAction = nil
                 handle(action)
+            }
+        }) {
+            ActionPanel(hasOngoing: ongoingMeetings.first != nil) { action in
+                pendingAction = action
+                showPanel = false
             }
         }
         .sheet(item: $activeSheet) { sheet in
