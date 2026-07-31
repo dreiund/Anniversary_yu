@@ -64,4 +64,32 @@ final class PlanItemRepositoryTests: XCTestCase {
         try repo.delete(a)
         XCTAssertEqual(repo.stats(for: meeting).planned, 0)
     }
+
+    func testSectionsSortRuleLocksTimeAndTieBreak() throws {
+        // 第3层锁定：时间升序（故意先add晚的再add早的，验证排序不依赖add顺序）
+        let item1 = try repo.add(to: meeting, day: date(2026, 9, 1), time: date(2026, 9, 1, 19, 30),
+                                  title: "火锅", note: nil, placeText: nil, authorID: nil)
+        let item2 = try repo.add(to: meeting, day: date(2026, 9, 1), time: date(2026, 9, 1, 9, 0),
+                                  title: "早茶", note: nil, placeText: nil, authorID: nil)
+
+        // 第4层锁定：全天条目的 sortIndex tie-break
+        let item3 = try repo.add(to: meeting, day: date(2026, 9, 2), time: nil,
+                                  title: "A全天", note: nil, placeText: nil, authorID: nil)
+        let item4 = try repo.add(to: meeting, day: date(2026, 9, 2), time: nil,
+                                  title: "B全天", note: nil, placeText: nil, authorID: nil)
+
+        // sortIndex 赋值验证：第一条 add 的 item.sortIndex == 0，后续递增
+        XCTAssertEqual(item1.sortIndex, 0)
+        XCTAssertEqual(item2.sortIndex, 1)
+        XCTAssertEqual(item3.sortIndex, 2)
+        XCTAssertEqual(item4.sortIndex, 3)
+
+        let s = repo.sections(for: meeting, calendar: cal)
+
+        // 验证第3层：时间升序
+        XCTAssertEqual(s.dated[0].items.map(\.title), ["早茶", "火锅"])
+
+        // 验证第4层：全天条目按 sortIndex 排序
+        XCTAssertEqual(s.dated[1].items.map(\.title), ["A全天", "B全天"])
+    }
 }
