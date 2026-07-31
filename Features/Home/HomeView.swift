@@ -14,6 +14,7 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
+            let _ = moods.count  // 注册 FetchRequest 依赖：任何 CDDailyMood 变更触发本视图刷新
             if let couple {
                 VStack(alignment: .leading, spacing: DS.Spacing.md) {
                     header(couple)
@@ -117,8 +118,11 @@ struct HomeView: View {
     private func moodCard(_ couple: CDCouple) -> some View {
         let repo = CoupleRepository(context: context)
         let partners = repo.partners(of: couple)
-        let mine = DailyMoodRepository(context: context)
-            .mood(couple: couple, authorID: partners.first?.id, day: Date(), calendar: .current)
+        let moodRepo = DailyMoodRepository(context: context)
+        let mine = moodRepo.mood(couple: couple, authorID: partners.first?.id, day: Date(), calendar: .current)
+        let partnerMood = partners.count > 1
+            ? moodRepo.mood(couple: couple, authorID: partners[1].id, day: Date(), calendar: .current)
+            : nil
         return Button {
             showMoodSheet = true
         } label: {
@@ -132,9 +136,13 @@ struct HomeView: View {
                             .frame(width: 24, height: 24)
                             .overlay(Text("+").dsCaption())
                     }
+                    if let partnerEmoji = partnerMood?.moodEmoji {
+                        Text(partnerEmoji).font(.system(size: 18))
+                    }
                     Spacer()
-                    Text(partners.count > 1 ? "\(partners[1].name ?? "TA") 还没打卡" : "")
-                        .dsFootnote()
+                    if partners.count > 1, partnerMood == nil {
+                        Text("\(partners[1].name ?? "TA") 还没打卡").dsFootnote()
+                    }
                 }
             }
         }
