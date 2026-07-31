@@ -26,4 +26,12 @@ final class HomeLogicTests: XCTestCase {
         XCTAssertEqual(HomeLogic.daysToNextAnniversary(anniversary: anniversary, today: date(2026, 6, 9), calendar: cal), 0)
         XCTAssertEqual(HomeLogic.daysToNextAnniversary(anniversary: anniversary, today: date(2026, 6, 10), calendar: cal), 364)
     }
+
+    func testFeb29AnniversaryFallsBackToFeb28InNonLeapYears() {
+        let anniversary = date(2024, 2, 29)
+        XCTAssertEqual(HomeLogic.daysToNextAnniversary(anniversary: anniversary, today: date(2025, 2, 27), calendar: cal), 1)
+        XCTAssertEqual(HomeLogic.daysToNextAnniversary(anniversary: anniversary, today: date(2025, 2, 28), calendar: cal), 0)
+        XCTAssertEqual(HomeLogic.daysToNextAnniversary(anniversary: anniversary, today: date(2025, 3, 1), calendar: cal), 364)
+        XCTAssertEqual(HomeLogic.daysToNextAnniversary(anniversary: anniversary, today: date(2028, 2, 29), calendar: cal), 0)
+    }
 }
