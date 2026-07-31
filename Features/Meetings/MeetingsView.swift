@@ -45,11 +45,14 @@ struct MeetingsView: View {
     private func card(for meeting: CDMeeting) -> some View {
         switch MeetingStatus(rawValue: meeting.statusRaw) ?? .planned {
         case .planned:
-            plannedCard(meeting)
+            NavigationLink { PlanView(meeting: meeting) } label: { plannedCard(meeting) }
+                .buttonStyle(DSPressEffect())
         case .ongoing:
-            ongoingCard(meeting)
+            NavigationLink { MeetingDetailView(meeting: meeting) } label: { ongoingCard(meeting) }
+                .buttonStyle(DSPressEffect())
         case .finished:
-            finishedCard(meeting)
+            NavigationLink { MeetingDetailView(meeting: meeting) } label: { finishedCard(meeting) }
+                .buttonStyle(DSPressEffect())
         }
     }
 
