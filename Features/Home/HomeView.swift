@@ -41,6 +41,13 @@ struct HomeView: View {
                 }
             }
             Spacer()
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 16))
+                    .foregroundStyle(DS.inkMuted)
+            }
         }
     }
 
