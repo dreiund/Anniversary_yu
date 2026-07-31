@@ -58,8 +58,12 @@ struct MainShell: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .newMoment, .mood, .seal:
-                Text("动作占位 · 后续任务接线").dsCaption().padding()  // T9/T12/T13 替换
+            case .newMoment:
+                Text("记忆表单 · T12 接线").dsCaption().padding()
+            case .mood:
+                Text("心情打卡 · T9 接线").dsCaption().padding()
+            case .seal(let meeting):
+                SealSheet(meeting: meeting)
             }
         }
     }
