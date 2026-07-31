@@ -70,4 +70,33 @@ extension MeetingRepository {
             .filter { $0.closedAt == nil }
             .max { $0.dayIndex < $1.dayIndex }
     }
+
+    /// 新记录归属的约会日：有开着的天用之；否则新开 dayIndex = 已有最大值 + 1（首条即第 1 天）
+    @discardableResult
+    func dayForNewRecord(in meeting: CDMeeting, at date: Date) throws -> CDDateDay {
+        if let open = try openDay(in: meeting) { return open }
+        let maxIndex = ((meeting.dateDays as? Set<CDDateDay>) ?? [])
+            .map(\.dayIndex).max() ?? 0
+        let day = CDDateDay(context: context)
+        day.id = UUID()
+        day.dayIndex = maxIndex + 1
+        day.openedAt = date
+        day.meeting = meeting
+        try context.save()
+        return day
+    }
+
+    /// 开着的约会日已超过阈值（默认 18 小时）未封盘 → 返回该天（用于新建记录前的补封拦截）
+    func staleOpenDay(in meeting: CDMeeting, now: Date,
+                      threshold: TimeInterval = 18 * 3600) throws -> CDDateDay? {
+        guard let open = try openDay(in: meeting),
+              let openedAt = open.openedAt,
+              now.timeIntervalSince(openedAt) > threshold else { return nil }
+        return open
+    }
+
+    func daysSorted(in meeting: CDMeeting) throws -> [CDDateDay] {
+        ((meeting.dateDays as? Set<CDDateDay>) ?? [])
+            .sorted { $0.dayIndex < $1.dayIndex }
+    }
 }
