@@ -36,7 +36,7 @@ struct MainShell: View {
         VStack(spacing: 0) {
             ZStack {
                 switch tab {
-                case .us: NavigationStack { DSGallery() }          // T9 接入 HomeView
+                case .us: NavigationStack { HomeView() }
                 case .footprints: NavigationStack { MeetingsView() }
                 }
             }
@@ -61,7 +61,9 @@ struct MainShell: View {
             case .newMoment:
                 Text("记忆表单 · T12 接线").dsCaption().padding()
             case .mood:
-                Text("心情打卡 · T9 接线").dsCaption().padding()
+                if let couple = try? CoupleRepository(context: context).fetchCouple() {
+                    MoodSheet(couple: couple)
+                }
             case .seal(let meeting):
                 SealSheet(meeting: meeting)
             }
