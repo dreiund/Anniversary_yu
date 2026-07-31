@@ -7,6 +7,7 @@ struct MomentDetailView: View {
     @State private var viewerIndex: ViewerIndex?
     @State private var showEdit = false
     @State private var confirmDelete = false
+    @State private var deleteFailed = false
 
     var body: some View {
         let repo = MomentRepository(context: context)
@@ -89,9 +90,16 @@ struct MomentDetailView: View {
         .sheet(isPresented: $showEdit) { MomentFormView(mode: .edit(moment)) }
         .confirmationDialog("删除这条记忆？", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("删除", role: .destructive) {
-                try? MomentRepository(context: context).delete(moment)
-                dismiss()
+                do {
+                    try MomentRepository(context: context).delete(moment)
+                    dismiss()
+                } catch {
+                    deleteFailed = true
+                }
             }
+        }
+        .alert("删除失败，请重试", isPresented: $deleteFailed) {
+            Button("知道了", role: .cancel) {}
         }
     }
 
@@ -100,7 +108,7 @@ struct MomentDetailView: View {
         if let meeting = moment.dateDay?.meeting,
            let days = try? MeetingRepository(context: context).daysSorted(in: meeting),
            days.count > 1 {
-            Menu("移到别的约会日") {
+            Menu("移到其他日") {
                 ForEach(days, id: \.objectID) { day in
                     if day.objectID != moment.dateDay?.objectID {
                         Button("第 \(day.dayIndex) 天") {

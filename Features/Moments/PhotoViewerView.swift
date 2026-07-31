@@ -11,7 +11,8 @@ struct PhotoViewerView: View {
             TabView(selection: $index) {
                 ForEach(Array(photos.enumerated()), id: \.element.objectID) { i, photo in
                     Group {
-                        if let data = photo.imageData, let ui = UIImage(data: data) {
+                        if abs(i - index) <= 1,
+                           let data = photo.imageData, let ui = UIImage(data: data) {
                             Image(uiImage: ui).resizable().scaledToFit()
                         } else {
                             Color.black
