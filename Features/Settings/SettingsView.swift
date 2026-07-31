@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var myName = ""
     @State private var partnerName = ""
     @State private var anniversary = Date()
+    @State private var loadedAnniversary: Date?
 
     var body: some View {
         ScrollView {
@@ -31,8 +32,10 @@ struct SettingsView: View {
                                in: ...Date(), displayedComponents: .date)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .onChange(of: anniversary) { _, newValue in
+                            guard let baseline = loadedAnniversary, newValue != baseline else { return }
                             couples.first?.anniversaryDate = newValue
                             try? context.save()
+                            loadedAnniversary = newValue
                         }
                 }
 
@@ -60,6 +63,7 @@ struct SettingsView: View {
         myName = partners.first?.name ?? ""
         partnerName = partners.count > 1 ? (partners[1].name ?? "") : ""
         anniversary = couple.anniversaryDate ?? Date()
+        loadedAnniversary = anniversary
     }
 
     private func save() {
