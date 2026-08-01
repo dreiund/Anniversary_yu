@@ -1,0 +1,85 @@
+import CloudKit
+import CoreData
+
+/// 情侣空间唯一一次配对的全部 CKShare 操作。
+/// 策略：链接即可加入（publicPermission .readWrite），链接只经微信私发；
+/// 对方加入后由「锁定邀请」把 publicPermission 关为 .none——门先开、人进来、再锁门。
+@MainActor
+final class SharingManager: ObservableObject {
+    /// nonisolated：不可变字符串常量，不依赖任何隔离状态，configure 从 nonisolated 上下文读取它。
+    nonisolated static let shareTitle = "我们的纪念空间"
+
+    private let controller: PersistenceController
+    @Published private(set) var share: CKShare?
+    @Published private(set) var lastError: String?
+
+    init(controller: PersistenceController) {
+        self.controller = controller
+    }
+
+    var participantJoined: Bool { Self.participantJoined(in: share) }
+
+    /// 除 owner 外存在已接受的参与者
+    /// nonisolated：只读参数里的 share，不碰任何 @MainActor 隔离状态，
+    /// 单测需要在非 MainActor 的同步上下文里直接调用（见编译修复说明）。
+    nonisolated static func participantJoined(in share: CKShare?) -> Bool {
+        guard let share else { return false }
+        return share.participants.contains { $0.role != .owner && $0.acceptanceStatus == .accepted }
+    }
+
+    /// nonisolated：同上，只改参数里的 share 本身，不涉及实例状态。
+    nonisolated static func configure(_ share: CKShare) {
+        share[CKShare.SystemFieldKey.title] = shareTitle
+        share.publicPermission = .readWrite
+    }
+
+    func loadShare(for couple: CDCouple) async {
+        do {
+            let shares = try controller.container.fetchShares(matching: [couple.objectID])
+            share = shares[couple.objectID]
+        } catch {
+            lastError = "读取配对状态失败"
+        }
+    }
+
+    /// 已有 share 直接返回；没有则创建（couple 整树迁入共享 zone）、配置并持久化。
+    func ensureShare(for couple: CDCouple) async throws -> CKShare {
+        if let share { return share }
+        if let existing = try controller.container.fetchShares(matching: [couple.objectID])[couple.objectID] {
+            share = existing
+            return existing
+        }
+        let (_, newShare, _) = try await controller.container.share([couple], to: nil)
+        Self.configure(newShare)
+        if let store = controller.privateStore {
+            let persisted = try await controller.container.persistUpdatedShare(newShare, in: store)
+            share = persisted
+            return persisted
+        }
+        share = newShare
+        return newShare
+    }
+
+    /// 她加入后关门：新人无法再经链接加入，既有参与者不受影响。
+    func lockInvites() async {
+        guard let share, let store = controller.privateStore else { return }
+        share.publicPermission = .none
+        do {
+            self.share = try await controller.container.persistUpdatedShare(share, in: store)
+        } catch {
+            lastError = "锁定失败，请重试"
+        }
+    }
+
+    /// 受邀方 delegate 入口（T7）。接受后镜像自动把共享 zone 导入共享库，
+    /// RootView 的 couple FetchRequest 随之非空，界面自动进入主壳。
+    nonisolated static func accept(_ metadata: CKShare.Metadata) {
+        let controller = PersistenceController.shared
+        guard let sharedStore = controller.sharedStore else { return }
+        controller.container.acceptShareInvitations(from: [metadata], into: sharedStore) { _, error in
+            if let error {
+                print("接受邀请失败：\(error)")
+            }
+        }
+    }
+}
