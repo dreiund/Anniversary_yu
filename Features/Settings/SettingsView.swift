@@ -59,21 +59,21 @@ struct SettingsView: View {
 
     private func load() {
         guard let couple = couples.first else { return }
-        let partners = CoupleRepository(context: context).partners(of: couple)
-        myName = partners.first?.name ?? ""
-        partnerName = partners.count > 1 ? (partners[1].name ?? "") : ""
+        let repo = CoupleRepository(context: context)
+        myName = repo.currentPartner(of: couple)?.name ?? ""
+        partnerName = repo.otherPartner(of: couple)?.name ?? ""
         anniversary = couple.anniversaryDate ?? Date()
         loadedAnniversary = anniversary
     }
 
     private func save() {
         guard let couple = couples.first else { return }
-        let partners = CoupleRepository(context: context).partners(of: couple)
+        let repo = CoupleRepository(context: context)
         if !myName.trimmingCharacters(in: .whitespaces).isEmpty {
-            partners.first?.name = myName
+            repo.currentPartner(of: couple)?.name = myName
         }
-        if partners.count > 1, !partnerName.trimmingCharacters(in: .whitespaces).isEmpty {
-            partners[1].name = partnerName
+        if !partnerName.trimmingCharacters(in: .whitespaces).isEmpty {
+            repo.otherPartner(of: couple)?.name = partnerName
         }
         try? context.save()
     }

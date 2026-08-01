@@ -126,12 +126,13 @@ struct HomeView: View {
 
     private func moodCard(_ couple: CDCouple) -> some View {
         let repo = CoupleRepository(context: context)
-        let partners = repo.partners(of: couple)
+        let me = repo.currentPartner(of: couple)
+        let other = repo.otherPartner(of: couple)
         let moodRepo = DailyMoodRepository(context: context)
-        let mine = moodRepo.mood(couple: couple, authorID: partners.first?.id, day: Date(), calendar: .current)
-        let partnerMood = partners.count > 1
-            ? moodRepo.mood(couple: couple, authorID: partners[1].id, day: Date(), calendar: .current)
-            : nil
+        let mine = moodRepo.mood(couple: couple, authorID: me?.id, day: Date(), calendar: .current)
+        let partnerMood = other.flatMap {
+            moodRepo.mood(couple: couple, authorID: $0.id, day: Date(), calendar: .current)
+        }
         return Button {
             showMoodSheet = true
         } label: {
@@ -149,8 +150,8 @@ struct HomeView: View {
                         Text(partnerEmoji).font(.system(size: 18))
                     }
                     Spacer()
-                    if partners.count > 1, partnerMood == nil {
-                        Text("\(partners[1].name ?? "TA") 还没打卡").dsFootnote()
+                    if let other, partnerMood == nil {
+                        Text("\(other.name ?? "TA") 还没打卡").dsFootnote()
                     }
                 }
             }

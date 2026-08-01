@@ -13,9 +13,12 @@ struct MomentDetailView: View {
         let repo = MomentRepository(context: context)
         let photos = repo.photosSorted(moment)
         let couples = CoupleRepository(context: context)
-        let partners = (try? couples.fetchCouple()).map { couples.partners(of: $0) } ?? []
-        let myEval = partners.first.flatMap { repo.evaluation(of: moment, by: $0.id) }
-        let partnerName = partners.count > 1 ? (partners[1].name ?? "TA") : "TA"
+        let couple = try? couples.fetchCouple()
+        let me = couple.flatMap { couples.currentPartner(of: $0) }
+        let other = couple.flatMap { couples.otherPartner(of: $0) }
+        let myEval = me.flatMap { repo.evaluation(of: moment, by: $0.id) }
+        let otherEval = other.flatMap { repo.evaluation(of: moment, by: $0.id) }
+        let partnerName = other?.name ?? "TA"
 
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.md) {
@@ -60,7 +63,18 @@ struct MomentDetailView: View {
                             Text("你还没写评价").dsCaption()
                         }
                         DS.hairline.frame(height: 1)
-                        Text("\(partnerName) · 还没写（P2 同步后她可以补上）").dsFootnote()
+                        if let otherEval {
+                            HStack(spacing: 6) {
+                                Text(partnerName).dsCaption()
+                                StarsView(stars: Int(otherEval.stars))
+                                if let emoji = otherEval.moodEmoji { Text(emoji) }
+                            }
+                            if let comment = otherEval.comment, !comment.isEmpty {
+                                Text("“\(comment)”").dsBody()
+                            }
+                        } else {
+                            Text("\(partnerName) · 还没写").dsCaption()
+                        }
                     }
                 }
 

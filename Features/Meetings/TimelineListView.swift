@@ -69,9 +69,12 @@ struct TimelineListView: View {
 
     private func momentCard(_ moment: CDMoment, repo: MomentRepository) -> some View {
         let couples = CoupleRepository(context: context)
-        let partners = (try? couples.fetchCouple()).map { couples.partners(of: $0) } ?? []
-        let myEval = partners.first.flatMap { repo.evaluation(of: moment, by: $0.id) }
-        let partnerName = partners.count > 1 ? (partners[1].name ?? "TA") : "TA"
+        let couple = try? couples.fetchCouple()
+        let me = couple.flatMap { couples.currentPartner(of: $0) }
+        let other = couple.flatMap { couples.otherPartner(of: $0) }
+        let myEval = me.flatMap { repo.evaluation(of: moment, by: $0.id) }
+        let otherEval = other.flatMap { repo.evaluation(of: moment, by: $0.id) }
+        let partnerName = other?.name ?? "TA"
         let thumb = repo.photosSorted(moment).first?.thumbnailData
 
         return VStack(alignment: .leading, spacing: 6) {
@@ -99,7 +102,17 @@ struct TimelineListView: View {
                         }
                     }
                 }
-                Text("\(partnerName) · 还没写").dsFootnote()
+                if let otherEval {
+                    HStack(spacing: 4) {
+                        Text(partnerName).dsFootnote()
+                        StarsView(stars: Int(otherEval.stars))
+                        if let comment = otherEval.comment, !comment.isEmpty {
+                            Text("“\(comment)”").font(.system(size: 12)).foregroundStyle(DS.ink).lineLimit(2)
+                        }
+                    }
+                } else {
+                    Text("\(partnerName) · 还没写").dsFootnote()
+                }
             }
         }
         .padding(.bottom, 4)
