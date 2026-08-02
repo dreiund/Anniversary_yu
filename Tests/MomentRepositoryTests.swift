@@ -100,4 +100,31 @@ final class MomentRepositoryTests: XCTestCase {
         XCTAssertEqual(moments.evaluation(of: moment, by: her)?.stars, 5)
         XCTAssertEqual(moments.evaluation(of: moment, by: her)?.comment, "改口，超好吃")
     }
+
+    func testEvaluationLookupDeterministicWhenDuplicated() throws {
+        let pc = PersistenceController(inMemory: true)
+        let ctx = pc.viewContext
+        let couple = try CoupleRepository(context: ctx)
+            .bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
+        let meetings = MeetingRepository(context: ctx)
+        let meeting = try meetings.createPlanned(couple: couple, title: nil, city: nil, plannedStart: nil, plannedEnd: nil)
+        try meetings.start(meeting, at: Date())
+        let repo = MomentRepository(context: ctx)
+        let moment = try repo.create(in: meeting, type: .restaurant, title: "馆子", body: nil,
+                                     happenedAt: Date(), photoDatas: [], myEvaluation: nil,
+                                     authorID: nil, place: nil)
+        let author = UUID()
+        let idA = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000000")!
+        let idB = UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000000")!
+        for (uuid, stars) in [(idB, Int16(2)), (idA, Int16(4))] {
+            let ev = CDEvaluation(context: ctx)
+            ev.id = uuid
+            ev.authorPartnerID = author
+            ev.stars = stars
+            ev.moment = moment
+        }
+        try ctx.save()
+        let found = repo.evaluation(of: moment, by: author)
+        XCTAssertEqual(found?.id, idA, "重复时必须取 id 字典序最小的一条，两端一致")
+    }
 }

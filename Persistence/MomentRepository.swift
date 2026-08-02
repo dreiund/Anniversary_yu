@@ -83,8 +83,12 @@ struct MomentRepository {
     }
 
     func evaluation(of moment: CDMoment, by authorID: UUID?) -> CDEvaluation? {
+        // CloudKit 禁 unique 约束，双端并发补评可产生同 (moment, author) 短暂重复；
+        // 按 id 字典序取首条，保证两端渲染与 upsert 存在判定选择一致（同 T5 mood 惯用法）。
         ((moment.evaluations as? Set<CDEvaluation>) ?? [])
-            .first { $0.authorPartnerID == authorID }
+            .filter { $0.authorPartnerID == authorID }
+            .sorted { ($0.id?.uuidString ?? "") < ($1.id?.uuidString ?? "") }
+            .first
     }
 
     /// 补评/改评的唯一写入口：同 (moment, author) 存在则更新，否则创建。
