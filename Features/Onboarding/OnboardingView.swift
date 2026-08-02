@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var partnerName = ""
     @State private var anniversary = Date()
     @State private var createError: String?
+    @State private var showAcceptGuide = false
 
     private var canCreate: Bool {
         !myName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -71,10 +72,46 @@ struct OnboardingView: View {
                         .foregroundStyle(DS.dsRed)
                 }
 
-                Text("P2 阶段这里会出现「接受 TA 的邀请」").dsFootnote()
+                Button("接受邀请") { showAcceptGuide = true }
+                    .buttonStyle(GhostPillButtonStyle())
+
+                Text("TA 已经创建过空间？别再新建，用上面的接受邀请加入。")
+                    .dsFootnote()
+                    .multilineTextAlignment(.center)
             }
             .padding(DS.Spacing.md)
         }
+        .background(DS.canvas)
+        .sheet(isPresented: $showAcceptGuide) { AcceptInviteGuideSheet() }
+    }
+}
+
+/// 接受方指引：接受动作本身由系统链接驱动（SceneDelegate），
+/// 本页只负责讲清步骤并陪伴等待；共享数据一到、RootView 自动切主界面。
+private struct AcceptInviteGuideSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+
+    var body: some View {
+        VStack(spacing: DS.Spacing.lg) {
+            let _ = couples.count  // 注册观察：共享空间导入后本 sheet 随 RootView 一起被替换
+            Capsule().fill(DS.chipBorder).frame(width: 36, height: 5).padding(.top, 8)
+            Text("加入 TA 的空间").dsPageTitle()
+            VStack(alignment: .leading, spacing: 10) {
+                Text("1. 让 TA 打开 App 设置 → 配对与同步，点「发出邀请」发给你").dsBody()
+                Text("2. 在微信里点开那条链接，选择用本 App 打开").dsBody()
+                Text("3. 回到这里稍等片刻，空间同步完成会自动进入").dsBody()
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            ProgressView()
+            Text("等链接点开后，这里会自动完成").dsFootnote()
+            Spacer()
+            Button("知道了") { dismiss() }
+                .buttonStyle(BluePillButtonStyle(fullWidth: true))
+                .padding(.horizontal, DS.Spacing.md)
+        }
+        .padding(.bottom, DS.Spacing.lg)
+        .presentationDetents([.medium])
         .background(DS.canvas)
     }
 }
