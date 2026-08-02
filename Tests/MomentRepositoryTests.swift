@@ -81,4 +81,23 @@ final class MomentRepositoryTests: XCTestCase {
         try moments.delete(a)
         XCTAssertEqual(moments.daysWithMoments(in: meeting)[0].moments.map(\.title), ["B"])
     }
+
+    func testUpsertEvaluationCreatesThenUpdates() throws {
+        let moment = try moments.create(in: meeting, type: .restaurant, title: "小馆子", body: nil,
+                                        happenedAt: Date(), photoDatas: [], myEvaluation: nil,
+                                        authorID: nil, place: nil)
+        let her = UUID()
+
+        let created = try moments.upsertEvaluation(on: moment, by: her,
+                                                   NewEvaluation(stars: 4, moodEmoji: "😊", comment: "好吃"))
+        XCTAssertEqual(moments.evaluation(of: moment, by: her)?.objectID, created.objectID)
+        XCTAssertEqual(created.stars, 4)
+
+        let updated = try moments.upsertEvaluation(on: moment, by: her,
+                                                   NewEvaluation(stars: 5, moodEmoji: "🥰", comment: "改口，超好吃"))
+        XCTAssertEqual(updated.objectID, created.objectID, "同作者第二次写入必须是更新不是新建")
+        XCTAssertEqual(((moment.evaluations as? Set<CDEvaluation>) ?? []).count, 1)
+        XCTAssertEqual(moments.evaluation(of: moment, by: her)?.stars, 5)
+        XCTAssertEqual(moments.evaluation(of: moment, by: her)?.comment, "改口，超好吃")
+    }
 }

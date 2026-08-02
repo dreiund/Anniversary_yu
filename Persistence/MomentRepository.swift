@@ -86,4 +86,23 @@ struct MomentRepository {
         ((moment.evaluations as? Set<CDEvaluation>) ?? [])
             .first { $0.authorPartnerID == authorID }
     }
+
+    /// 补评/改评的唯一写入口：同 (moment, author) 存在则更新，否则创建。
+    @discardableResult
+    func upsertEvaluation(on moment: CDMoment, by authorID: UUID?, _ new: NewEvaluation) throws -> CDEvaluation {
+        let evaluation: CDEvaluation
+        if let existing = self.evaluation(of: moment, by: authorID) {
+            evaluation = existing
+        } else {
+            evaluation = CDEvaluation(context: context)
+            evaluation.id = UUID()
+            evaluation.authorPartnerID = authorID
+            evaluation.moment = moment
+        }
+        evaluation.stars = new.stars
+        evaluation.moodEmoji = new.moodEmoji
+        evaluation.comment = new.comment
+        try context.save()
+        return evaluation
+    }
 }

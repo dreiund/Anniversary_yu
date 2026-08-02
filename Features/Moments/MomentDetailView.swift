@@ -6,6 +6,7 @@ struct MomentDetailView: View {
     let moment: CDMoment
     @State private var viewerIndex: ViewerIndex?
     @State private var showEdit = false
+    @State private var showEvalForm = false
     @State private var confirmDelete = false
     @State private var deleteFailed = false
 
@@ -60,7 +61,8 @@ struct MomentDetailView: View {
                                 Text("“\(comment)”").dsBody()
                             }
                         } else {
-                            Text("你还没写评价").dsCaption()
+                            Button("补上评价") { showEvalForm = true }
+                                .buttonStyle(GhostPillButtonStyle())
                         }
                         DS.hairline.frame(height: 1)
                         if let otherEval {
@@ -102,6 +104,7 @@ struct MomentDetailView: View {
             PhotoViewerView(photos: photos, index: index.id)
         }
         .sheet(isPresented: $showEdit) { MomentFormView(mode: .edit(moment)) }
+        .sheet(isPresented: $showEvalForm) { EvaluationFormSheet(moment: moment) }
         .confirmationDialog("删除这条记忆？", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("删除", role: .destructive) {
                 do {
