@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreData
+import CloudKit
 
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var context
@@ -10,15 +11,26 @@ struct HomeView: View {
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>
     @FetchRequest(sortDescriptors: []) private var dateDays: FetchedResults<CDDateDay>
     @FetchRequest(sortDescriptors: []) private var planItems: FetchedResults<CDPlanItem>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDMoment.happenedAt, order: .reverse)])
+    private var momentsAll: FetchedResults<CDMoment>
+    @State private var accountAvailable = true
     @State private var showMoodSheet = false
 
     private var couple: CDCouple? { couples.first }
 
     var body: some View {
         ScrollView {
-            let _ = (moods.count, dateDays.count, planItems.count)  // 注册观察：心情/约会日/计划项变更均刷新首页
+            let _ = (moods.count, dateDays.count, planItems.count, momentsAll.count)  // 注册观察：心情/约会日/计划项/记忆（含对方同步进来的）变更均刷新首页
             if let couple {
                 VStack(alignment: .leading, spacing: DS.Spacing.md) {
+                    if !accountAvailable {
+                        ParchmentCard {
+                            HStack(spacing: 8) {
+                                Circle().fill(DS.dsRed).frame(width: 6, height: 6)
+                                Text("同步已暂停 · 登录 iCloud 后自动恢复").dsCaption()
+                            }
+                        }
+                    }
                     header(couple)
                     hero(couple)
                     statusCard(couple)
@@ -29,6 +41,10 @@ struct HomeView: View {
             }
         }
         .background(DS.canvas)
+        .task { await refreshAccountStatus() }
+        .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
+            Task { await refreshAccountStatus() }
+        }
         .sheet(isPresented: $showMoodSheet) {
             if let couple { MoodSheet(couple: couple) }
         }
@@ -161,23 +177,44 @@ struct HomeView: View {
 
     @ViewBuilder
     private func reminders(_ couple: CDCouple) -> some View {
-        let repo = MeetingRepository(context: context)
+        let meetingRepo = MeetingRepository(context: context)
+        let momentRepo = MomentRepository(context: context)
         let ongoing = meetings.first { $0.statusRaw == MeetingStatus.ongoing.rawValue }
-        let stale = ongoing.flatMap { try? repo.staleOpenDay(in: $0, now: Date()) } ?? nil
+        let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date()) } ?? nil
+        let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
+        let pendingEvals = Array(momentsAll.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
 
         Text("提醒").dsSectionTitle()
         GroupedSection {
-            if let ongoing, stale != nil {
-                NavigationLink {
-                    MeetingDetailView(meeting: ongoing)
-                } label: {
-                    GroupedRow(title: "昨天忘了封盘？", value: "去封盘 ›",
-                               valueColor: DS.actionBlue, showsDivider: false)
-                }
-                .buttonStyle(.plain)
-            } else {
+            if stale == nil && pendingEvals.isEmpty {
                 GroupedRow(title: "一切都好", value: "去足迹翻翻回忆 ›", showsDivider: false)
+            } else {
+                if let ongoing, stale != nil {
+                    NavigationLink {
+                        MeetingDetailView(meeting: ongoing)
+                    } label: {
+                        GroupedRow(title: "昨天忘了封盘？", value: "去封盘 ›",
+                                   valueColor: DS.actionBlue, showsDivider: !pendingEvals.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                }
+                ForEach(Array(pendingEvals.enumerated()), id: \.element.objectID) { i, moment in
+                    NavigationLink {
+                        MomentDetailView(moment: moment)
+                    } label: {
+                        GroupedRow(title: "「\(moment.title ?? "新回忆")」还没写你的评价",
+                                   value: "去补评 ›", valueColor: DS.actionBlue,
+                                   showsDivider: i < pendingEvals.count - 1)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
+    }
+
+    @MainActor
+    private func refreshAccountStatus() async {
+        let status = try? await CKContainer(identifier: PersistenceController.cloudContainerID).accountStatus()
+        accountAvailable = status == .available
     }
 }
