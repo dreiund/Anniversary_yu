@@ -18,6 +18,9 @@ final class HistoryMonitor {
     /// 在 monitor 的后台 context 队列内被调用，实现只能用传入的 context 取数
     private let myPartnerID: (NSManagedObjectContext) -> UUID?
     private var observer: NSObjectProtocol?
+    /// 串行化 processChanges：远程变更通知可能从多线程并发投递，
+    /// 无互斥时两次调用会在彼此存 token 前读到同一批事务 → 重复通知（WWDC19 官方模式）。
+    private let processQueue = DispatchQueue(label: "HistoryMonitor.process")
 
     init(container: NSPersistentContainer, localAuthor: String, notifier: MomentNotifying,
          defaults: UserDefaults = .standard,
@@ -43,32 +46,34 @@ final class HistoryMonitor {
     }
 
     func processChanges() {
-        let context = container.newBackgroundContext()
-        context.performAndWait {
-            let request = NSPersistentHistoryChangeRequest.fetchHistory(after: loadToken())
-            request.resultType = .transactionsAndChanges
-            guard let result = try? context.execute(request) as? NSPersistentHistoryResult,
-                  let transactions = result.result as? [NSPersistentHistoryTransaction],
-                  !transactions.isEmpty else { return }
+        processQueue.sync {
+            let context = container.newBackgroundContext()
+            context.performAndWait {
+                let request = NSPersistentHistoryChangeRequest.fetchHistory(after: loadToken())
+                request.resultType = .transactionsAndChanges
+                guard let result = try? context.execute(request) as? NSPersistentHistoryResult,
+                      let transactions = result.result as? [NSPersistentHistoryTransaction],
+                      !transactions.isEmpty else { return }
 
-            var insertedMomentIDs: [NSManagedObjectID] = []
-            for transaction in transactions where transaction.author != localAuthor {
-                for change in transaction.changes ?? []
-                where change.changeType == .insert && change.changedObjectID.entity.name == "CDMoment" {
-                    insertedMomentIDs.append(change.changedObjectID)
+                var insertedMomentIDs: [NSManagedObjectID] = []
+                for transaction in transactions where transaction.author != localAuthor {
+                    for change in transaction.changes ?? []
+                    where change.changeType == .insert && change.changedObjectID.entity.name == "CDMoment" {
+                        insertedMomentIDs.append(change.changedObjectID)
+                    }
                 }
-            }
-            if let last = transactions.last { saveToken(last.token) }
+                if let last = transactions.last { saveToken(last.token) }
 
-            guard isEnabled(), !insertedMomentIDs.isEmpty else { return }
-            let me = myPartnerID(context)
-            let titles: [String] = insertedMomentIDs.compactMap { id in
-                guard let moment = try? context.existingObject(with: id) as? CDMoment else { return nil }
-                if let me, moment.authorPartnerID == me { return nil }  // 自己另一台设备写的不提醒
-                return moment.title ?? "新回忆"
-            }
-            if !titles.isEmpty {
-                notifier.notifyNewMoments(titles: titles)
+                guard isEnabled(), !insertedMomentIDs.isEmpty else { return }
+                let me = myPartnerID(context)
+                let titles: [String] = insertedMomentIDs.compactMap { id in
+                    guard let moment = try? context.existingObject(with: id) as? CDMoment else { return nil }
+                    if let me, moment.authorPartnerID == me { return nil }  // 自己另一台设备写的不提醒
+                    return moment.title ?? "新回忆"
+                }
+                if !titles.isEmpty {
+                    notifier.notifyNewMoments(titles: titles)
+                }
             }
         }
     }
