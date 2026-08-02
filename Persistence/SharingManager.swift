@@ -46,6 +46,15 @@ final class SharingManager: ObservableObject {
     func ensureShare(for couple: CDCouple) async throws -> CKShare {
         if let share { return share }
         if let existing = try controller.container.fetchShares(matching: [couple.objectID])[couple.objectID] {
+            // 上次建 share 后 persist 失败的遗留：无参与者却是 .none → 补一次配置。
+            // （正常锁定后的 share 同为 .none 但已有参与者，不能重开。）
+            if existing.publicPermission == .none, !Self.participantJoined(in: existing),
+               let store = controller.privateStore {
+                Self.configure(existing)
+                let persisted = try await controller.container.persistUpdatedShare(existing, in: store)
+                share = persisted
+                return persisted
+            }
             share = existing
             return existing
         }
@@ -63,10 +72,12 @@ final class SharingManager: ObservableObject {
     /// 她加入后关门：新人无法再经链接加入，既有参与者不受影响。
     func lockInvites() async {
         guard let share, let store = controller.privateStore else { return }
+        let original = share.publicPermission
         share.publicPermission = .none
         do {
             self.share = try await controller.container.persistUpdatedShare(share, in: store)
         } catch {
+            share.publicPermission = original  // 回滚：云端未锁成，本地不得谎报已锁
             lastError = "锁定失败，请重试"
         }
     }
