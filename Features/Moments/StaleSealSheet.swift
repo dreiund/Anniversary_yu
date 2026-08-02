@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StaleSealSheet: View {
+    @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     let day: CDDateDay
     let onConfirm: (Date) -> Void
@@ -15,6 +16,7 @@ struct StaleSealSheet: View {
                 .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
             Button("补封并继续") {
                 onConfirm(sealTime)
+                SealReminder.refresh(context: context)
                 dismiss()
             }
             .buttonStyle(BluePillButtonStyle(fullWidth: true))

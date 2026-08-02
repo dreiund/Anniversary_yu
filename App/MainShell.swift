@@ -74,6 +74,9 @@ struct MainShell: View {
         } message: {
             Text("去足迹页开始一次见面，再来记录。")
         }
+        .onAppear {
+            SealReminder.refresh(context: context)
+        }
     }
 
     private func handle(_ action: PanelAction) {

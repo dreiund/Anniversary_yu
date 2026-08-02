@@ -45,6 +45,7 @@ struct MeetingDetailView: View {
                             isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("结束见面", role: .destructive) {
                 try? MeetingRepository(context: context).end(meeting, at: Date())
+                SealReminder.refresh(context: context)
             }
         }
     }

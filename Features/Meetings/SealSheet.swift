@@ -15,6 +15,7 @@ struct SealSheet: View {
                 .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
             Button("确认封盘") {
                 try? MeetingRepository(context: context).sealOpenDay(in: meeting, at: sealTime)
+                SealReminder.refresh(context: context)
                 dismiss()
             }
             .buttonStyle(BluePillButtonStyle(fullWidth: true))

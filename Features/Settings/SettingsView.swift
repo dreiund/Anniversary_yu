@@ -4,6 +4,8 @@ import CloudKit
 struct SettingsView: View {
     @Environment(\.managedObjectContext) private var context
     @AppStorage("showCountdown") private var showCountdown = true
+    @AppStorage("sealReminderOn") private var sealReminderOn = true
+    @AppStorage("newMomentAlertOn") private var newMomentAlertOn = true
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var partnerName = ""
@@ -46,6 +48,18 @@ struct SettingsView: View {
                 Text("显示").dsSectionTitle()
                 GroupedSection {
                     Toggle("首页倒计时", isOn: $showCountdown)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                }
+
+                Text("通知").dsSectionTitle()
+                GroupedSection {
+                    Toggle("封盘提醒", isOn: $sealReminderOn)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .onChange(of: sealReminderOn) { _, _ in
+                            SealReminder.refresh(context: context)
+                        }
+                    DS.hairline.frame(height: 1).padding(.leading, 14)
+                    Toggle("新记忆提醒", isOn: $newMomentAlertOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
 

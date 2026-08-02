@@ -214,6 +214,7 @@ struct MomentFormView: View {
             body: bodyText.isEmpty ? nil : bodyText,
             happenedAt: happenedAt, photoDatas: photoDatas,
             myEvaluation: evaluation, authorID: authorID, place: place)
+        SealReminder.refresh(context: context)
         dismiss()
     }
 }
