@@ -83,7 +83,6 @@ struct TimelineListView: View {
                     .resizable().scaledToFill()
                     .frame(maxWidth: .infinity).frame(height: 200)
                     .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
-                    .dsPhotoShadow()
             }
             HStack {
                 Text(moment.title ?? "").font(.system(size: 17, weight: .semibold)).foregroundStyle(DS.ink)
@@ -115,6 +114,8 @@ struct TimelineListView: View {
                 }
             }
         }
-        .padding(.bottom, 4)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
     }
 }

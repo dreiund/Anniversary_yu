@@ -30,7 +30,7 @@ struct MeetingDetailView: View {
                 PlanView(meeting: meeting)
             }
         }
-        .background(DS.canvas)
+        .background(DS.parchment)
         .navigationTitle(meeting.title ?? meeting.city ?? "见面")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
