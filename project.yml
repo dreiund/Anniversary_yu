@@ -25,6 +25,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Anniversary
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSLocationWhenInUseUsageDescription: 用于给记忆自动记录当前位置
