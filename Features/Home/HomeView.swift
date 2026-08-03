@@ -11,7 +11,14 @@ struct HomeView: View {
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>
     @FetchRequest(sortDescriptors: []) private var dateDays: FetchedResults<CDDateDay>
     @FetchRequest(sortDescriptors: []) private var planItems: FetchedResults<CDPlanItem>
-    @FetchRequest(sortDescriptors: [SortDescriptor(\CDMoment.happenedAt, order: .reverse)])
+    @FetchRequest(fetchRequest: {
+        // 提醒区只关心最近的待补评：限量 50 条按时间倒序，年深日久也不全表扫描；
+        // 更久远的未评价记忆不再入提醒（补评提醒本就该关注近期）。
+        let request = NSFetchRequest<CDMoment>(entityName: "CDMoment")
+        request.sortDescriptors = [NSSortDescriptor(key: "happenedAt", ascending: false)]
+        request.fetchLimit = 50
+        return request
+    }())
     private var momentsAll: FetchedResults<CDMoment>
     @State private var accountAvailable = true
     @State private var showMoodSheet = false
@@ -182,7 +189,7 @@ struct HomeView: View {
         let ongoing = meetings.first { $0.statusRaw == MeetingStatus.ongoing.rawValue }
         let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date()) } ?? nil
         let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
-        let pendingEvals = Array(momentsAll.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
+        let pendingEvals = Array(momentsAll.lazy.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
 
         Text("提醒").dsSectionTitle()
         GroupedSection {
