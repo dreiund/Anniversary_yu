@@ -10,11 +10,12 @@ struct EvaluationFormSheet: View {
     @State private var moodEmoji: String?
     @State private var comment = ""
     @State private var saveFailed = false
+    @State private var loaded = false
 
     var body: some View {
         VStack(spacing: DS.Spacing.lg) {
             Capsule().fill(DS.chipBorder).frame(width: 36, height: 5).padding(.top, 8)
-            Text("补上我的评价").dsPageTitle()
+            Text("我的评价").dsPageTitle()
             ParchmentCard {
                 VStack(alignment: .leading, spacing: 12) {
                     StarInputView(stars: $stars)
@@ -44,6 +45,18 @@ struct EvaluationFormSheet: View {
                 Text("保存失败，请重试").font(.system(size: 13)).foregroundStyle(DS.dsRed)
             }
             Spacer()
+        }
+        .onAppear {
+            guard !loaded else { return }
+            loaded = true
+            let couples = CoupleRepository(context: context)
+            if let couple = try? couples.fetchCouple(),
+               let existing = MomentRepository(context: context)
+                   .evaluation(of: moment, by: couples.currentPartnerID(of: couple)) {
+                stars = Int(existing.stars)
+                moodEmoji = existing.moodEmoji
+                comment = existing.comment ?? ""
+            }
         }
         .presentationDetents([.medium])
         .background(DS.canvas)

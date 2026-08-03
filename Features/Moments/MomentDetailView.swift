@@ -3,7 +3,7 @@ import SwiftUI
 struct MomentDetailView: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
-    let moment: CDMoment
+    @ObservedObject var moment: CDMoment
     @State private var viewerIndex: ViewerIndex?
     @State private var showEdit = false
     @State private var showEvalForm = false
@@ -58,8 +58,12 @@ struct MomentDetailView: View {
                                 if let emoji = myEval.moodEmoji { Text(emoji) }
                             }
                             if let comment = myEval.comment {
-                                Text("“\(comment)”").dsBody()
+                                Text("\u{201c}\(comment)\u{201d}").dsBody()
                             }
+                            Button("改我的评价") { showEvalForm = true }
+                                .font(.system(size: 13))
+                                .foregroundStyle(DS.actionBlue)
+                                .buttonStyle(.plain)
                         } else {
                             Button("补上评价") { showEvalForm = true }
                                 .buttonStyle(GhostPillButtonStyle())
@@ -72,7 +76,7 @@ struct MomentDetailView: View {
                                 if let emoji = otherEval.moodEmoji { Text(emoji) }
                             }
                             if let comment = otherEval.comment, !comment.isEmpty {
-                                Text("“\(comment)”").dsBody()
+                                Text("\u{201c}\(comment)\u{201d}").dsBody()
                             }
                         } else {
                             Text("\(partnerName) · 还没写").dsCaption()
