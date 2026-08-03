@@ -22,7 +22,6 @@ struct MomentFormView: View {
     @State private var comment = ""
     @State private var locationName = ""
     @State private var coords: (Double, Double)?
-    @State private var locating = false
     @State private var staleDay: CDDateDay?
     @State private var showPlacePicker = false
     @State private var existingPhotos: [CDPhoto] = []
@@ -205,6 +204,11 @@ struct MomentFormView: View {
                     .foregroundStyle(DS.actionBlue)
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
+            if coords != nil {
+                Text("已带坐标 · 换店请重新选点")
+                    .dsFootnote()
+                    .padding(.horizontal, 14).padding(.bottom, 9)
+            }
         }
     }
 
