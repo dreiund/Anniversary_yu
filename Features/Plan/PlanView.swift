@@ -54,7 +54,7 @@ struct PlanView: View {
             .padding(DS.Spacing.md)
             .padding(.bottom, 80)
         }
-        .background(DS.canvas)
+        .background(DS.parchment)
         .navigationTitle("行前计划")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
