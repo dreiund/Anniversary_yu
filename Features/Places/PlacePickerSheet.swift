@@ -20,6 +20,7 @@ struct PlacePickerSheet: View {
     @State private var query = ""
     @State private var results: [MKMapItem] = []
     @State private var locating = false
+    @State private var visibleRegion: MKCoordinateRegion?
 
     var body: some View {
         NavigationStack {
@@ -33,6 +34,9 @@ struct PlacePickerSheet: View {
                 .onTapGesture { point in
                     guard let coord = proxy.convert(point, from: .local) else { return }
                     drop(at: coord, fillNameIfEmpty: true)
+                }
+                .onMapCameraChange { context in
+                    visibleRegion = context.region
                 }
             }
             .overlay(alignment: .top) { searchOverlay }
@@ -138,7 +142,11 @@ struct PlacePickerSheet: View {
             let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
             if let mark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
                 let suggested = [mark.name, mark.locality].compactMap { $0 }.joined(separator: " · ")
-                if name.trimmingCharacters(in: .whitespaces).isEmpty { name = suggested }
+                // 反查是异步的：回来时若 pin 已移到别处，这个结果就过期了，丢弃
+                guard let current = pin,
+                      current.latitude == coord.latitude, current.longitude == coord.longitude,
+                      name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                name = suggested
             }
         }
     }
@@ -153,6 +161,9 @@ struct PlacePickerSheet: View {
         guard !trimmed.isEmpty else { return }
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = trimmed
+        if let visibleRegion {
+            request.region = visibleRegion
+        }
         Task {
             let response = try? await MKLocalSearch(request: request).start()
             results = response?.mapItems ?? []
