@@ -255,7 +255,7 @@ struct MomentFormView: View {
         if !locationName.trimmingCharacters(in: .whitespaces).isEmpty, let couple {
             let p = CDPlace(context: context)
             p.id = UUID()
-            p.name = locationName
+            p.name = locationName.trimmingCharacters(in: .whitespaces)
             p.latitude = coords?.0 ?? 0
             p.longitude = coords?.1 ?? 0
             p.createdAt = Date()

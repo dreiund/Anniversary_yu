@@ -6,6 +6,7 @@ struct TimelineListView: View {
     let meeting: CDMeeting
     @FetchRequest private var momentsFetch: FetchedResults<CDMoment>
     @FetchRequest private var daysFetch: FetchedResults<CDDateDay>
+    @FetchRequest private var evalsFetch: FetchedResults<CDEvaluation>
     @State private var showSeal = false
 
     init(meeting: CDMeeting) {
@@ -14,10 +15,12 @@ struct TimelineListView: View {
                                      predicate: NSPredicate(format: "dateDay.meeting == %@", meeting))
         _daysFetch = FetchRequest(sortDescriptors: [],
                                   predicate: NSPredicate(format: "meeting == %@", meeting))
+        _evalsFetch = FetchRequest(sortDescriptors: [],
+                                   predicate: NSPredicate(format: "moment.dateDay.meeting == %@", meeting))
     }
 
     var body: some View {
-        let _ = (momentsFetch.count, daysFetch.count)  // 注册观察：记忆与约会日（封盘）变更均刷新时间线
+        let _ = (momentsFetch.count, daysFetch.count, evalsFetch.count)  // 注册观察：记忆/约会日（封盘）/评价（含对方补评与修改）变更均刷新时间线
         let momentsRepo = MomentRepository(context: context)
         let grouped = momentsRepo.daysWithMoments(in: meeting)
 
