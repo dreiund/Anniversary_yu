@@ -3,6 +3,8 @@ import SwiftUI
 struct MomentDetailView: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
+    /// 观察 moment 自身属性与关系变化（移动到其他日、照片增删、换地点会触发）。
+    /// 评价对象自身属性的更新不走此通道——依赖本页各 sheet 收起时的 @State 变化重算 body；跨设备远程更新的实时刷新延后 P6。
     @ObservedObject var moment: CDMoment
     @State private var viewerIndex: ViewerIndex?
     @State private var showEdit = false
