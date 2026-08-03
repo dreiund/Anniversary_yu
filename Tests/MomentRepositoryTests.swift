@@ -127,4 +127,51 @@ final class MomentRepositoryTests: XCTestCase {
         let found = repo.evaluation(of: moment, by: author)
         XCTAssertEqual(found?.id, idA, "重复时必须取 id 字典序最小的一条，两端一致")
     }
+
+    func testAddPhotosAppendsAfterExistingSortIndex() throws {
+        let pc = PersistenceController(inMemory: true)
+        let ctx = pc.viewContext
+        let couple = try CoupleRepository(context: ctx)
+            .bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
+        let meetings = MeetingRepository(context: ctx)
+        let meeting = try meetings.createPlanned(couple: couple, title: nil, city: nil, plannedStart: nil, plannedEnd: nil)
+        try meetings.start(meeting, at: Date())
+        let repo = MomentRepository(context: ctx)
+        let moment = try repo.create(in: meeting, type: .sight, title: "外滩", body: nil,
+                                     happenedAt: Date(), photoDatas: [Data([1]), Data([2])],
+                                     myEvaluation: nil, authorID: nil, place: nil)
+
+        try repo.addPhotos(moment, datas: [Data([3])])
+        let photos = repo.photosSorted(moment)
+        XCTAssertEqual(photos.count, 3)
+        XCTAssertEqual(photos.map(\.sortIndex), [0, 1, 2], "新增照片的 sortIndex 必须续接")
+        XCTAssertEqual(photos.last?.imageData, Data([3]))
+
+        try repo.deletePhoto(photos[1])
+        XCTAssertEqual(repo.photosSorted(moment).count, 2)
+        XCTAssertEqual(repo.photosSorted(moment).map(\.imageData), [Data([1]), Data([3])])
+    }
+
+    func testSetPlaceReplacesAndClears() throws {
+        let pc = PersistenceController(inMemory: true)
+        let ctx = pc.viewContext
+        let couple = try CoupleRepository(context: ctx)
+            .bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
+        let meetings = MeetingRepository(context: ctx)
+        let meeting = try meetings.createPlanned(couple: couple, title: nil, city: nil, plannedStart: nil, plannedEnd: nil)
+        try meetings.start(meeting, at: Date())
+        let repo = MomentRepository(context: ctx)
+        let moment = try repo.create(in: meeting, type: .restaurant, title: "小馆", body: nil,
+                                     happenedAt: Date(), photoDatas: [], myEvaluation: nil,
+                                     authorID: nil, place: nil)
+
+        let place = CDPlace(context: ctx)
+        place.id = UUID(); place.name = "蟹家大院"; place.latitude = 31.2; place.longitude = 121.5
+        place.createdAt = Date(); place.couple = couple
+
+        try repo.setPlace(moment, place: place)
+        XCTAssertEqual(moment.place?.name, "蟹家大院")
+        try repo.setPlace(moment, place: nil)
+        XCTAssertNil(moment.place)
+    }
 }

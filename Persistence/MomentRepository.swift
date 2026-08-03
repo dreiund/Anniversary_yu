@@ -67,6 +67,31 @@ struct MomentRepository {
         try context.save()
     }
 
+    /// 编辑模式追加照片：sortIndex 续接既有最大值，保持既有排序不变
+    func addPhotos(_ moment: CDMoment, datas: [Data]) throws {
+        let base = (photosSorted(moment).last?.sortIndex ?? -1) + 1
+        for (i, data) in datas.enumerated() {
+            let photo = CDPhoto(context: context)
+            photo.id = UUID()
+            photo.imageData = data
+            photo.thumbnailData = Thumbnailer.thumbnailData(from: data)
+            photo.sortIndex = base + Int32(i)
+            photo.moment = moment
+        }
+        try context.save()
+    }
+
+    func deletePhoto(_ photo: CDPhoto) throws {
+        context.delete(photo)
+        try context.save()
+    }
+
+    /// 换/清地点。旧 CDPlace 不删（可能被其他记忆引用；地点档案与归并是 P3 范围）
+    func setPlace(_ moment: CDMoment, place: CDPlace?) throws {
+        moment.place = place
+        try context.save()
+    }
+
     func daysWithMoments(in meeting: CDMeeting) -> [(day: CDDateDay, moments: [CDMoment])]{
         let days = ((meeting.dateDays as? Set<CDDateDay>) ?? [])
             .sorted { $0.dayIndex < $1.dayIndex }
