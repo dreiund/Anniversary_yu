@@ -20,7 +20,7 @@
 
 1. https://appstoreconnect.apple.com → 我的 App → ＋ → 新建 App。
 2. 平台 iOS；名称先用 `Anniversary`（正式名想好后可改）；主要语言 简体中文；Bundle ID 选 `com.fkc.anniversary`；SKU 填 `anniversary-yu`。
-3. TestFlight 外部测试要求填「Beta 版 App 信息」：反馈邮箱填你的邮箱；隐私政策 URL 必填——可让 Claude 生成一页静态说明（"数据仅存于两台设备与你们的 iCloud 私有库，无第三方服务器"）挂在 GitHub Pages。
+3. TestFlight 外部测试要求填「Beta 版 App 信息」：反馈邮箱填你的邮箱；隐私政策 URL 必填——**已上线：`https://dreiund.github.io/anniversary-privacy/`**（仓库 dreiund/anniversary-privacy，2026-08-03 建）。
 
 ## 三、归档上传
 
