@@ -26,9 +26,7 @@ struct MeetingsView: View {
                     selectedDay = SelectedCalendarDay(id: day, mode: mode)
                 })
             case 2:
-                Text("地图（下一任务接入）").dsCaption()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(DS.canvas)
+                PlacesMapView()
             default:
                 listContent
             }
