@@ -13,6 +13,7 @@ struct RouteMapView: View {
     @State private var progress: CGFloat = 1        // 虚线 trim 进度，默认全显
     @State private var playing = false
     @State private var cameraTick = 0
+    @State private var playToken = 0
 
     private var routeDays: [RouteDay] {
         let repo = MomentRepository(context: context)
@@ -46,7 +47,10 @@ struct RouteMapView: View {
             }
         }
         .onAppear { fitCamera() }
-        .onChange(of: selectedDay) { fitCamera() }
+        .onChange(of: selectedDay) {
+            stopPlay()
+            fitCamera()
+        }
     }
 
     private func dayChips(_ days: [RouteDay]) -> some View {
@@ -148,17 +152,20 @@ struct RouteMapView: View {
     private func play() {
         let segmentCount = visibleDays.map { max($0.stops.count - 1, 0) }.reduce(0, +)
         guard segmentCount > 0 else { return }
+        playToken += 1
+        let token = playToken
         playing = true
         progress = 0
         let duration = reduceMotion ? 0 : 0.5 * Double(segmentCount)
         withAnimation(.linear(duration: duration)) { progress = 1 }
         Task {
             try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
-            playing = false
+            if token == playToken { playing = false }
         }
     }
 
     private func stopPlay() {
+        playToken += 1
         withAnimation(.linear(duration: 0)) { progress = 1 }
         playing = false
     }
