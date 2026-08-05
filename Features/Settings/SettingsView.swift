@@ -14,6 +14,7 @@ struct SettingsView: View {
     @StateObject private var sharing = SharingManager(controller: .shared)
     @State private var accountAvailable = true
     @State private var creatingShare = false
+    @State private var confirmUnpair = false
 
     var body: some View {
         ScrollView {
@@ -65,24 +66,11 @@ struct SettingsView: View {
 
                 Text("配对与同步").dsSectionTitle()
                 GroupedSection {
-                    GroupedRow(title: "配对状态", value: pairingStatusText,
-                               valueColor: pairingStatusDone ? DS.dsGreen : DS.inkMuted)
-                    if let couple = couples.first,
-                       !CoupleRepository(context: context).isParticipantDevice(couple) {
-                        if let url = sharing.share?.url {
-                            ShareLink(item: url) {
-                                GroupedRow(title: "邀请链接", value: "发出邀请 ›", valueColor: DS.actionBlue)
-                            }
-                            .buttonStyle(.plain)
-                            if sharing.participantJoined, sharing.share?.publicPermission != CKShare.ParticipantPermission.none {
-                                Button {
-                                    Task { await sharing.lockInvites() }
-                                } label: {
-                                    GroupedRow(title: "对方已加入", value: "锁定邀请 ›", valueColor: DS.actionBlue)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        } else {
+                    GroupedRow(title: "配对状态", value: pairingStatus.label,
+                               valueColor: pairingStatus == .connected ? DS.dsGreen : DS.inkMuted)
+                    if let couple = couples.first, !isParticipant {
+                        switch pairingStatus {
+                        case .notPaired:
                             Button {
                                 creatingShare = true
                                 Task {
@@ -95,14 +83,54 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(creatingShare)
+                        case .invited:
+                            if let url = sharing.share?.url {
+                                ShareLink(item: url) {
+                                    GroupedRow(title: "邀请链接", value: "发出邀请 ›", valueColor: DS.actionBlue)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        case .connected:
+                            if sharing.share?.publicPermission != CKShare.ParticipantPermission.none {
+                                if let url = sharing.share?.url {
+                                    ShareLink(item: url) {
+                                        GroupedRow(title: "邀请链接", value: "发出邀请 ›", valueColor: DS.actionBlue)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                Button {
+                                    Task { await sharing.lockInvites() }
+                                } label: {
+                                    GroupedRow(title: "对方已加入", value: "锁定邀请 ›", valueColor: DS.actionBlue)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                     GroupedRow(title: "iCloud 账号", value: accountAvailable ? "正常" : "未登录",
-                               valueColor: accountAvailable ? DS.dsGreen : DS.dsRed, showsDivider: false)
+                               valueColor: accountAvailable ? DS.dsGreen : DS.dsRed,
+                               showsDivider: pairingStatus == .connected)
+                    if pairingStatus == .connected {
+                        Button { confirmUnpair = true } label: {
+                            HStack {
+                                Text("解除配对").dsBody().foregroundStyle(DS.dsRed)
+                                Spacer()
+                                Text("›").dsBody().foregroundStyle(DS.dsRed)
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 11)
+                        }
+                        .buttonStyle(DSPressEffect())
+                    }
                     if let error = sharing.lastError {
                         Text(error).font(.system(size: 12)).foregroundStyle(DS.dsRed)
                             .padding(.horizontal, 14).padding(.bottom, 8)
                     }
+                }
+                if pairingStatus == .connected {
+                    Text(isParticipant
+                         ? "解除配对后你的手机会清空这段空间；TA 的记录不受影响。"
+                         : "解除配对后 TA 的手机会清空这段空间；你的记录全部保留。")
+                        .dsFootnote().padding(.horizontal, 4)
                 }
 
                 Text("版本 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
@@ -120,6 +148,21 @@ struct SettingsView: View {
             }
             let status = try? await CKContainer(identifier: PersistenceController.cloudContainerID).accountStatus()
             accountAvailable = status == .available
+        }
+        .confirmationDialog("解除配对？", isPresented: $confirmUnpair, titleVisibility: .visible) {
+            Button("解除配对", role: .destructive) {
+                guard let couple = couples.first else { return }
+                let participant = isParticipant
+                Task {
+                    if participant {
+                        await sharing.leaveSpace(for: couple)
+                    } else {
+                        await sharing.unpair(for: couple)
+                    }
+                }
+            }
+        } message: {
+            Text(unpairDialogMessage)
         }
         .onDisappear(perform: save)
     }
@@ -145,13 +188,23 @@ struct SettingsView: View {
         try? context.save()
     }
 
-    private var pairingStatusText: String {
-        guard let couple = couples.first else { return "未配对" }
-        if CoupleRepository(context: context).isParticipantDevice(couple) { return "已连接" }
-        if sharing.participantJoined { return "已连接" }
-        if sharing.share != nil { return "邀请已发出" }
-        return "未配对"
+    private var isParticipant: Bool {
+        guard let couple = couples.first else { return false }
+        return CoupleRepository(context: context).isParticipantDevice(couple)
     }
 
-    private var pairingStatusDone: Bool { pairingStatusText == "已连接" }
+    private var pairingStatus: PairingStatus {
+        SharingManager.pairingStatus(
+            shareExists: sharing.share != nil,
+            participantJoined: sharing.participantJoined,
+            publicPermissionOpen: sharing.share?.publicPermission != CKShare.ParticipantPermission.none,
+            isParticipantDevice: isParticipant)
+    }
+
+    /// 弹窗文案按角色（spec §一 文案照抄）
+    private var unpairDialogMessage: String {
+        isParticipant
+            ? "解除后你的手机会清空这段空间并回到引导页；TA 那边的记录不受影响。想复合就让 TA 重新发邀请。"
+            : "解除后 TA 的手机会清空这段空间并回到引导页；你的记录全部保留，重新发邀请可恢复。"
+    }
 }
