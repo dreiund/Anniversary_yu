@@ -47,4 +47,12 @@ final class CoupleRepositoryTests: XCTestCase {
         XCTAssertNil(partners[0].themeColorHex)
         XCTAssertEqual(repo.currentPartnerID(of: couple), partners[0].id)
     }
+
+    // spec §二：已连接后 TA 的昵称只能 TA 自己改；未配对时创建方可改（改错别字）
+    func testCanEditPartnerNameRules() {
+        XCTAssertTrue(CoupleRepository.canEditPartnerName(isParticipantDevice: false, participantJoined: false))
+        XCTAssertFalse(CoupleRepository.canEditPartnerName(isParticipantDevice: false, participantJoined: true))
+        XCTAssertFalse(CoupleRepository.canEditPartnerName(isParticipantDevice: true, participantJoined: false))
+        XCTAssertFalse(CoupleRepository.canEditPartnerName(isParticipantDevice: true, participantJoined: true))
+    }
 }

@@ -30,8 +30,16 @@ struct SettingsView: View {
                     DS.hairline.frame(height: 1).padding(.leading, 14)
                     HStack {
                         Text("TA 的昵称").dsBody()
-                        TextField("", text: $partnerName).multilineTextAlignment(.trailing)
-                            .onSubmit(save)
+                        if canEditPartnerNameNow {
+                            TextField("", text: $partnerName).multilineTextAlignment(.trailing)
+                                .onSubmit(save)
+                        } else {
+                            Spacer()
+                            Text(partnerName).dsBody().foregroundStyle(DS.inkMuted)
+                            Image(systemName: "lock")
+                                .font(.system(size: 11))
+                                .foregroundStyle(DS.chipBorder)
+                        }
                     }
                     .padding(.horizontal, 14).padding(.vertical, 11)
                     DS.hairline.frame(height: 1).padding(.leading, 14)
@@ -44,6 +52,9 @@ struct SettingsView: View {
                             try? context.save()
                             loadedAnniversary = newValue
                         }
+                }
+                if !canEditPartnerNameNow {
+                    Text("TA 的昵称由 TA 自己定").dsFootnote().padding(.horizontal, 4)
                 }
 
                 Text("显示").dsSectionTitle()
@@ -182,7 +193,7 @@ struct SettingsView: View {
         if !myName.trimmingCharacters(in: .whitespaces).isEmpty {
             repo.currentPartner(of: couple)?.name = myName
         }
-        if !partnerName.trimmingCharacters(in: .whitespaces).isEmpty {
+        if !partnerName.trimmingCharacters(in: .whitespaces).isEmpty, canEditPartnerNameNow {
             repo.otherPartner(of: couple)?.name = partnerName
         }
         try? context.save()
@@ -191,6 +202,11 @@ struct SettingsView: View {
     private var isParticipant: Bool {
         guard let couple = couples.first else { return false }
         return CoupleRepository(context: context).isParticipantDevice(couple)
+    }
+
+    private var canEditPartnerNameNow: Bool {
+        CoupleRepository.canEditPartnerName(isParticipantDevice: isParticipant,
+                                            participantJoined: sharing.participantJoined)
     }
 
     private var pairingStatus: PairingStatus {

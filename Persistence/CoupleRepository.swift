@@ -66,4 +66,10 @@ struct CoupleRepository {
     func currentPartnerID(of couple: CDCouple) -> UUID? {
         currentPartner(of: couple)?.id
     }
+
+    /// 已连接后 TA 的昵称只能 TA 自己改：受邀方永不可改对方；创建方在对方加入后不可改。
+    /// 未配对/邀请未被接受时创建方可改两个名字（TA 本人还没进来，得能改错别字）。
+    static func canEditPartnerName(isParticipantDevice: Bool, participantJoined: Bool) -> Bool {
+        !isParticipantDevice && !participantJoined
+    }
 }
