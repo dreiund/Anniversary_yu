@@ -1,13 +1,22 @@
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.managedObjectContext) private var context
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @AppStorage("nameConfirmedCoupleID") private var confirmedCoupleID = ""
 
     var body: some View {
-        if couples.isEmpty {
-            OnboardingView()
+        if let couple = couples.first {
+            if JoinNameConfirm.isNeeded(
+                isParticipantDevice: CoupleRepository(context: context).isParticipantDevice(couple),
+                coupleID: couple.id,
+                confirmedCoupleID: confirmedCoupleID) {
+                JoinNameConfirmView(couple: couple)
+            } else {
+                MainShell()
+            }
         } else {
-            MainShell()
+            OnboardingView()
         }
     }
 }
