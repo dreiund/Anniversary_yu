@@ -3,7 +3,7 @@ import CoreData
 
 /// 足迹·日历段（spec §三）。数据自取：本 couple 全量记忆/心情/见面，交给 CalendarProjector 投影。
 struct CalendarView: View {
-    let onDayTap: (Date) -> Void
+    let onDayTap: (Date, CalendarMode) -> Void
     @Environment(\.managedObjectContext) private var context
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMoment.happenedAt)])
@@ -120,7 +120,7 @@ struct CalendarView: View {
                 ForEach(cells, id: \.day) { cell in
                     CalendarDayCell(cell: cell)
                         .contentShape(Rectangle())
-                        .onTapGesture { if cell.inMonth { onDayTap(cell.day) } }
+                        .onTapGesture { if cell.inMonth { onDayTap(cell.day, mode) } }
                 }
             }
         }

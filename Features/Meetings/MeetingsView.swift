@@ -8,6 +8,7 @@ struct MeetingsView: View {
     private var meetings: FetchedResults<CDMeeting>
     @State private var showForm = false
     @State private var segment = 0
+    @State private var selectedDay: SelectedCalendarDay?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +22,9 @@ struct MeetingsView: View {
 
             switch segment {
             case 1:
-                CalendarView(onDayTap: { _ in })
+                CalendarView(onDayTap: { day, mode in
+                    selectedDay = SelectedCalendarDay(id: day, mode: mode)
+                })
             case 2:
                 Text("地图（下一任务接入）").dsCaption()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -35,6 +38,10 @@ struct MeetingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showForm) {
             if let couple = couples.first { MeetingFormView(mode: .create(couple)) }
+        }
+        .sheet(item: $selectedDay) { sel in
+            DaySheet(day: sel.id, mode: sel.mode)
+                .presentationDetents([.medium, .large])
         }
     }
 
