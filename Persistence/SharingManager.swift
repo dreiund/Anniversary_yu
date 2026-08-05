@@ -44,9 +44,8 @@ final class SharingManager: ObservableObject {
 
     /// 已有 share 直接返回；没有则创建（couple 整树迁入共享 zone）、配置并持久化。
     func ensureShare(for couple: CDCouple) async throws -> CKShare {
-        if let share { return share }
-        if let existing = try controller.container.fetchShares(matching: [couple.objectID])[couple.objectID] {
-            // 上次建 share 后 persist 失败的遗留：无参与者却是 .none → 补一次配置。
+        if let existing = try share ?? controller.container.fetchShares(matching: [couple.objectID])[couple.objectID] {
+            // 上次建 share 后 persist 失败的遗留、或解绑后遗留：无参与者却是 .none → 补一次配置（同链接复活）。
             // （正常锁定后的 share 同为 .none 但已有参与者，不能重开。）
             if existing.publicPermission == .none, !Self.participantJoined(in: existing),
                let store = controller.privateStore {
@@ -71,6 +70,7 @@ final class SharingManager: ObservableObject {
 
     /// 她加入后关门：新人无法再经链接加入，既有参与者不受影响。
     func lockInvites() async {
+        lastError = nil
         guard let share, let store = controller.privateStore else { return }
         let original = share.publicPermission
         share.publicPermission = .none
@@ -123,20 +123,22 @@ extension SharingManager {
     /// 创建方解除配对：移除全部非 owner 参与者并锁链接，一次持久化。
     /// 失败时参与者移除无法本地回滚（CKShare 不支持重加），重拉云端真相代替回滚。
     func unpair(for couple: CDCouple) async {
+        lastError = nil
         guard let share, let store = controller.privateStore else { return }
         share.participants.filter { $0.role != .owner }.forEach(share.removeParticipant)
         share.publicPermission = .none
         do {
             self.share = try await controller.container.persistUpdatedShare(share, in: store)
         } catch {
-            lastError = "解除失败，请重试"
             await loadShare(for: couple)
+            lastError = "解除失败，请重试"
         }
     }
 
     /// 受邀方解除配对：清除共享 zone（CloudKit 定义的"参与者退出共享"）。
     /// 成功后本机共享库清空 → RootView 的 couple FetchRequest 变空 → 自动回引导页。
     func leaveSpace(for couple: CDCouple) async {
+        lastError = nil
         guard let sharedStore = controller.sharedStore,
               let zoneID = controller.container.recordID(for: couple.objectID)?.zoneID else {
             lastError = "解除失败，请重试"
