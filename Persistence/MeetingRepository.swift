@@ -100,3 +100,39 @@ extension MeetingRepository {
             .sorted { $0.dayIndex < $1.dayIndex }
     }
 }
+
+extension MeetingRepository {
+    enum EditError: Error { case notPlanned }
+
+    /// 三态可改基本信息：日期按状态落位（planned→计划日期对；ongoing→仅 startedAt；finished→startedAt+endedAt）
+    func update(_ meeting: CDMeeting, title: String?, city: String?,
+                start: Date?, end: Date?) throws {
+        meeting.title = title
+        meeting.city = city
+        switch status(of: meeting) {
+        case .planned:
+            meeting.plannedStart = start
+            meeting.plannedEnd = end
+        case .ongoing:
+            meeting.startedAt = start ?? meeting.startedAt
+        case .finished:
+            meeting.startedAt = start ?? meeting.startedAt
+            meeting.endedAt = end ?? meeting.endedAt
+        }
+        try context.save()
+    }
+
+    /// 仅计划中可删；级联删行前计划项；其后所有见面（不论状态）序号 -1 保持连续——
+    /// 没发生过的计划被拿掉后，后面那次在现实里就是第 N-1 次见面。
+    func deletePlanned(_ meeting: CDMeeting) throws {
+        guard status(of: meeting) == .planned else { throw EditError.notPlanned }
+        let couple = meeting.couple
+        let removedIndex = meeting.index
+        ((meeting.planItems as? Set<CDPlanItem>) ?? []).forEach(context.delete)
+        context.delete(meeting)
+        ((couple?.meetings as? Set<CDMeeting>) ?? [])
+            .filter { $0.index > removedIndex }
+            .forEach { $0.index -= 1 }
+        try context.save()
+    }
+}
