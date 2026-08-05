@@ -160,26 +160,32 @@ struct HomeView: View {
             showMoodSheet = true
         } label: {
             ParchmentCard {
-                HStack(spacing: 8) {
-                    Text("今日心情").dsCaption()
-                    if let emoji = mine?.moodEmoji {
-                        Text(emoji).font(.system(size: 18))
-                    } else {
-                        Circle().stroke(DS.chipBorder, style: StrokeStyle(lineWidth: 1, dash: [3]))
-                            .frame(width: 24, height: 24)
-                            .overlay(Text("+").dsCaption())
-                    }
-                    if let partnerEmoji = partnerMood?.moodEmoji {
-                        Text(partnerEmoji).font(.system(size: 18))
-                    }
+                HStack(alignment: .top, spacing: 14) {
+                    Text("今日心情").dsCaption().padding(.top, 4)
+                    moodSlot(name: me?.name ?? "我", emoji: mine?.moodEmoji)
+                    moodSlot(name: other?.name ?? "TA", emoji: partnerMood?.moodEmoji)
                     Spacer()
-                    if let other, partnerMood == nil {
-                        Text("\(other.name ?? "TA") 还没打卡").dsFootnote()
+                    if other != nil, partnerMood == nil {
+                        Text("还没打卡").dsFootnote().padding(.top, 4)
                     }
                 }
             }
         }
         .buttonStyle(DSPressEffect())
+    }
+
+    /// 心情槽位：emoji（或虚线空位）+ 正下方昵称小字，名字跟人走
+    private func moodSlot(name: String, emoji: String?) -> some View {
+        VStack(spacing: 3) {
+            if let emoji {
+                Text(emoji).font(.system(size: 18))
+            } else {
+                Circle().stroke(DS.chipBorder, style: StrokeStyle(lineWidth: 1, dash: [3]))
+                    .frame(width: 24, height: 24)
+                    .overlay(Text("+").dsCaption())
+            }
+            Text(name).font(.system(size: 10)).foregroundStyle(DS.inkMuted)
+        }
     }
 
     @ViewBuilder
