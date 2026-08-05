@@ -27,7 +27,7 @@ struct MeetingsView: View {
         .navigationTitle("足迹")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showForm) {
-            if let couple = couples.first { MeetingFormView(couple: couple) }
+            if let couple = couples.first { MeetingFormView(mode: .create(couple)) }
         }
     }
 

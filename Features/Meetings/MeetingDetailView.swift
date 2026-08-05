@@ -5,6 +5,7 @@ struct MeetingDetailView: View {
     let meeting: CDMeeting
     @State private var segment = 0
     @State private var confirmEnd = false
+    @State private var showEditForm = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,6 +41,12 @@ struct MeetingDetailView: View {
                         .font(.system(size: 14))
                 }
             }
+            if meeting.statusRaw != MeetingStatus.planned.rawValue {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("编辑") { showEditForm = true }
+                        .font(.system(size: 14))
+                }
+            }
         }
         .confirmationDialog("结束这次见面？未封盘的天会一并封盘。",
                             isPresented: $confirmEnd, titleVisibility: .visible) {
@@ -48,5 +55,6 @@ struct MeetingDetailView: View {
                 SealReminder.refresh(context: context)
             }
         }
+        .sheet(isPresented: $showEditForm) { MeetingFormView(mode: .edit(meeting)) }
     }
 }

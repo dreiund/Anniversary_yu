@@ -11,6 +11,8 @@ struct PlanView: View {
     ) private var ongoingMeetings: FetchedResults<CDMeeting>
     @State private var editingItem: CDPlanItem?
     @State private var showAdd = false
+    @State private var showEditForm = false
+    @Environment(\.dismiss) private var dismiss
 
     init(meeting: CDMeeting) {
         self.meeting = meeting
@@ -19,6 +21,16 @@ struct PlanView: View {
     }
 
     var body: some View {
+        // 删除后本页对象失效：立即退出，避免渲染已删 CDMeeting 触发 fault 崩溃
+        if meeting.managedObjectContext == nil || meeting.isDeleted {
+            Color.clear.onAppear { dismiss() }
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         let _ = items.count  // 注册 FetchRequest 依赖：任何 CDPlanItem 变更触发本视图刷新
         let repo = PlanItemRepository(context: context)
         let sections = repo.sections(for: meeting, calendar: .current)
@@ -57,6 +69,12 @@ struct PlanView: View {
         .background(DS.parchment)
         .navigationTitle("行前计划")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("编辑") { showEditForm = true }
+                    .font(.system(size: 14))
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             FrostedBottomBar {
                 HStack {
@@ -69,6 +87,7 @@ struct PlanView: View {
         }
         .sheet(isPresented: $showAdd) { PlanItemFormSheet(meeting: meeting, item: nil) }
         .sheet(item: $editingItem) { PlanItemFormSheet(meeting: meeting, item: $0) }
+        .sheet(isPresented: $showEditForm) { MeetingFormView(mode: .edit(meeting)) }
     }
 
     private var header: some View {
