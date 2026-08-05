@@ -16,7 +16,8 @@ struct MeetingDetailView: View {
                 Spacer()
                 HStack(spacing: 4) {
                     SelectableChip(title: "时间线", isSelected: segment == 0) { segment = 0 }
-                    SelectableChip(title: "计划", isSelected: segment == 1) { segment = 1 }
+                    SelectableChip(title: "路线图", isSelected: segment == 1) { segment = 1 }
+                    SelectableChip(title: "计划", isSelected: segment == 2) { segment = 2 }
                 }
             }
             .padding(DS.Spacing.md)
@@ -27,6 +28,8 @@ struct MeetingDetailView: View {
                         .padding(.horizontal, DS.Spacing.md)
                         .padding(.bottom, DS.Spacing.md)
                 }
+            } else if segment == 1 {
+                RouteMapView(meeting: meeting)
             } else {
                 PlanView(meeting: meeting)
             }
