@@ -17,6 +17,7 @@ struct PlacePickerSheet: View {
     @State private var camera: MapCameraPosition = .automatic
     @State private var pin: CLLocationCoordinate2D?
     @State private var name = ""
+    @State private var lastAutoName = ""
     @State private var query = ""
     @State private var results: [MKMapItem] = []
     @State private var locating = false
@@ -33,7 +34,7 @@ struct PlacePickerSheet: View {
                 }
                 .onTapGesture { point in
                     guard let coord = proxy.convert(point, from: .local) else { return }
-                    drop(at: coord, fillNameIfEmpty: true)
+                    drop(at: coord, refillAutoName: true)
                 }
                 .onMapCameraChange { context in
                     visibleRegion = context.region
@@ -121,9 +122,16 @@ struct PlacePickerSheet: View {
         .background(.ultraThinMaterial)
     }
 
+    /// 名字仍是"自动填入"（定位/搜索/反查/初始值）时才允许被新落点的反查覆盖；用户手改过的名字保留
+    private var nameIsAuto: Bool {
+        let t = name.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty || t == lastAutoName.trimmingCharacters(in: .whitespaces)
+    }
+
     private func restoreInitial() {
         guard let initial else { return }
         name = initial.name
+        lastAutoName = initial.name
         if initial.latitude != 0 || initial.longitude != 0 {
             let coord = CLLocationCoordinate2D(latitude: initial.latitude, longitude: initial.longitude)
             pin = coord
@@ -132,28 +140,32 @@ struct PlacePickerSheet: View {
         }
     }
 
-    private func drop(at coord: CLLocationCoordinate2D, fillNameIfEmpty: Bool) {
+    private func drop(at coord: CLLocationCoordinate2D, refillAutoName: Bool) {
         pin = coord
         camera = .region(MKCoordinateRegion(center: coord,
                                             latitudinalMeters: 800, longitudinalMeters: 800))
         results = []
-        guard fillNameIfEmpty, name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard refillAutoName, nameIsAuto else { return }
         Task {
             let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
             if let mark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
                 let suggested = [mark.name, mark.locality].compactMap { $0 }.joined(separator: " · ")
-                // 反查是异步的：回来时若 pin 已移到别处，这个结果就过期了，丢弃
+                // 反查是异步的：回来时若 pin 已移到别处、或用户已手输名字，这个结果就过期了，丢弃
                 guard let current = pin,
                       current.latitude == coord.latitude, current.longitude == coord.longitude,
-                      name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                      nameIsAuto else { return }
                 name = suggested
+                lastAutoName = suggested
             }
         }
     }
 
     private func select(_ item: MKMapItem) {
-        name = item.name ?? name
-        drop(at: item.placemark.coordinate, fillNameIfEmpty: false)
+        if let n = item.name {
+            name = n
+            lastAutoName = n
+        }
+        drop(at: item.placemark.coordinate, refillAutoName: false)
     }
 
     private func runSearch() {
@@ -175,8 +187,9 @@ struct PlacePickerSheet: View {
         Task {
             if let result = try? await LocationFetcher().fetch() {
                 name = result.name
+                lastAutoName = result.name
                 drop(at: CLLocationCoordinate2D(latitude: result.latitude, longitude: result.longitude),
-                     fillNameIfEmpty: false)
+                     refillAutoName: false)
             }
             locating = false
         }
