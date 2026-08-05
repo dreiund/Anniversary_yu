@@ -48,12 +48,14 @@ struct MeetingDetailView: View {
                 }
             }
         }
-        .confirmationDialog("结束这次见面？未封盘的天会一并封盘。",
-                            isPresented: $confirmEnd, titleVisibility: .visible) {
+        .alert("结束这次见面？", isPresented: $confirmEnd) {
             Button("结束见面", role: .destructive) {
                 try? MeetingRepository(context: context).end(meeting, at: Date())
                 SealReminder.refresh(context: context)
             }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("未封盘的天会一并封盘。")
         }
         .sheet(isPresented: $showEditForm) { MeetingFormView(mode: .edit(meeting)) }
     }

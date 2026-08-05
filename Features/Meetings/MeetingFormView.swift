@@ -83,14 +83,16 @@ struct MeetingFormView: View {
                     Button("保存") { save() }
                 }
             }
-            .confirmationDialog("删除这次计划？行前计划的日程会一起删除。",
-                                isPresented: $confirmDelete, titleVisibility: .visible) {
+            .alert("删除这次计划？", isPresented: $confirmDelete) {
                 Button("删除计划", role: .destructive) {
                     if let m = editingMeeting {
                         try? MeetingRepository(context: context).deletePlanned(m)
                     }
                     dismiss()
                 }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("行前计划的日程会一起删除。")
             }
             .onAppear(perform: loadIfNeeded)
         }

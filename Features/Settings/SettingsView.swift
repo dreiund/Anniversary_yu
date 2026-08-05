@@ -160,7 +160,7 @@ struct SettingsView: View {
             let status = try? await CKContainer(identifier: PersistenceController.cloudContainerID).accountStatus()
             accountAvailable = status == .available
         }
-        .confirmationDialog("解除配对？", isPresented: $confirmUnpair, titleVisibility: .visible) {
+        .alert("解除配对？", isPresented: $confirmUnpair) {
             Button("解除配对", role: .destructive) {
                 guard let couple = couples.first else { return }
                 let participant = isParticipant
@@ -172,6 +172,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            Button("取消", role: .cancel) {}
         } message: {
             Text(unpairDialogMessage)
         }

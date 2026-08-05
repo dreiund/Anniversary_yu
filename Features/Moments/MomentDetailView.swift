@@ -111,7 +111,7 @@ struct MomentDetailView: View {
         }
         .sheet(isPresented: $showEdit) { MomentFormView(mode: .edit(moment)) }
         .sheet(isPresented: $showEvalForm) { EvaluationFormSheet(moment: moment) }
-        .confirmationDialog("删除这条记忆？", isPresented: $confirmDelete, titleVisibility: .visible) {
+        .alert("删除这条记忆？", isPresented: $confirmDelete) {
             Button("删除", role: .destructive) {
                 do {
                     try MomentRepository(context: context).delete(moment)
@@ -120,6 +120,7 @@ struct MomentDetailView: View {
                     deleteFailed = true
                 }
             }
+            Button("取消", role: .cancel) {}
         }
         .alert("删除失败，请重试", isPresented: $deleteFailed) {
             Button("知道了", role: .cancel) {}
