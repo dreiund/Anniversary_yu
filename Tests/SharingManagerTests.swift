@@ -19,4 +19,30 @@ final class SharingManagerTests: XCTestCase {
         // 新建 share 只有 owner 一名参与者
         XCTAssertFalse(SharingManager.participantJoined(in: makeShare()))
     }
+
+    // spec §一 状态表：四态规则
+    func testPairingStatusTable() {
+        typealias S = SharingManager
+        // 受邀方设备恒为已连接
+        XCTAssertEqual(S.pairingStatus(shareExists: false, participantJoined: false,
+                                       publicPermissionOpen: false, isParticipantDevice: true), .connected)
+        // 无 share → 未配对
+        XCTAssertEqual(S.pairingStatus(shareExists: false, participantJoined: false,
+                                       publicPermissionOpen: true, isParticipantDevice: false), .notPaired)
+        // 有参与者已接受 → 已连接（无论锁没锁）
+        XCTAssertEqual(S.pairingStatus(shareExists: true, participantJoined: true,
+                                       publicPermissionOpen: false, isParticipantDevice: false), .connected)
+        // 无参与者 + 链接开着 → 邀请已发出
+        XCTAssertEqual(S.pairingStatus(shareExists: true, participantJoined: false,
+                                       publicPermissionOpen: true, isParticipantDevice: false), .invited)
+        // 无参与者 + 已锁（解绑后遗留）→ 未配对
+        XCTAssertEqual(S.pairingStatus(shareExists: true, participantJoined: false,
+                                       publicPermissionOpen: false, isParticipantDevice: false), .notPaired)
+    }
+
+    func testPairingStatusLabels() {
+        XCTAssertEqual(PairingStatus.notPaired.label, "未配对")
+        XCTAssertEqual(PairingStatus.invited.label, "邀请已发出")
+        XCTAssertEqual(PairingStatus.connected.label, "已连接")
+    }
 }

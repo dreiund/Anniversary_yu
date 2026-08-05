@@ -94,3 +94,58 @@ final class SharingManager: ObservableObject {
         }
     }
 }
+
+/// 设置页配对区的展示状态（spec §一 规则表）
+enum PairingStatus: Equatable {
+    case notPaired, invited, connected
+
+    var label: String {
+        switch self {
+        case .notPaired: return "未配对"
+        case .invited: return "邀请已发出"
+        case .connected: return "已连接"
+        }
+    }
+}
+
+extension SharingManager {
+    /// nonisolated 纯函数：只依赖入参，单测直调。
+    /// 解绑后遗留的"已锁且无参与者" share 视同未配对——生成邀请走既有重开分支同链接复活。
+    nonisolated static func pairingStatus(shareExists: Bool, participantJoined: Bool,
+                                          publicPermissionOpen: Bool,
+                                          isParticipantDevice: Bool) -> PairingStatus {
+        if isParticipantDevice { return .connected }
+        guard shareExists else { return .notPaired }
+        if participantJoined { return .connected }
+        return publicPermissionOpen ? .invited : .notPaired
+    }
+
+    /// 创建方解除配对：移除全部非 owner 参与者并锁链接，一次持久化。
+    /// 失败时参与者移除无法本地回滚（CKShare 不支持重加），重拉云端真相代替回滚。
+    func unpair(for couple: CDCouple) async {
+        guard let share, let store = controller.privateStore else { return }
+        share.participants.filter { $0.role != .owner }.forEach(share.removeParticipant)
+        share.publicPermission = .none
+        do {
+            self.share = try await controller.container.persistUpdatedShare(share, in: store)
+        } catch {
+            lastError = "解除失败，请重试"
+            await loadShare(for: couple)
+        }
+    }
+
+    /// 受邀方解除配对：清除共享 zone（CloudKit 定义的"参与者退出共享"）。
+    /// 成功后本机共享库清空 → RootView 的 couple FetchRequest 变空 → 自动回引导页。
+    func leaveSpace(for couple: CDCouple) async {
+        guard let sharedStore = controller.sharedStore,
+              let zoneID = controller.container.recordID(for: couple.objectID)?.zoneID else {
+            lastError = "解除失败，请重试"
+            return
+        }
+        do {
+            _ = try await controller.container.purgeObjectsAndRecordsInZone(with: zoneID, in: sharedStore)
+        } catch {
+            lastError = "解除失败，请重试"
+        }
+    }
+}
