@@ -102,6 +102,16 @@ struct PlacesMapView: View {
                     Text("还没有带地点的记忆").dsCaption()
                 }
             }
+            .overlay(alignment: .bottom) {
+                // 对方远端删除该地点时不渲染已删对象（spec §九，沿用 PlanView 守卫模式）
+                if let selected = selectedPlace,
+                   selected.managedObjectContext != nil, !selected.isDeleted {
+                    PlaceDrawer(place: selected)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: selectedPlace)
         }
     }
 
