@@ -70,9 +70,11 @@ struct PlanView: View {
         .navigationTitle("行前计划")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("编辑") { showEditForm = true }
-                    .font(.system(size: 14))
+            if meeting.statusRaw == MeetingStatus.planned.rawValue {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("编辑") { showEditForm = true }
+                        .font(.system(size: 14))
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
