@@ -89,7 +89,10 @@ struct PlanView: View {
         }
         .sheet(isPresented: $showAdd) { PlanItemFormSheet(meeting: meeting, item: nil) }
         .sheet(item: $editingItem) { PlanItemFormSheet(meeting: meeting, item: $0) }
-        .sheet(isPresented: $showEditForm) { MeetingFormView(mode: .edit(meeting)) }
+        .sheet(isPresented: $showEditForm, onDismiss: {
+            // 表单里删除计划后：等 sheet 完全收场再退出本页——body 守卫在转场中会竞速失效
+            if meeting.managedObjectContext == nil || meeting.isDeleted { dismiss() }
+        }) { MeetingFormView(mode: .edit(meeting)) }
     }
 
     private var header: some View {
