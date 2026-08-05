@@ -71,8 +71,14 @@ struct JoinNameConfirmView: View {
 
     private func confirm() {
         let repo = CoupleRepository(context: context)
-        repo.currentPartner(of: couple)?.name = name.trimmingCharacters(in: .whitespaces)
-        try? context.save()
-        confirmedCoupleID = couple.id?.uuidString ?? ""
+        // 伴侣记录未同步到位时不消费一次性确认页：静默不动，等同步好再点。
+        guard let partner = repo.currentPartner(of: couple) else { return }
+        partner.name = name.trimmingCharacters(in: .whitespaces)
+        do {
+            try context.save()
+            confirmedCoupleID = couple.id?.uuidString ?? ""
+        } catch {
+            context.rollback()
+        }
     }
 }
