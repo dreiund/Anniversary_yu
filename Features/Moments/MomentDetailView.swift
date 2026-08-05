@@ -46,8 +46,12 @@ struct MomentDetailView: View {
                     Text("\((MomentType(rawValue: moment.typeRaw) ?? .other).title) · 第 \(moment.dateDay?.dayIndex ?? 0) 天 · \(moment.happenedAt.map { Fmt.hm.string(from: $0) } ?? "")")
                         .dsFootnote()
                     Text(moment.title ?? "").dsPageTitle()
-                    if let place = moment.place?.name {
-                        Text(place).font(.system(size: 13)).foregroundStyle(DS.actionBlue)
+                    if let place = moment.place {
+                        NavigationLink { PlaceProfileView(place: place) } label: {
+                            Text(place.name ?? "地点")
+                                .font(.system(size: 13)).foregroundStyle(DS.actionBlue)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
