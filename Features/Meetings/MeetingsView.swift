@@ -7,8 +7,38 @@ struct MeetingsView: View {
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
     private var meetings: FetchedResults<CDMeeting>
     @State private var showForm = false
+    @State private var segment = 0
 
     var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                SelectableChip(title: "列表", isSelected: segment == 0) { segment = 0 }
+                SelectableChip(title: "日历", isSelected: segment == 1) { segment = 1 }
+                SelectableChip(title: "地图", isSelected: segment == 2) { segment = 2 }
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.vertical, 8)
+
+            switch segment {
+            case 1:
+                CalendarView(onDayTap: { _ in })
+            case 2:
+                Text("地图（下一任务接入）").dsCaption()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(DS.canvas)
+            default:
+                listContent
+            }
+        }
+        .background(DS.canvas)
+        .navigationTitle("足迹")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showForm) {
+            if let couple = couples.first { MeetingFormView(mode: .create(couple)) }
+        }
+    }
+
+    private var listContent: some View {
         ScrollView {
             VStack(spacing: DS.Spacing.md) {
                 ForEach(meetings, id: \.objectID) { meeting in
@@ -22,12 +52,6 @@ struct MeetingsView: View {
                     .padding(.top, DS.Spacing.xs)
             }
             .padding(DS.Spacing.md)
-        }
-        .background(DS.canvas)
-        .navigationTitle("足迹")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showForm) {
-            if let couple = couples.first { MeetingFormView(mode: .create(couple)) }
         }
     }
 
