@@ -35,6 +35,7 @@ enum DS {
     static let dsRed = Color(hex: 0xFF3B30)
     static let dsGreen = Color(hex: 0x34C759)
     static let roseCycle = Color(hex: 0xD96450)
+    static let dsOrange = Color(hex: 0xFF9F0A)   // 警示语义色：消极徽章 / 雷区描边（P4，不作行动色）
     static let bandBlue = Color(hex: 0xEDF4FC)   // 日历见面带淡蓝（P3 spec §3.1）
 
     enum Spacing {
