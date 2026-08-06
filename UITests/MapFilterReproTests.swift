@@ -38,6 +38,10 @@ final class MapFilterReproTests: XCTestCase {
                       "空态文案未出现")
         sleep(2)
         attach(app, name: "3-空类目稍后")
+
+        app.buttons["全部"].tap()
+        sleep(2)
+        attach(app, name: "4-切回全部")
     }
 
     @MainActor

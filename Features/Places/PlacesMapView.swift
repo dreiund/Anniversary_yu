@@ -28,14 +28,16 @@ struct PlacesMapView: View {
         VStack(spacing: 0) {
             filterChips
             mapBody
-                // Map 内容闭包不受 SwiftUI 依赖追踪（延迟求值），外部筛选变了钉不会跟；
-                // 把身份边界放在 MapReader 最外层，切筛选整棵子树换新（顺带自动取景）
-                .id(filter)
         }
         .onChange(of: filter) {
             if let selected = selectedPlace, !visiblePlaces.contains(selected) {
                 selectedPlace = nil
             }
+            // 取景规则（用户定稿）：空类目或新集合全在当前视野内 → 区域不动只换钉；
+            // 新集合在视野外（如广州→苏州）→ 平滑飞过去
+            guard let target = boundingRegion(of: visiblePlaces) else { return }
+            if let current = currentRegion, contains(current, allOf: visiblePlaces) { return }
+            withAnimation(.smooth(duration: 0.8)) { camera = .region(target) }
         }
         .navigationDestination(item: $profilePlace) { place in
             PlaceProfileView(place: place)
@@ -71,49 +73,25 @@ struct PlacesMapView: View {
     }
 
     private var mapBody: some View {
+        // 钉层不进 Map 内容（MapContentBuilder 延迟求值不追踪外部状态，筛选切换会残留旧钉——
+        // 反馈⑤截图实证）；改为屏幕坐标 overlay 直渲，与路线图同款：即时响应、可动画、相机不被动
         MapReader { proxy in
-            Map(position: $camera) {
-                ForEach(displayItems(proxy: proxy, tick: cameraTick), id: \.key) { item in
-                    switch item.output {
-                    case .pin(let id, _):
-                        if let place = visiblePlaces.first(where: { $0.id == id }) {
-                            Annotation("", coordinate: CLLocationCoordinate2D(
-                                latitude: place.latitude, longitude: place.longitude)) {
-                                PlacePin(image: place.latestThumbnail(context: context),
-                                         fallbackText: place.name ?? "地")
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 9)
-                                            .stroke(DS.actionBlue,
-                                                    lineWidth: selectedPlace == place ? 2 : 0)
-                                            .padding(-2)
-                                    )
-                                    .onTapGesture { selectedPlace = place }
-                            }
-                        }
-                    case .cluster(let ids, let point):
-                        if let coord = proxy.convert(point, from: .local) {
-                            Annotation("", coordinate: coord) {
-                                Text("\(ids.count) 处")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.vertical, 5).padding(.horizontal, 9)
-                                    .background(RoundedRectangle(cornerRadius: 8).fill(DS.darkCard))
-                                    .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                                    .onTapGesture { zoomInto(coordinate: coord) }
-                            }
-                        }
-                    }
-                }
-            }
+            Map(position: $camera)
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
-            .onMapCameraChange(frequency: .onEnd) { context in
+            .onMapCameraChange(frequency: .continuous) { context in
                 currentRegion = context.region
                 cameraTick += 1
                 }
             .onTapGesture { selectedPlace = nil }
+            .overlay { pinLayer(proxy: proxy).clipped() }
             .overlay {
                 if visiblePlaces.isEmpty {
                     Text("还没有带地点的记忆").dsCaption()
+                }
+            }
+            .onAppear {
+                if currentRegion == nil, let region = boundingRegion(of: visiblePlaces) {
+                    camera = .region(region)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -129,8 +107,69 @@ struct PlacesMapView: View {
         }
     }
 
-    /// 屏幕空间聚合：坐标→屏幕点→聚合→回投。ForEach 需要稳定 key。
-    /// tick 参数只为在 body 求值期读到 cameraTick 注册依赖（MapContentBuilder 里不能写 let _）。
+    /// 钉层：屏幕坐标直渲（普通 ViewBuilder，筛选/相机变化即时重投）。
+    /// 动画只绑 filter——切筛选淡入淡出；拖拽缩放的连续重投不做动画（跟手优先）。
+    @ViewBuilder
+    private func pinLayer(proxy: MapProxy) -> some View {
+        let _ = cameraTick   // 连续重投影依赖注册
+        ZStack {
+            ForEach(displayItems(proxy: proxy, tick: cameraTick), id: \.key) { item in
+                switch item.output {
+                case .pin(let id, let point):
+                    if let place = visiblePlaces.first(where: { $0.id == id }) {
+                        PlacePin(image: place.latestThumbnail(context: context),
+                                 fallbackText: place.name ?? "地")
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 9)
+                                    .stroke(DS.actionBlue,
+                                            lineWidth: selectedPlace == place ? 2 : 0)
+                                    .padding(-2)
+                            )
+                            .onTapGesture { selectedPlace = place }
+                            .position(point)
+                            .transition(.scale(scale: 0.9).combined(with: .opacity))
+                    }
+                case .cluster(let ids, let point):
+                    Text("\(ids.count) 处")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.vertical, 5).padding(.horizontal, 9)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(DS.darkCard))
+                        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                        .onTapGesture {
+                            if let coord = proxy.convert(point, from: .local) {
+                                zoomInto(coordinate: coord)
+                            }
+                        }
+                        .position(point)
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
+                }
+            }
+        }
+        .animation(.smooth, value: filter)
+    }
+
+    /// 可见地点的取景边界（1.5 倍留白，最小跨度兜底）；空集合返回 nil
+    private func boundingRegion(of places: [CDPlace]) -> MKCoordinateRegion? {
+        guard !places.isEmpty else { return nil }
+        let lats = places.map(\.latitude), lons = places.map(\.longitude)
+        let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2,
+                                            longitude: (lons.min()! + lons.max()!) / 2)
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((lats.max()! - lats.min()!) * 1.5, 0.02),
+            longitudeDelta: max((lons.max()! - lons.min()!) * 1.5, 0.02))
+        return MKCoordinateRegion(center: center, span: span)
+    }
+
+    /// 集合是否全部落在当前视野内（在则筛选切换不动相机）
+    private func contains(_ region: MKCoordinateRegion, allOf places: [CDPlace]) -> Bool {
+        places.allSatisfy { p in
+            abs(p.latitude - region.center.latitude) <= region.span.latitudeDelta / 2
+            && abs(p.longitude - region.center.longitude) <= region.span.longitudeDelta / 2
+        }
+    }
+
+    /// 屏幕空间聚合：坐标→屏幕点→聚合。ForEach 需要稳定 key。
     private func displayItems(proxy: MapProxy, tick: Int) -> [(key: String, output: ClusterOutput)] {
         let inputs = visiblePlaces.compactMap { place -> ClusterInput? in
             guard let id = place.id,
