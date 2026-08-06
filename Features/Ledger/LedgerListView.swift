@@ -90,7 +90,7 @@ struct LedgerListView: View {
             emptyHint
         } else {
             ForEach(list, id: \.objectID) { entry in
-                NavigationLink { Text(entry.title ?? "") } label: { entryCard(entry) }
+                NavigationLink { LedgerDetailView(entry: entry) } label: { entryCard(entry) }
                     .buttonStyle(.plain)
             }
         }
@@ -106,14 +106,14 @@ struct LedgerListView: View {
             if !likes.isEmpty {
                 Text("❤ 喜欢").font(.system(size: 14, weight: .bold))
                 ForEach(likes, id: \.objectID) { entry in
-                    NavigationLink { Text(entry.title ?? "") } label: { moodCard(entry, accent: DS.dsGreen) }
+                    NavigationLink { LedgerDetailView(entry: entry) } label: { moodCard(entry, accent: DS.dsGreen) }
                         .buttonStyle(.plain)
                 }
             }
             if !triggers.isEmpty {
                 Text("⚡ 雷区").font(.system(size: 14, weight: .bold)).padding(.top, 4)
                 ForEach(triggers, id: \.objectID) { entry in
-                    NavigationLink { Text(entry.title ?? "") } label: { moodCard(entry, accent: DS.dsOrange) }
+                    NavigationLink { LedgerDetailView(entry: entry) } label: { moodCard(entry, accent: DS.dsOrange) }
                         .buttonStyle(.plain)
                 }
             }
