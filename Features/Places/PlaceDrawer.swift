@@ -55,6 +55,7 @@ struct PlaceDrawer: View {
                     Text("档案 ›").font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(DS.actionBlue)
                 }
+                .contentShape(Rectangle())   // 头像退出命中后，整行仍可点
             }
             .buttonStyle(.plain)
 

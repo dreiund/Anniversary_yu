@@ -137,6 +137,7 @@ struct DaySheet: View {
                 }
             }
             .padding(.vertical, 8)
+            .contentShape(Rectangle())   // 缩略图退出命中后，整行仍可点
         }
         .buttonStyle(.plain)
         .overlay(alignment: .top) { DS.hairline.frame(height: 1) }

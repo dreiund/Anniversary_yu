@@ -162,5 +162,7 @@ struct MeetingsView: View {
             .padding(12)
         }
         .frame(maxWidth: .infinity)
+        // 封面图已退出命中（防溢出抢点击），整卡命中区由此矩形接管
+        .contentShape(Rectangle())
     }
 }

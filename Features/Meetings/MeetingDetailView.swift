@@ -12,6 +12,7 @@ struct MeetingDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("第 \(meeting.index) 次见面\(meeting.city.map { " · \($0)" } ?? "")").dsFootnote()
+                        .lineLimit(1)   // 三段 chips 定宽后，空间不足由标题截断
                 }
                 Spacer()
                 HStack(spacing: 4) {

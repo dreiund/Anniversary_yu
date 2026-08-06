@@ -201,6 +201,7 @@ struct PlaceProfileView: View {
                 .foregroundStyle(DS.ink)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
+            .contentShape(Rectangle())   // 缩略图退出命中后，整行仍可点
         }
         .buttonStyle(.plain)
     }
