@@ -80,8 +80,10 @@ struct MomentFormView: View {
             }
             .sheet(isPresented: $showPlacePicker) {
                 PlacePickerSheet(initial: coords.map {
-                    PickedPlace(name: locationName, latitude: $0.0, longitude: $0.1)
-                } ?? (locationName.isEmpty ? nil : PickedPlace(name: locationName, latitude: 0, longitude: 0))) { picked in
+                    PickedPlace(name: locationName, latitude: $0.0, longitude: $0.1,
+                                categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
+                } ?? (locationName.isEmpty ? nil : PickedPlace(name: locationName, latitude: 0, longitude: 0,
+                                                                categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID))) { picked in
                     locationName = picked.name
                     coords = (picked.latitude, picked.longitude)
                     locationCategoryRaw = picked.categoryRaw
@@ -230,6 +232,8 @@ struct MomentFormView: View {
         if let place = moment.place, place.latitude != 0 || place.longitude != 0 {
             coords = (place.latitude, place.longitude)
         }
+        locationCategoryRaw = moment.place?.categoryRaw ?? 0
+        linkedPlaceID = moment.place?.id
         loadedPlaceSignature = placeSignature
     }
 

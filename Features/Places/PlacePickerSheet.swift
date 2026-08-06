@@ -224,6 +224,7 @@ struct PlacePickerSheet: View {
                                                 latitudinalMeters: 800, longitudinalMeters: 800))
         }
         categoryRaw = initial.categoryRaw
+        linkedPlaceID = initial.existingPlaceID
     }
 
     private func drop(at coord: CLLocationCoordinate2D, refillAutoName: Bool) {
