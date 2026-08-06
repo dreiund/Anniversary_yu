@@ -272,24 +272,6 @@ struct MomentFormView: View {
         }
     }
 
-    /// PickedPlace → CDPlace：优先关联既有（spec §七），否则按六字段纪律新建
-    private func resolvePlace(_ picked: PickedPlace) -> CDPlace? {
-        if let id = picked.existingPlaceID {
-            let req = NSFetchRequest<CDPlace>(entityName: "CDPlace")
-            req.predicate = NSPredicate(format: "id == %@", id as CVarArg)
-            req.fetchLimit = 1
-            if let existing = (try? context.fetch(req))?.first { return existing }
-        }
-        let place = CDPlace(context: context)
-        place.id = UUID()
-        place.name = picked.name
-        place.latitude = picked.latitude
-        place.longitude = picked.longitude
-        place.categoryRaw = picked.categoryRaw
-        place.createdAt = Date()
-        return place
-    }
-
     private func doCreate(in meeting: CDMeeting, sealNewPastDayAt: Date? = nil) {
         let couples = CoupleRepository(context: context)
         let couple = try? couples.fetchCouple()
@@ -300,9 +282,7 @@ struct MomentFormView: View {
             let picked = PickedPlace(name: locationName.trimmingCharacters(in: .whitespaces),
                                      latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
                                      categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
-            let resolved = resolvePlace(picked)
-            if let resolved, resolved.couple == nil { resolved.couple = couple }
-            place = resolved
+            place = PlaceResolver.resolve(picked, context: context, couple: couple)
         }
 
         let evaluation = stars > 0 || moodEmoji != nil || !comment.isEmpty
@@ -320,7 +300,7 @@ struct MomentFormView: View {
         dismiss()
     }
 
-    /// 地点签名变了才动关系：清空→setPlace(nil)；有值→关联既有或新建 CDPlace（resolvePlace，六字段纪律）。
+    /// 地点签名变了才动关系：清空→setPlace(nil)；有值→关联既有或新建 CDPlace（PlaceResolver.resolve，六字段纪律）。
     /// 旧 CDPlace 不删（可能被其他记忆引用）。
     private func applyPlaceChangeIfNeeded(to moment: CDMoment, repo: MomentRepository) {
         guard placeSignature != loadedPlaceSignature else { return }
@@ -333,7 +313,7 @@ struct MomentFormView: View {
         guard let couple = try? couples.fetchCouple() else { return }
         let picked = PickedPlace(name: trimmed, latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
                                  categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
-        guard let place = resolvePlace(picked) else { return }
+        guard let place = PlaceResolver.resolve(picked, context: context, couple: couple) else { return }
         if place.couple == nil { place.couple = couple }
         try? repo.setPlace(moment, place: place)
     }
