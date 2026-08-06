@@ -183,7 +183,7 @@ struct QuickLedgerSheet: View {
             for evidence in evidencesToDelete { try? repo.deleteEvidence(evidence) }
             if !photoDatas.isEmpty {
                 // 佐证限 1 张：有新图则旧图全清再写
-                for evidence in LedgerRepository(context: context).evidencesSorted(entry) {
+                for evidence in repo.evidencesSorted(entry) {
                     try? repo.deleteEvidence(evidence)
                 }
                 try? repo.addEvidences(entry, datas: photoDatas)

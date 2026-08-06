@@ -27,7 +27,8 @@ enum LedgerRules {
         visibilityRaw == EntryVisibility.sharedImmediately.rawValue || revealedAt != nil
     }
 
-    /// 我的条目恒可见；对方条目仅公开可见（列表 / 详情入口 / 通知判定三处共用，不得旁路）
+    /// 我的条目恒可见；对方条目仅公开可见（列表 / 详情入口共用，不得旁路；
+    /// 通知判定见 HistoryMonitor.ledgerNotifiable 同构实现——Persistence 层避免依赖本层）
     static func isVisible(authorID: UUID?, myID: UUID?, visibilityRaw: Int16, revealedAt: Date?) -> Bool {
         if let authorID, let myID, authorID == myID { return true }
         return isRevealed(visibilityRaw: visibilityRaw, revealedAt: revealedAt)

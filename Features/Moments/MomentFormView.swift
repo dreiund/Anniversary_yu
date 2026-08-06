@@ -314,7 +314,6 @@ struct MomentFormView: View {
         let picked = PickedPlace(name: trimmed, latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
                                  categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
         guard let place = PlaceResolver.resolve(picked, context: context, couple: couple) else { return }
-        if place.couple == nil { place.couple = couple }
         try? repo.setPlace(moment, place: place)
     }
 }
