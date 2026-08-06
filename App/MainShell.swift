@@ -4,6 +4,7 @@ import CoreData
 enum AppTab {
     case us
     case footprints
+    case ledger
 }
 
 struct MainShell: View {
@@ -39,6 +40,7 @@ struct MainShell: View {
                 switch tab {
                 case .us: NavigationStack { HomeView() }
                 case .footprints: NavigationStack { MeetingsView() }
+                case .ledger: NavigationStack { LedgerListView() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -111,7 +113,7 @@ struct MainShell: View {
                 .buttonStyle(DSPressEffect())
                 .offset(y: -8)
                 Spacer()
-                disabledTab("小本本")
+                tabButton("小本本", tab: .ledger)
                 Spacer()
                 disabledTab("她")
             }
