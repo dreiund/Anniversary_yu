@@ -28,6 +28,14 @@ struct PlacesMapView: View {
         VStack(spacing: 0) {
             filterChips
             mapBody
+                // Map 内容闭包不受 SwiftUI 依赖追踪（延迟求值），外部筛选变了钉不会跟；
+                // 把身份边界放在 MapReader 最外层，切筛选整棵子树换新（顺带自动取景）
+                .id(filter)
+        }
+        .onChange(of: filter) {
+            if let selected = selectedPlace, !visiblePlaces.contains(selected) {
+                selectedPlace = nil
+            }
         }
         .navigationDestination(item: $profilePlace) { place in
             PlaceProfileView(place: place)
@@ -98,18 +106,11 @@ struct PlacesMapView: View {
                 }
             }
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
-            // Map 内容闭包不跟外部 @State（筛选）失效——强制按筛选重建整个 Map（顺带按剩余钉自动取景）
-            .id(filter)
             .onMapCameraChange(frequency: .onEnd) { context in
                 currentRegion = context.region
                 cameraTick += 1
                 }
             .onTapGesture { selectedPlace = nil }
-            .onChange(of: filter) {
-                if let selected = selectedPlace, !visiblePlaces.contains(selected) {
-                    selectedPlace = nil
-                }
-            }
             .overlay {
                 if visiblePlaces.isEmpty {
                     Text("还没有带地点的记忆").dsCaption()

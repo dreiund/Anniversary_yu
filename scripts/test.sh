@@ -7,5 +7,6 @@ echo "▶ 模拟器: $SIM"
 xcodebuild test \
   -project Anniversary.xcodeproj -scheme Anniversary \
   -destination "platform=iOS Simulator,name=$SIM" \
+  -skip-testing:AnniversaryUITests \
   -derivedDataPath .build -quiet
 echo "✅ 测试通过"

@@ -48,6 +48,7 @@ targets:
     scheme:
       testTargets:
         - AnniversaryTests
+        - AnniversaryUITests
       commandLineArguments:
         "-InitCloudKitSchema": false
   AnniversaryTests:
@@ -55,6 +56,16 @@ targets:
     platform: iOS
     sources:
       - Tests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Anniversary
+  AnniversaryUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

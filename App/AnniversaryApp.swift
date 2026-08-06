@@ -27,6 +27,11 @@ struct AnniversaryApp: App {
 
     init() {
         _ = AppServices.historyMonitor
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--seed-map-demo") {
+            DebugSeeder.seedMapDemoIfEmpty(context: persistence.viewContext)
+        }
+        #endif
     }
 
     var body: some Scene {
