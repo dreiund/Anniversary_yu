@@ -248,7 +248,7 @@ struct MomentFormView: View {
             applyPlaceChangeIfNeeded(to: moment, repo: repo)
             dismiss()
         case let .create(meeting):
-            let stale = (try? MeetingRepository(context: context).staleOpenDay(in: meeting, now: Date())) ?? nil
+            let stale = (try? MeetingRepository(context: context).staleOpenDay(in: meeting, now: Date(), recordAt: happenedAt)) ?? nil
             if let stale {
                 staleDay = stale
                 return

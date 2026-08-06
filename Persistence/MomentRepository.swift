@@ -13,7 +13,7 @@ struct MomentRepository {
     func create(in meeting: CDMeeting, type: MomentType, title: String, body: String?,
                 happenedAt: Date, photoDatas: [Data], myEvaluation: NewEvaluation?,
                 authorID: UUID?, place: CDPlace?) throws -> CDMoment {
-        let day = try MeetingRepository(context: context).dayForNewRecord(in: meeting, at: happenedAt)
+        let day = try MeetingRepository(context: context).dayForRecord(in: meeting, at: happenedAt)
 
         let moment = CDMoment(context: context)
         moment.id = UUID()
@@ -54,6 +54,14 @@ struct MomentRepository {
         moment.title = title
         moment.body = body
         moment.happenedAt = happenedAt
+        // 反馈③：改日期后按区间规则自动重归属；原天变空则清除（原实现归属不动，是被报的 bug）
+        if let oldDay = moment.dateDay, let meeting = oldDay.meeting {
+            let target = try MeetingRepository(context: context).dayForRecord(in: meeting, at: happenedAt)
+            if target.objectID != oldDay.objectID {
+                moment.dateDay = target
+                MeetingRepository(context: context).pruneDayIfEmpty(oldDay, in: meeting)
+            }
+        }
         try context.save()
     }
 
@@ -63,7 +71,11 @@ struct MomentRepository {
     }
 
     func move(_ moment: CDMoment, to day: CDDateDay) throws {
+        let oldDay = moment.dateDay
         moment.dateDay = day
+        if let oldDay, oldDay.objectID != day.objectID, let meeting = oldDay.meeting {
+            MeetingRepository(context: context).pruneDayIfEmpty(oldDay, in: meeting)
+        }
         try context.save()
     }
 

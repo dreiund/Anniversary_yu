@@ -16,7 +16,7 @@ final class DateDayMachineTests: XCTestCase {
         let (_, repo, m) = try makeOngoingMeeting()
         let t = Date(timeIntervalSince1970: 1_000)
 
-        let day = try repo.dayForNewRecord(in: m, at: t)
+        let day = try repo.dayForRecord(in: m, at: t, now: t)
 
         XCTAssertEqual(day.dayIndex, 1)
         XCTAssertEqual(day.openedAt, t)
@@ -25,18 +25,22 @@ final class DateDayMachineTests: XCTestCase {
 
     func testSecondRecordReusesOpenDay() throws {
         let (_, repo, m) = try makeOngoingMeeting()
-        let d1 = try repo.dayForNewRecord(in: m, at: Date(timeIntervalSince1970: 1_000))
-        let d2 = try repo.dayForNewRecord(in: m, at: Date(timeIntervalSince1970: 5_000))
+        let d1 = try repo.dayForRecord(in: m, at: Date(timeIntervalSince1970: 1_000),
+                                       now: Date(timeIntervalSince1970: 1_000))
+        let d2 = try repo.dayForRecord(in: m, at: Date(timeIntervalSince1970: 5_000),
+                                       now: Date(timeIntervalSince1970: 5_000))
         XCTAssertEqual(d1.objectID, d2.objectID)
         XCTAssertEqual(try repo.daysSorted(in: m).count, 1)
     }
 
     func testSealThenNewRecordOpensNextDay() throws {
         let (_, repo, m) = try makeOngoingMeeting()
-        _ = try repo.dayForNewRecord(in: m, at: Date(timeIntervalSince1970: 1_000))
+        _ = try repo.dayForRecord(in: m, at: Date(timeIntervalSince1970: 1_000),
+                                  now: Date(timeIntervalSince1970: 1_000))
         try repo.sealOpenDay(in: m, at: Date(timeIntervalSince1970: 40_000))
 
-        let day2 = try repo.dayForNewRecord(in: m, at: Date(timeIntervalSince1970: 50_000))
+        let day2 = try repo.dayForRecord(in: m, at: Date(timeIntervalSince1970: 50_000),
+                                         now: Date(timeIntervalSince1970: 50_000))
 
         XCTAssertEqual(day2.dayIndex, 2)
         let days = try repo.daysSorted(in: m)
@@ -45,21 +49,34 @@ final class DateDayMachineTests: XCTestCase {
         XCTAssertNil(days[1].closedAt)
     }
 
-    func testStaleOpenDayAt18HourBoundary() throws {
+    // spec §5.1 修订 6：保险丝仅对「现记跨天」触发；补录与同日马拉松不拦
+    func testStaleInterceptsOnlyLiveCrossDayRecords() throws {
+        let cal = Calendar.current
         let (_, repo, m) = try makeOngoingMeeting()
-        let opened = Date(timeIntervalSince1970: 0)
-        _ = try repo.dayForNewRecord(in: m, at: opened)
+        let opened = cal.date(from: DateComponents(year: 2026, month: 8, day: 5, hour: 20))!
+        _ = try repo.dayForRecord(in: m, at: opened, now: opened)
 
-        let justUnder = opened.addingTimeInterval(18 * 3600 - 60)
-        let justOver = opened.addingTimeInterval(18 * 3600 + 60)
+        let nowOver = opened.addingTimeInterval(18 * 3600 + 60)    // 8/6 14:01，跨天且超时
+        let nowUnder = opened.addingTimeInterval(18 * 3600 - 60)   // 8/6 13:59，跨天未超时
 
-        XCTAssertNil(try repo.staleOpenDay(in: m, now: justUnder))
-        XCTAssertNotNil(try repo.staleOpenDay(in: m, now: justOver))
+        XCTAssertNotNil(try repo.staleOpenDay(in: m, now: nowOver, recordAt: nowOver))
+        XCTAssertNil(try repo.staleOpenDay(in: m, now: nowUnder, recordAt: nowUnder))
+        // 补录过去日期：即便开着的天已超时也不拦
+        let backfillAt = cal.date(from: DateComponents(year: 2026, month: 8, day: 1, hour: 12))!
+        XCTAssertNil(try repo.staleOpenDay(in: m, now: nowOver, recordAt: backfillAt))
+
+        // 同日马拉松：开着的天与记录同一自然日，19 小时也不拦
+        let (_, repo2, m2) = try makeOngoingMeeting()
+        let sameDayOpened = cal.date(from: DateComponents(year: 2026, month: 8, day: 6, minute: 30))!
+        _ = try repo2.dayForRecord(in: m2, at: sameDayOpened, now: sameDayOpened)
+        let lateSameDay = sameDayOpened.addingTimeInterval(19 * 3600)
+        XCTAssertNil(try repo2.staleOpenDay(in: m2, now: lateSameDay, recordAt: lateSameDay))
     }
 
     func testEndMeetingSealsOpenDay() throws {
         let (_, repo, m) = try makeOngoingMeeting()
-        _ = try repo.dayForNewRecord(in: m, at: Date(timeIntervalSince1970: 1_000))
+        _ = try repo.dayForRecord(in: m, at: Date(timeIntervalSince1970: 1_000),
+                                  now: Date(timeIntervalSince1970: 1_000))
 
         let endTime = Date(timeIntervalSince1970: 90_000)
         try repo.end(m, at: endTime)

@@ -47,16 +47,16 @@ final class MomentRepositoryTests: XCTestCase {
         XCTAssertEqual(eval?.comment, "封神")
     }
 
+    // 反馈③区间语义：过去日期补录自动以当日 23:59 收尾；同日再补落回同一区间，次日另开一天
     func testDaysWithMomentsGroupsAndSorts() throws {
-        _ = try moments.create(in: meeting, type: .sight, title: "外滩", body: nil,
-                               happenedAt: Date(timeIntervalSince1970: 5_000),
-                               photoDatas: [], myEvaluation: nil, authorID: creatorID, place: nil)
         _ = try moments.create(in: meeting, type: .restaurant, title: "早茶", body: nil,
                                happenedAt: Date(timeIntervalSince1970: 2_000),
                                photoDatas: [], myEvaluation: nil, authorID: creatorID, place: nil)
-        try meetings.sealOpenDay(in: meeting, at: Date(timeIntervalSince1970: 40_000))
+        _ = try moments.create(in: meeting, type: .sight, title: "外滩", body: nil,
+                               happenedAt: Date(timeIntervalSince1970: 5_000),
+                               photoDatas: [], myEvaluation: nil, authorID: creatorID, place: nil)
         _ = try moments.create(in: meeting, type: .activity, title: "桌游", body: nil,
-                               happenedAt: Date(timeIntervalSince1970: 50_000),
+                               happenedAt: Date(timeIntervalSince1970: 100_000),   // 次日凌晨，区间外
                                photoDatas: [], myEvaluation: nil, authorID: creatorID, place: nil)
 
         let grouped = moments.daysWithMoments(in: meeting)

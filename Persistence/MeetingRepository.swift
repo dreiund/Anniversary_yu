@@ -71,27 +71,64 @@ extension MeetingRepository {
             .max { $0.dayIndex < $1.dayIndex }
     }
 
-    /// 新记录归属的约会日：有开着的天用之；否则新开 dayIndex = 已有最大值 + 1（首条即第 1 天）
+    /// 记录归属的约会日（反馈③轮区间规则，spec §5.1 修订 6）：
+    /// 1) 时刻落在某天区间 [openedAt, closedAt]（开着的天上界开放）→ 归它，已封的天照收（补录不解封）；
+    ///    区间重叠时归 openedAt 最晚的命中天
+    /// 2) 区间外 → 新开一天（openedAt = 记录时刻）；过去的天自动以当日 23:59 收尾——仅区间上界占位，
+    ///    不改变"现记睡觉才算结束"的语义（现记的天照旧手动封盘）
+    /// 3) 天序号按 openedAt 重排，第 1 天恒为最早
     @discardableResult
-    func dayForNewRecord(in meeting: CDMeeting, at date: Date) throws -> CDDateDay {
-        if let open = try openDay(in: meeting) { return open }
-        let maxIndex = ((meeting.dateDays as? Set<CDDateDay>) ?? [])
-            .map(\.dayIndex).max() ?? 0
+    func dayForRecord(in meeting: CDMeeting, at date: Date,
+                      now: Date = Date(), calendar: Calendar = .current) throws -> CDDateDay {
+        let days = (meeting.dateDays as? Set<CDDateDay>) ?? []
+        let hits = days.filter { d in
+            guard let opened = d.openedAt, opened <= date else { return false }
+            guard let closed = d.closedAt else { return true }
+            return date <= closed
+        }
+        if let hit = hits.max(by: { ($0.openedAt ?? .distantPast) < ($1.openedAt ?? .distantPast) }) {
+            return hit
+        }
         let day = CDDateDay(context: context)
         day.id = UUID()
-        day.dayIndex = maxIndex + 1
         day.openedAt = date
         day.meeting = meeting
+        if !calendar.isDate(date, inSameDayAs: now) {
+            day.closedAt = calendar.date(bySettingHour: 23, minute: 59, second: 0, of: date)
+        }
+        renumberDays(in: meeting)
         try context.save()
         return day
     }
 
-    /// 开着的约会日已超过阈值（默认 18 小时）未封盘 → 返回该天（用于新建记录前的补封拦截）
-    func staleOpenDay(in meeting: CDMeeting, now: Date,
-                      threshold: TimeInterval = 18 * 3600) throws -> CDDateDay? {
+    /// 按 openedAt 时间顺序重编 dayIndex（第 1 天恒为最早；先例：deletePlanned 的序号重排）
+    func renumberDays(in meeting: CDMeeting) {
+        let sorted = ((meeting.dateDays as? Set<CDDateDay>) ?? [])
+            .sorted { ($0.openedAt ?? .distantPast) < ($1.openedAt ?? .distantPast) }
+        for (i, day) in sorted.enumerated() where day.dayIndex != Int32(i + 1) {
+            day.dayIndex = Int32(i + 1)
+        }
+    }
+
+    /// 记录挪走后清理空天（无记忆且无亲密记录），并重排天序。调用方随后统一 save。
+    func pruneDayIfEmpty(_ day: CDDateDay, in meeting: CDMeeting) {
+        let moments = (day.moments as? Set<CDMoment>) ?? []
+        let intimacy = (day.intimacyRecords as? Set<CDIntimacyRecord>) ?? []
+        guard moments.isEmpty, intimacy.isEmpty else { return }
+        context.delete(day)
+        renumberDays(in: meeting)
+    }
+
+    /// 补封拦截（spec §5.1-4，修订 6 限定）：仅「现记跨天」触发——
+    /// 记录的是"今天"的事、开着的天却是更早的自然日、且已开超过阈值。补录过去日期不拦。
+    func staleOpenDay(in meeting: CDMeeting, now: Date, recordAt: Date,
+                      threshold: TimeInterval = 18 * 3600,
+                      calendar: Calendar = .current) throws -> CDDateDay? {
         guard let open = try openDay(in: meeting),
               let openedAt = open.openedAt,
-              now.timeIntervalSince(openedAt) > threshold else { return nil }
+              now.timeIntervalSince(openedAt) > threshold,
+              calendar.isDate(recordAt, inSameDayAs: now),
+              !calendar.isDate(openedAt, inSameDayAs: recordAt) else { return nil }
         return open
     }
 

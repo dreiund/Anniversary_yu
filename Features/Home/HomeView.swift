@@ -193,7 +193,7 @@ struct HomeView: View {
         let meetingRepo = MeetingRepository(context: context)
         let momentRepo = MomentRepository(context: context)
         let ongoing = meetings.first { $0.statusRaw == MeetingStatus.ongoing.rawValue }
-        let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date()) } ?? nil
+        let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date(), recordAt: Date()) } ?? nil
         let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
         let pendingEvals = Array(momentsAll.lazy.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
 
