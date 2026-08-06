@@ -12,6 +12,7 @@ struct PlacesMapView: View {
     @State private var filter: PlaceCategory?          // nil = 全部
     @State private var selectedPlace: CDPlace?
     @State private var cameraTick = 0                  // 相机停稳后自增，触发聚合重算
+    @State private var currentRegion: MKCoordinateRegion?
 
     /// 有坐标且挂着记忆的地点，经筛选（spec §4.1）
     private var visiblePlaces: [CDPlace] {
@@ -93,10 +94,16 @@ struct PlacesMapView: View {
                 }
             }
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
-            .onMapCameraChange(frequency: .onEnd) { _ in
+            .onMapCameraChange(frequency: .onEnd) { context in
+                currentRegion = context.region
                 cameraTick += 1
                 }
             .onTapGesture { selectedPlace = nil }
+            .onChange(of: filter) {
+                if let selected = selectedPlace, !visiblePlaces.contains(selected) {
+                    selectedPlace = nil
+                }
+            }
             .overlay {
                 if visiblePlaces.isEmpty {
                     Text("还没有带地点的记忆").dsCaption()
@@ -136,9 +143,17 @@ struct PlacesMapView: View {
 
     private func zoomInto(coordinate: CLLocationCoordinate2D) {
         withAnimation(.smooth) {
-            camera = .region(MKCoordinateRegion(
-                center: coordinate,
-                latitudinalMeters: 800, longitudinalMeters: 800))
+            if let currentRegion {
+                let span = currentRegion.span
+                camera = .region(MKCoordinateRegion(
+                    center: coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: span.latitudeDelta / 2,
+                                          longitudeDelta: span.longitudeDelta / 2)))
+            } else {
+                camera = .region(MKCoordinateRegion(
+                    center: coordinate,
+                    latitudinalMeters: 800, longitudinalMeters: 800))
+            }
         }
     }
 }

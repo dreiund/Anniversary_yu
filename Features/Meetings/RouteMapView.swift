@@ -7,6 +7,7 @@ struct RouteMapView: View {
     let meeting: CDMeeting
     @Environment(\.managedObjectContext) private var context
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FetchRequest private var momentsFetch: FetchedResults<CDMoment>
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var selectedDay: Int32?          // nil = 全部
@@ -14,6 +15,12 @@ struct RouteMapView: View {
     @State private var playing = false
     @State private var cameraTick = 0
     @State private var playToken = 0
+
+    init(meeting: CDMeeting) {
+        self.meeting = meeting
+        _momentsFetch = FetchRequest(sortDescriptors: [],
+                                     predicate: NSPredicate(format: "dateDay.meeting == %@", meeting))
+    }
 
     private var routeDays: [RouteDay] {
         let repo = MomentRepository(context: context)
@@ -35,6 +42,7 @@ struct RouteMapView: View {
     }
 
     var body: some View {
+        let _ = momentsFetch.count   // FetchRequest 依赖注册：对端新增/删除记忆时刷新路线（TimelineListView 同款惯用法）
         let days = routeDays
         VStack(spacing: 0) {
             if days.isEmpty {

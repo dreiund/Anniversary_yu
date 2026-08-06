@@ -59,7 +59,7 @@ struct DaySheet: View {
                         }
                     }
                     if let info = dateDayInfo, let closed = info.closedAt {
-                        Text("\(Fmt.hm.string(from: closed)) 封盘 · 晚安 🌙")
+                        Text("\(Fmt.hm.string(from: closed)) 封盘 · 晚安")
                             .dsFootnote()
                             .frame(maxWidth: .infinity)
                             .padding(.top, 10)
