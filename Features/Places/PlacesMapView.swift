@@ -11,6 +11,7 @@ struct PlacesMapView: View {
     @State private var camera: MapCameraPosition = .automatic
     @State private var filter: PlaceCategory?          // nil = 全部
     @State private var selectedPlace: CDPlace?
+    @State private var profilePlace: CDPlace?   // 程序化推档案：目标页在正常视图环境构建，不进 Map overlay 的链接邪路
     @State private var cameraTick = 0                  // 相机停稳后自增，触发聚合重算
     @State private var currentRegion: MKCoordinateRegion?
 
@@ -27,6 +28,9 @@ struct PlacesMapView: View {
         VStack(spacing: 0) {
             filterChips
             mapBody
+        }
+        .navigationDestination(item: $profilePlace) { place in
+            PlaceProfileView(place: place)
         }
     }
 
@@ -94,6 +98,8 @@ struct PlacesMapView: View {
                 }
             }
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
+            // Map 内容闭包不跟外部 @State（筛选）失效——强制按筛选重建整个 Map（顺带按剩余钉自动取景）
+            .id(filter)
             .onMapCameraChange(frequency: .onEnd) { context in
                 currentRegion = context.region
                 cameraTick += 1
@@ -113,7 +119,7 @@ struct PlacesMapView: View {
                 // 对方远端删除该地点时不渲染已删对象（spec §九，沿用 PlanView 守卫模式）
                 if let selected = selectedPlace,
                    selected.managedObjectContext != nil, !selected.isDeleted {
-                    PlaceDrawer(place: selected)
+                    PlaceDrawer(place: selected, onOpenProfile: { profilePlace = selected })
                         .padding(.bottom, 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }

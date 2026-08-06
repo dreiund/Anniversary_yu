@@ -189,3 +189,4 @@ final class CDPlanItem: NSManagedObject {
 }
 
 extension CDPlanItem: Identifiable {}
+extension CDPlace: Identifiable {}

@@ -4,6 +4,7 @@ import CoreData
 /// 点钉后的富抽屉（spec §4.2，小样选 B）：头行 + 两人均分墨条 + 最近照片条。
 struct PlaceDrawer: View {
     @ObservedObject var place: CDPlace
+    let onOpenProfile: () -> Void
     @Environment(\.managedObjectContext) private var context
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
 
@@ -23,7 +24,7 @@ struct PlaceDrawer: View {
         let lastDate = placeMoments.first?.happenedAt
 
         VStack(alignment: .leading, spacing: 9) {
-            NavigationLink { PlaceProfileView(place: place) } label: {
+            Button(action: onOpenProfile) {
                 HStack(spacing: 9) {
                     Group {
                         if let img = place.latestThumbnail(context: context) {
@@ -64,13 +65,22 @@ struct PlaceDrawer: View {
                 scoreCell(label: "\(other?.name ?? "TA")的均分", value: otherAvg)
             }
 
-            if !placeMoments.isEmpty {
+            // 照片条只收有照片的记忆；一张都没有就整条不显示（反馈：无照片占位方块不美观）
+            let stripImages: [(CDMoment, UIImage)] = placeMoments.compactMap { moment in
+                guard let data = momentRepo.photosSorted(moment).first?.thumbnailData,
+                      let img = UIImage(data: data) else { return nil }
+                return (moment, img)
+            }
+            if !stripImages.isEmpty {
                 HStack(spacing: 5) {
-                    ForEach(Array(placeMoments.prefix(3)), id: \.objectID) { moment in
-                        thumb(moment)
+                    ForEach(Array(stripImages.prefix(3)), id: \.0.objectID) { _, img in
+                        Image(uiImage: img).resizable().scaledToFill()
+                            .frame(width: 40, height: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                            .allowsHitTesting(false)
                     }
-                    if placeMoments.count > 3 {
-                        Text("+\(placeMoments.count - 3)")
+                    if stripImages.count > 3 {
+                        Text("+\(stripImages.count - 3)")
                             .font(.system(size: 10)).foregroundStyle(DS.inkMuted)
                             .frame(width: 40, height: 40)
                             .background(RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.parchment))
@@ -112,17 +122,4 @@ struct PlaceDrawer: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func thumb(_ moment: CDMoment) -> some View {
-        let data = MomentRepository(context: context).photosSorted(moment).first?.thumbnailData
-        return Group {
-            if let data, let img = UIImage(data: data) {
-                Image(uiImage: img).resizable().scaledToFill()
-            } else {
-                RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.parchment)
-            }
-        }
-        .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
-        .allowsHitTesting(false)   // 溢出不抢头行链接点击
-    }
 }
