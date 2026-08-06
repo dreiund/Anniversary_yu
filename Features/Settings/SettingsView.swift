@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage("showCountdown") private var showCountdown = true
     @AppStorage("sealReminderOn") private var sealReminderOn = true
     @AppStorage("newMomentAlertOn") private var newMomentAlertOn = true
+    @AppStorage("newLedgerAlertOn") private var newLedgerAlertOn = true
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var partnerName = ""
@@ -72,6 +73,9 @@ struct SettingsView: View {
                         }
                     DS.hairline.frame(height: 1).padding(.leading, 14)
                     Toggle("新记忆提醒", isOn: $newMomentAlertOn)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                    DS.hairline.frame(height: 1).padding(.leading, 14)
+                    Toggle("TA 记了小本本", isOn: $newLedgerAlertOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
 

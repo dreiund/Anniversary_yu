@@ -5,6 +5,7 @@ import CoreData
 private final class SpyNotifier: MomentNotifying {
     var calls: [[String]] = []
     func notifyNewMoments(titles: [String]) { calls.append(titles) }
+    func notifyNewLedgerEntries(count: Int) {}
 }
 
 final class HistoryMonitorTests: XCTestCase {
@@ -51,10 +52,11 @@ final class HistoryMonitorTests: XCTestCase {
         if let thrown { throw thrown }
     }
 
-    private func makeMonitor(notifier: SpyNotifier, enabled: Bool = true, me: UUID) -> HistoryMonitor {
+    private func makeMonitor(notifier: SpyNotifier, enabled: Bool = true, ledgerEnabled: Bool = true,
+                             me: UUID) -> HistoryMonitor {
         HistoryMonitor(container: container, localAuthor: "AnniversaryApp",
                        notifier: notifier, defaults: defaults,
-                       isEnabled: { enabled }, myPartnerID: { _ in me })
+                       isEnabled: { enabled }, isLedgerEnabled: { ledgerEnabled }, myPartnerID: { _ in me })
     }
 
     func testPartnerImportTriggersNotificationOnce() throws {

@@ -2,6 +2,7 @@ import CoreData
 
 protocol MomentNotifying {
     func notifyNewMoments(titles: [String])
+    func notifyNewLedgerEntries(count: Int)
 }
 
 /// 远程导入监听：镜像把对方的写入合进本地库时（NSPersistentStoreRemoteChange），
@@ -15,6 +16,7 @@ final class HistoryMonitor {
     private let notifier: MomentNotifying
     private let defaults: UserDefaults
     private let isEnabled: () -> Bool
+    private let isLedgerEnabled: () -> Bool
     /// 在 monitor 的后台 context 队列内被调用，实现只能用传入的 context 取数
     private let myPartnerID: (NSManagedObjectContext) -> UUID?
     private var observer: NSObjectProtocol?
@@ -24,12 +26,14 @@ final class HistoryMonitor {
 
     init(container: NSPersistentContainer, localAuthor: String, notifier: MomentNotifying,
          defaults: UserDefaults = .standard,
-         isEnabled: @escaping () -> Bool, myPartnerID: @escaping (NSManagedObjectContext) -> UUID?) {
+         isEnabled: @escaping () -> Bool,
+         isLedgerEnabled: @escaping () -> Bool, myPartnerID: @escaping (NSManagedObjectContext) -> UUID?) {
         self.container = container
         self.localAuthor = localAuthor
         self.notifier = notifier
         self.defaults = defaults
         self.isEnabled = isEnabled
+        self.isLedgerEnabled = isLedgerEnabled
         self.myPartnerID = myPartnerID
     }
 
@@ -56,23 +60,49 @@ final class HistoryMonitor {
                       !transactions.isEmpty else { return }
 
                 var insertedMomentIDs: [NSManagedObjectID] = []
+                var ledgerIDs = Set<NSManagedObjectID>()
                 for transaction in transactions where transaction.author != localAuthor {
-                    for change in transaction.changes ?? []
-                    where change.changeType == .insert && change.changedObjectID.entity.name == "CDMoment" {
-                        insertedMomentIDs.append(change.changedObjectID)
+                    for change in transaction.changes ?? [] {
+                        let entity = change.changedObjectID.entity.name
+                        if change.changeType == .insert && entity == "CDMoment" {
+                            insertedMomentIDs.append(change.changedObjectID)
+                        }
+                        if entity == "CDLedgerEntry" {
+                            switch change.changeType {
+                            case .insert:
+                                ledgerIDs.insert(change.changedObjectID)
+                            case .update:
+                                if change.updatedProperties?.contains(where: { $0.name == "revealedAt" }) == true {
+                                    ledgerIDs.insert(change.changedObjectID)
+                                }
+                            default: break
+                            }
+                        }
                     }
                 }
                 if let last = transactions.last { saveToken(last.token) }
 
-                guard isEnabled(), !insertedMomentIDs.isEmpty else { return }
-                let me = myPartnerID(context)
-                let titles: [String] = insertedMomentIDs.compactMap { id in
-                    guard let moment = try? context.existingObject(with: id) as? CDMoment else { return nil }
-                    if let me, moment.authorPartnerID == me { return nil }  // 自己另一台设备写的不提醒
-                    return moment.title ?? "新回忆"
+                if isEnabled(), !insertedMomentIDs.isEmpty {
+                    let me = myPartnerID(context)
+                    let titles: [String] = insertedMomentIDs.compactMap { id in
+                        guard let moment = try? context.existingObject(with: id) as? CDMoment else { return nil }
+                        if let me, moment.authorPartnerID == me { return nil }  // 自己另一台设备写的不提醒
+                        return moment.title ?? "新回忆"
+                    }
+                    if !titles.isEmpty {
+                        notifier.notifyNewMoments(titles: titles)
+                    }
                 }
-                if !titles.isEmpty {
-                    notifier.notifyNewMoments(titles: titles)
+
+                if isLedgerEnabled(), !ledgerIDs.isEmpty {
+                    let me = myPartnerID(context)
+                    let count = ledgerIDs.reduce(into: 0) { acc, id in
+                        guard let entry = try? context.existingObject(with: id) as? CDLedgerEntry else { return }
+                        if Self.ledgerNotifiable(authorIsMe: me != nil && entry.authorPartnerID == me,
+                                                 visibilityRaw: entry.visibilityRaw,
+                                                 revealedAt: entry.revealedAt) { acc += 1 }
+                    }
+                    if count > 0 { notifier.notifyNewLedgerEntries(count: count) }
                 }
             }
         }
@@ -86,5 +116,12 @@ final class HistoryMonitor {
     private func saveToken(_ token: NSPersistentHistoryToken) {
         guard let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true) else { return }
         defaults.set(data, forKey: Self.tokenKey)
+    }
+
+    /// 对方的公开条目才提醒（可见性判定与 LedgerRules.isRevealed 同构，独立实现避免层次反转）
+    nonisolated static func ledgerNotifiable(authorIsMe: Bool, visibilityRaw: Int16,
+                                             revealedAt: Date?) -> Bool {
+        guard !authorIsMe else { return false }
+        return visibilityRaw == EntryVisibility.sharedImmediately.rawValue || revealedAt != nil
     }
 }
