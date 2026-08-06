@@ -235,7 +235,9 @@ struct LedgerFormView: View {
         title = entry.title ?? ""
         detail = entry.detail ?? ""
         happenedAt = entry.happenedAt ?? Date()
-        visibility = EntryVisibility(rawValue: entry.visibilityRaw) ?? .sharedImmediately
+        // 经详情页仪式公开的条目 visibilityRaw 仍为私密（reveal 不碰它）——锁定态强制显示「公开」
+        visibility = visibilityLocked ? .sharedImmediately
+            : (EntryVisibility(rawValue: entry.visibilityRaw) ?? .sharedImmediately)
         if let place = entry.place {
             locationName = place.name ?? ""
             coords = (place.latitude, place.longitude)
