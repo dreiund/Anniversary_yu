@@ -116,7 +116,7 @@ struct LedgerDetailView: View {
             if category == .praise || category == .complaint {
                 LedgerFormView(mode: .edit(entry))
             } else {
-                Text("喜怒编辑 T8 接入")
+                QuickLedgerSheet(mode: .edit(entry))
             }
         }
         .fullScreenCover(item: Binding(
