@@ -24,12 +24,16 @@ struct MainShell: View {
         case newMoment(CDMeeting)
         case mood
         case seal(CDMeeting)
+        case ledgerForm
+        case quickLedger
 
         var id: String {
             switch self {
             case .newMoment: "newMoment"
             case .mood: "mood"
             case .seal: "seal"
+            case .ledgerForm: "ledgerForm"
+            case .quickLedger: "quickLedger"
             }
         }
     }
@@ -69,6 +73,14 @@ struct MainShell: View {
                 }
             case .seal(let meeting):
                 SealSheet(meeting: meeting)
+            case .ledgerForm:
+                if let couple = try? CoupleRepository(context: context).fetchCouple() {
+                    LedgerFormView(mode: .create(couple))
+                }
+            case .quickLedger:
+                if let couple = try? CoupleRepository(context: context).fetchCouple() {
+                    QuickLedgerSheet(mode: .create(couple))
+                }
             }
         }
         .alert("还没有进行中的见面", isPresented: $showNoMeetingAlert) {
@@ -89,6 +101,10 @@ struct MainShell: View {
             activeSheet = .mood
         case .seal:
             if let meeting = ongoingMeetings.first { activeSheet = .seal(meeting) }
+        case .ledgerEntry:
+            activeSheet = .ledgerForm
+        case .quickEntry:
+            activeSheet = .quickLedger
         }
     }
 

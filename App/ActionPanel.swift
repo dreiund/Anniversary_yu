@@ -4,6 +4,8 @@ enum PanelAction {
     case newMoment
     case mood
     case seal
+    case ledgerEntry
+    case quickEntry
 }
 
 struct ActionPanel: View {
@@ -19,9 +21,9 @@ struct ActionPanel: View {
     private var tiles: [Tile] {
         [
             Tile(symbol: "photo.on.rectangle", title: "记忆", action: .newMoment),
-            Tile(symbol: "square.and.pencil", title: "互评", action: nil),
+            Tile(symbol: "square.and.pencil", title: "互评", action: .ledgerEntry),
             Tile(symbol: "face.smiling", title: "心情", action: .mood),
-            Tile(symbol: "heart", title: "喜怒", action: nil),
+            Tile(symbol: "heart", title: "喜怒", action: .quickEntry),
             Tile(symbol: "sparkles", title: "亲密", action: nil),
             Tile(symbol: "drop", title: "经期", action: nil),
         ]
