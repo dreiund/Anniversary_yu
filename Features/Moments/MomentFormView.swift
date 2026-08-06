@@ -26,6 +26,7 @@ struct MomentFormView: View {
     @State private var locationCategoryRaw: Int16 = 0
     @State private var linkedPlaceID: UUID?
     @State private var staleDay: CDDateDay?
+    @State private var backfillSeal: BackfillSealTarget?
     @State private var showPlacePicker = false
     @State private var existingPhotos: [CDPhoto] = []
     @State private var photosToDelete: [CDPhoto] = []
@@ -75,6 +76,14 @@ struct MomentFormView: View {
                     if case let .create(meeting) = mode {
                         try? MeetingRepository(context: context).sealOpenDay(in: meeting, at: sealTime)
                         doCreate(in: meeting)
+                    }
+                }
+            }
+            .sheet(item: $backfillSeal) { target in
+                BackfillSealSheet(day: target.id) { sealAt in
+                    backfillSeal = nil
+                    if case let .create(meeting) = mode {
+                        doCreate(in: meeting, sealNewPastDayAt: sealAt)
                     }
                 }
             }
@@ -248,9 +257,15 @@ struct MomentFormView: View {
             applyPlaceChangeIfNeeded(to: moment, repo: repo)
             dismiss()
         case let .create(meeting):
-            let stale = (try? MeetingRepository(context: context).staleOpenDay(in: meeting, now: Date(), recordAt: happenedAt)) ?? nil
+            let meetingRepo = MeetingRepository(context: context)
+            let stale = (try? meetingRepo.staleOpenDay(in: meeting, now: Date(), recordAt: happenedAt)) ?? nil
             if let stale {
                 staleDay = stale
+                return
+            }
+            // 反馈④：补录要新开过去的天 → 先选那天的收尾时刻，不再默认 23:59
+            if meetingRepo.wouldOpenNewPastDay(in: meeting, at: happenedAt) {
+                backfillSeal = BackfillSealTarget(id: happenedAt)
                 return
             }
             doCreate(in: meeting)
@@ -275,7 +290,7 @@ struct MomentFormView: View {
         return place
     }
 
-    private func doCreate(in meeting: CDMeeting) {
+    private func doCreate(in meeting: CDMeeting, sealNewPastDayAt: Date? = nil) {
         let couples = CoupleRepository(context: context)
         let couple = try? couples.fetchCouple()
         let authorID = couple.flatMap { couples.currentPartnerID(of: $0) }
@@ -299,7 +314,8 @@ struct MomentFormView: View {
             in: meeting, type: type, title: title,
             body: bodyText.isEmpty ? nil : bodyText,
             happenedAt: happenedAt, photoDatas: photoDatas,
-            myEvaluation: evaluation, authorID: authorID, place: place)
+            myEvaluation: evaluation, authorID: authorID, place: place,
+            sealNewPastDayAt: sealNewPastDayAt)
         SealReminder.refresh(context: context)
         dismiss()
     }
@@ -324,3 +340,8 @@ struct MomentFormView: View {
 }
 
 extension CDDateDay: Identifiable {}
+
+/// 补录待选收尾时刻的目标日（sheet item）
+struct BackfillSealTarget: Identifiable {
+    let id: Date
+}

@@ -84,6 +84,31 @@ final class DayAttributionTests: XCTestCase {
         XCTAssertEqual(hit.objectID, inner.objectID)
     }
 
+    // 反馈④：补录新开过去天时，封盘时刻由调用方指定（UI 弹选时刻），可跨午夜
+    func testCustomSealTimeForNewPastDay() throws {
+        let (_, repo, m) = try makeOngoingMeeting()
+
+        let day = try repo.dayForRecord(in: m, at: d(8, 1, 15), now: today,
+                                        sealNewPastDayAt: d(8, 2, 1, 30))
+
+        XCTAssertEqual(day.closedAt, d(8, 2, 1, 30))
+        // 自选的跨午夜区间照常收后续补录
+        let hit = try repo.dayForRecord(in: m, at: d(8, 2, 0, 40), now: today)
+        XCTAssertEqual(hit.objectID, day.objectID)
+    }
+
+    // 反馈④：是否将新开过去天的判定（UI 决定要不要弹选时刻 sheet）
+    func testWouldOpenNewPastDay() throws {
+        let (_, repo, m) = try makeOngoingMeeting()
+        // 空表 + 过去日期 → 要新开
+        XCTAssertTrue(repo.wouldOpenNewPastDay(in: m, at: d(8, 1, 15), now: today))
+        _ = try repo.dayForRecord(in: m, at: d(8, 1, 15), now: today)
+        // 已有区间命中 → 不新开
+        XCTAssertFalse(repo.wouldOpenNewPastDay(in: m, at: d(8, 1, 20), now: today))
+        // 今天的区间外记录 → 新开但不是"过去天"，不弹
+        XCTAssertFalse(repo.wouldOpenNewPastDay(in: m, at: today, now: today))
+    }
+
     // 编辑改期：自动按区间规则重归属，原天变空则清除并重排
     func testUpdateReattributesAndPrunesEmptyDay() throws {
         let (pc, repo, m) = try makeOngoingMeeting()

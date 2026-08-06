@@ -12,8 +12,9 @@ struct MomentRepository {
     @discardableResult
     func create(in meeting: CDMeeting, type: MomentType, title: String, body: String?,
                 happenedAt: Date, photoDatas: [Data], myEvaluation: NewEvaluation?,
-                authorID: UUID?, place: CDPlace?) throws -> CDMoment {
-        let day = try MeetingRepository(context: context).dayForRecord(in: meeting, at: happenedAt)
+                authorID: UUID?, place: CDPlace?, sealNewPastDayAt: Date? = nil) throws -> CDMoment {
+        let day = try MeetingRepository(context: context)
+            .dayForRecord(in: meeting, at: happenedAt, sealNewPastDayAt: sealNewPastDayAt)
 
         let moment = CDMoment(context: context)
         moment.id = UUID()

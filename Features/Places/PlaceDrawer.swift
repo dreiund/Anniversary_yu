@@ -39,6 +39,7 @@ struct PlaceDrawer: View {
                     .frame(width: 40, height: 40)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(DS.hairline, lineWidth: 1))
+                    .allowsHitTesting(false)   // 溢出不抢头行链接点击
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 5) {
                             Text(place.name ?? "未命名")
@@ -121,5 +122,6 @@ struct PlaceDrawer: View {
         }
         .frame(width: 40, height: 40)
         .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+        .allowsHitTesting(false)   // 溢出不抢头行链接点击
     }
 }

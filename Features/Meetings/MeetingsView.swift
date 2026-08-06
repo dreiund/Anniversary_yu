@@ -145,6 +145,7 @@ struct MeetingsView: View {
                                                  startPoint: .center, endPoint: .bottom))
                     )
                     .dsPhotoShadow()
+                    .allowsHitTesting(false)   // 溢出不抢相邻卡点击
             } else {
                 RoundedRectangle(cornerRadius: DS.Radius.image)
                     .fill(DS.parchment)

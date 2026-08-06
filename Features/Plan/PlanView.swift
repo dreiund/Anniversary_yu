@@ -12,6 +12,7 @@ struct PlanView: View {
     @State private var editingItem: CDPlanItem?
     @State private var showAdd = false
     @State private var showEditForm = false
+    @State private var goDetail = false
     @Environment(\.dismiss) private var dismiss
 
     init(meeting: CDMeeting) {
@@ -93,6 +94,7 @@ struct PlanView: View {
             // 表单里删除计划后：等 sheet 完全收场再退出本页——body 守卫在转场中会竞速失效
             if meeting.managedObjectContext == nil || meeting.isDeleted { dismiss() }
         }) { MeetingFormView(mode: .edit(meeting)) }
+        .navigationDestination(isPresented: $goDetail) { MeetingDetailView(meeting: meeting) }
     }
 
     private var header: some View {
@@ -108,6 +110,7 @@ struct PlanView: View {
                 if ongoingMeetings.isEmpty {
                     Button("开始见面") {
                         try? MeetingRepository(context: context).start(meeting, at: Date())
+                        goDetail = true   // 反馈④：开始后直接进见面详情（时间线），不留在计划页
                     }
                     .buttonStyle(BluePillButtonStyle())
                     .padding(.top, 6)

@@ -86,6 +86,9 @@ struct TimelineListView: View {
                     .resizable().scaledToFill()
                     .frame(maxWidth: .infinity).frame(height: 200)
                     .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                    // scaledToFill 的不可见溢出会替下方卡片抢走上方卡片的点击（clipShape 不裁命中区）；
+                    // 装饰图彻底退出命中测试，点击全部交给卡片矩形
+                    .allowsHitTesting(false)
             }
             HStack {
                 Text(moment.title ?? "").font(.system(size: 17, weight: .semibold)).foregroundStyle(DS.ink)

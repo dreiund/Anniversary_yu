@@ -187,6 +187,7 @@ struct PlaceProfileView: View {
                 }
                 .frame(width: 36, height: 36)
                 .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                .allowsHitTesting(false)   // 溢出不抢相邻行点击
                 VStack(alignment: .leading, spacing: 2) {
                     Text(moment.title ?? "未命名").dsBody().lineLimit(1)
                     Text(sub).dsFootnote()

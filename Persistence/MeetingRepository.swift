@@ -79,26 +79,38 @@ extension MeetingRepository {
     /// 3) 天序号按 openedAt 重排，第 1 天恒为最早
     @discardableResult
     func dayForRecord(in meeting: CDMeeting, at date: Date,
-                      now: Date = Date(), calendar: Calendar = .current) throws -> CDDateDay {
-        let days = (meeting.dateDays as? Set<CDDateDay>) ?? []
-        let hits = days.filter { d in
-            guard let opened = d.openedAt, opened <= date else { return false }
-            guard let closed = d.closedAt else { return true }
-            return date <= closed
-        }
-        if let hit = hits.max(by: { ($0.openedAt ?? .distantPast) < ($1.openedAt ?? .distantPast) }) {
-            return hit
-        }
+                      now: Date = Date(), calendar: Calendar = .current,
+                      sealNewPastDayAt: Date? = nil) throws -> CDDateDay {
+        if let hit = rangeHit(in: meeting, at: date) { return hit }
         let day = CDDateDay(context: context)
         day.id = UUID()
         day.openedAt = date
         day.meeting = meeting
         if !calendar.isDate(date, inSameDayAs: now) {
-            day.closedAt = calendar.date(bySettingHour: 23, minute: 59, second: 0, of: date)
+            // 反馈④：补录新开的过去天，收尾时刻优先用调用方（UI 选时刻 sheet）给的；无则 23:59 占位
+            day.closedAt = sealNewPastDayAt
+                ?? calendar.date(bySettingHour: 23, minute: 59, second: 0, of: date)
         }
         renumberDays(in: meeting)
         try context.save()
         return day
+    }
+
+    /// 区间命中：[openedAt, closedAt]（开着的天上界开放），重叠取 openedAt 最晚
+    private func rangeHit(in meeting: CDMeeting, at date: Date) -> CDDateDay? {
+        ((meeting.dateDays as? Set<CDDateDay>) ?? [])
+            .filter { d in
+                guard let opened = d.openedAt, opened <= date else { return false }
+                guard let closed = d.closedAt else { return true }
+                return date <= closed
+            }
+            .max { ($0.openedAt ?? .distantPast) < ($1.openedAt ?? .distantPast) }
+    }
+
+    /// 这条记录会不会新开一个「过去的天」（UI 据此决定是否弹封盘时刻选择）
+    func wouldOpenNewPastDay(in meeting: CDMeeting, at date: Date,
+                             now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        rangeHit(in: meeting, at: date) == nil && !calendar.isDate(date, inSameDayAs: now)
     }
 
     /// 按 openedAt 时间顺序重编 dayIndex（第 1 天恒为最早；先例：deletePlanned 的序号重排）
