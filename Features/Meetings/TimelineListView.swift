@@ -120,5 +120,7 @@ struct TimelineListView: View {
         .padding(10)
         .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
         .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
+        // 命中区限定在卡片矩形内：scaledToFill 照片的不可见溢出不再劫持相邻卡片的点击
+        .contentShape(Rectangle())
     }
 }

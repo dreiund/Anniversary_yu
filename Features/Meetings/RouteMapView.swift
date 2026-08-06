@@ -91,7 +91,7 @@ struct RouteMapView: View {
                 }
             }
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
-            .onMapCameraChange(frequency: .onEnd) { _ in cameraTick += 1 }
+            .onMapCameraChange(frequency: .continuous) { _ in cameraTick += 1 }  // 连续重投：虚线随拖拽缩放实时跟手
             .overlay {
                 let _ = cameraTick   // 相机变化后重投屏幕点
                 routeLines(proxy: proxy)
