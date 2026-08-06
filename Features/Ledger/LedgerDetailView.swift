@@ -112,7 +112,13 @@ struct LedgerDetailView: View {
             }
             Button("取消", role: .cancel) {}
         }
-        .sheet(isPresented: $showEdit) { Text("编辑表单 T7/T8 接入") }
+        .sheet(isPresented: $showEdit) {
+            if category == .praise || category == .complaint {
+                LedgerFormView(mode: .edit(entry))
+            } else {
+                Text("喜怒编辑 T8 接入")
+            }
+        }
         .fullScreenCover(item: Binding(
             get: { viewerIndex.map { EvidenceIndex(id: $0) } },
             set: { viewerIndex = $0?.id })) { index in
