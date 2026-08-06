@@ -24,6 +24,10 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>iosamap</string>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于给记忆自动记录当前位置</string>
 	<key>UIBackgroundModes</key>

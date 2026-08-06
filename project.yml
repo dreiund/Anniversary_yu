@@ -30,6 +30,7 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSLocationWhenInUseUsageDescription: 用于给记忆自动记录当前位置
+        LSApplicationQueriesSchemes: [iosamap]
         CKSharingSupported: true
         UIBackgroundModes: [remote-notification]
         ITSAppUsesNonExemptEncryption: false

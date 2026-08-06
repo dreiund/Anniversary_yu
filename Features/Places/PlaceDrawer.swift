@@ -87,6 +87,21 @@ struct PlaceDrawer: View {
                     }
                 }
             }
+
+            if place.latitude != 0 || place.longitude != 0 {
+                Button {
+                    AmapNavigator.navigate(name: place.name ?? "目的地",
+                                           latitude: place.latitude, longitude: place.longitude)
+                } label: {
+                    Text("导航到这里 ›")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DS.actionBlue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(DS.parchment))
+                }
+                .buttonStyle(DSPressEffect())
+            }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: DS.Radius.large).fill(DS.canvas))

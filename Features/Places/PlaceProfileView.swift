@@ -53,9 +53,17 @@ struct PlaceProfileView: View {
                              value: otherAvg.map { String(format: "%.1f", $0) } ?? "—",
                              bar: otherAvg)
                 }
-                Button("在地图中查看 ›") { showMiniMap = true }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(DS.actionBlue)
+                HStack(spacing: 18) {
+                    Button("在地图中查看 ›") { showMiniMap = true }
+                    if place.latitude != 0 || place.longitude != 0 {
+                        Button("导航到这里 ›") {
+                            AmapNavigator.navigate(name: place.name ?? "目的地",
+                                                   latitude: place.latitude, longitude: place.longitude)
+                        }
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(DS.actionBlue)
                 historyList
             }
             .padding(DS.Spacing.md)
