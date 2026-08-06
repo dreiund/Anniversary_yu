@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import CoreData
 
 enum MomentFormMode {
     case create(CDMeeting)
@@ -22,6 +23,8 @@ struct MomentFormView: View {
     @State private var comment = ""
     @State private var locationName = ""
     @State private var coords: (Double, Double)?
+    @State private var locationCategoryRaw: Int16 = 0
+    @State private var linkedPlaceID: UUID?
     @State private var staleDay: CDDateDay?
     @State private var showPlacePicker = false
     @State private var existingPhotos: [CDPhoto] = []
@@ -81,6 +84,8 @@ struct MomentFormView: View {
                 } ?? (locationName.isEmpty ? nil : PickedPlace(name: locationName, latitude: 0, longitude: 0))) { picked in
                     locationName = picked.name
                     coords = (picked.latitude, picked.longitude)
+                    locationCategoryRaw = picked.categoryRaw
+                    linkedPlaceID = picked.existingPlaceID
                 }
             }
         }
@@ -195,6 +200,8 @@ struct MomentFormView: View {
                     Button("清除") {
                         locationName = ""
                         coords = nil
+                        locationCategoryRaw = 0
+                        linkedPlaceID = nil
                     }
                     .font(.system(size: 14))
                     .foregroundStyle(DS.inkMuted)
@@ -246,6 +253,24 @@ struct MomentFormView: View {
         }
     }
 
+    /// PickedPlace → CDPlace：优先关联既有（spec §七），否则按六字段纪律新建
+    private func resolvePlace(_ picked: PickedPlace) -> CDPlace? {
+        if let id = picked.existingPlaceID {
+            let req = NSFetchRequest<CDPlace>(entityName: "CDPlace")
+            req.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+            req.fetchLimit = 1
+            if let existing = (try? context.fetch(req))?.first { return existing }
+        }
+        let place = CDPlace(context: context)
+        place.id = UUID()
+        place.name = picked.name
+        place.latitude = picked.latitude
+        place.longitude = picked.longitude
+        place.categoryRaw = picked.categoryRaw
+        place.createdAt = Date()
+        return place
+    }
+
     private func doCreate(in meeting: CDMeeting) {
         let couples = CoupleRepository(context: context)
         let couple = try? couples.fetchCouple()
@@ -253,14 +278,12 @@ struct MomentFormView: View {
 
         var place: CDPlace?
         if !locationName.trimmingCharacters(in: .whitespaces).isEmpty, let couple {
-            let p = CDPlace(context: context)
-            p.id = UUID()
-            p.name = locationName.trimmingCharacters(in: .whitespaces)
-            p.latitude = coords?.0 ?? 0
-            p.longitude = coords?.1 ?? 0
-            p.createdAt = Date()
-            p.couple = couple
-            place = p
+            let picked = PickedPlace(name: locationName.trimmingCharacters(in: .whitespaces),
+                                     latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
+                                     categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
+            let resolved = resolvePlace(picked)
+            if let resolved, resolved.couple == nil { resolved.couple = couple }
+            place = resolved
         }
 
         let evaluation = stars > 0 || moodEmoji != nil || !comment.isEmpty
@@ -277,8 +300,8 @@ struct MomentFormView: View {
         dismiss()
     }
 
-    /// 地点签名变了才动关系：清空→setPlace(nil)；有值→新建 CDPlace（六字段纪律）。
-    /// 旧 CDPlace 不删（可能被其他记忆引用；归并与档案是 P3 范围）。
+    /// 地点签名变了才动关系：清空→setPlace(nil)；有值→关联既有或新建 CDPlace（resolvePlace，六字段纪律）。
+    /// 旧 CDPlace 不删（可能被其他记忆引用）。
     private func applyPlaceChangeIfNeeded(to moment: CDMoment, repo: MomentRepository) {
         guard placeSignature != loadedPlaceSignature else { return }
         let trimmed = locationName.trimmingCharacters(in: .whitespaces)
@@ -288,13 +311,10 @@ struct MomentFormView: View {
         }
         let couples = CoupleRepository(context: context)
         guard let couple = try? couples.fetchCouple() else { return }
-        let place = CDPlace(context: context)
-        place.id = UUID()
-        place.name = trimmed
-        place.latitude = coords?.0 ?? 0
-        place.longitude = coords?.1 ?? 0
-        place.createdAt = Date()
-        place.couple = couple
+        let picked = PickedPlace(name: trimmed, latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
+                                 categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
+        guard let place = resolvePlace(picked) else { return }
+        if place.couple == nil { place.couple = couple }
         try? repo.setPlace(moment, place: place)
     }
 }
