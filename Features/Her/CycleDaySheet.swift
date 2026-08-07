@@ -125,13 +125,13 @@ struct CycleDaySheet: View {
         TextField("备注（可选）", text: $note, axis: .vertical)
             .padding(10)
             .background(RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.parchment))
-            .onSubmit { saveLog(cycle: cycle, pain: log?.painRaw ?? 0,
-                                flow: log?.flowRaw ?? 0, color: log?.colorRaw ?? 0) }
+            .onChange(of: note) { _, _ in
+                saveLog(cycle: cycle, pain: log?.painRaw ?? 0,
+                        flow: log?.flowRaw ?? 0, color: log?.colorRaw ?? 0)
+            }
         if cycle.endDate == nil, cal.startOfDay(for: day) >= (cycle.startDate ?? day) {
             Button("这天经期结束") { endCycle(cycle) }
                 .buttonStyle(GhostPillButtonStyle())
-                .frame(maxWidth: .infinity)
-                .tint(DS.roseCycle)
         }
     }
 
