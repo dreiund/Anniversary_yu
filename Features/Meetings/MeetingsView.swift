@@ -9,6 +9,9 @@ struct MeetingsView: View {
     @State private var showForm = false
     @State private var pendingDelete: CDMeeting?
     @State private var openSwipeID: NSManagedObjectID?
+    @State private var selecting = false
+    @State private var selected: Set<NSManagedObjectID> = []
+    @State private var confirmBatch = false
 
     private var deleteIsPlanned: Bool {
         pendingDelete.map { MeetingStatus(rawValue: $0.statusRaw) == .planned } ?? false
@@ -40,6 +43,40 @@ struct MeetingsView: View {
         .background(DS.canvas)
         .navigationTitle("足迹")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: segment) { _, _ in
+            selecting = false
+            selected = []
+        }
+        .toolbar {
+            if segment == 0 && !meetings.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(selecting ? "完成" : "管理") {
+                        selecting.toggle()
+                        selected = []
+                        openSwipeID = nil
+                    }
+                    .font(.system(size: 14))
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if selecting && segment == 0 {
+                FrostedBottomBar {
+                    BatchDeleteBar(count: selected.count) { confirmBatch = true }
+                }
+            }
+        }
+        .alert("删除所选 \(selected.count) 项？", isPresented: $confirmBatch) {
+            Button("删除所选", role: .destructive) {
+                let picked = meetings.filter { selected.contains($0.objectID) }
+                try? MeetingRepository(context: context).delete(Array(picked))
+                selected = []
+                selecting = false
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("所选见面的约会日、记忆和照片会一并删除，无法恢复。")
+        }
         .sheet(isPresented: $showForm) {
             if let couple = couples.first { MeetingFormView(mode: .create(couple)) }
         }
@@ -68,10 +105,22 @@ struct MeetingsView: View {
         ScrollView {
             VStack(spacing: DS.Spacing.md) {
                 ForEach(meetings, id: \.objectID) { meeting in
-                    SwipeDeleteRow(id: meeting.objectID, openID: $openSwipeID) {
-                        pendingDelete = meeting
-                    } content: {
-                        card(for: meeting)
+                    if selecting {
+                        Button {
+                            toggleSelection(meeting.objectID)
+                        } label: {
+                            HStack(spacing: 10) {
+                                SelectionCircle(isOn: selected.contains(meeting.objectID))
+                                cardBody(for: meeting)
+                            }
+                        }
+                        .buttonStyle(DSPressEffect())
+                    } else {
+                        SwipeDeleteRow(id: meeting.objectID, openID: $openSwipeID) {
+                            pendingDelete = meeting
+                        } content: {
+                            card(for: meeting)
+                        }
                     }
                 }
                 if meetings.isEmpty {
@@ -88,6 +137,10 @@ struct MeetingsView: View {
     private func card(for meeting: CDMeeting) -> some View {
         NavigationLink { destination(for: meeting) } label: { cardBody(for: meeting) }
             .buttonStyle(DSPressEffect())
+    }
+
+    private func toggleSelection(_ id: NSManagedObjectID) {
+        if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
     }
 
     @ViewBuilder

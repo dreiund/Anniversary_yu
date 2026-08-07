@@ -6,6 +6,10 @@ import SwiftUI
 struct SwipeDeleteRow<ID: Equatable, Content: View>: View {
     let id: ID
     @Binding var openID: ID?
+    var buttonWidth: CGFloat = 68
+    var cornerRadius: CGFloat = DS.Radius.card
+    var buttonInset: CGFloat = 0      // 行内紧凑样式：按钮上下内缩
+    var showsLabel = true             // 矮行（如行前日程）只放图标
     let onDelete: () -> Void
     @ViewBuilder let content: () -> Content
 
@@ -13,7 +17,6 @@ struct SwipeDeleteRow<ID: Equatable, Content: View>: View {
     @GestureState(resetTransaction: Transaction(animation: .snappy))
     private var drag: CGFloat = 0
 
-    private let buttonWidth: CGFloat = 68
     private let gap: CGFloat = 8
     private var revealed: CGFloat { buttonWidth + gap }
     private var isOpen: Bool { openID == id }
@@ -28,22 +31,29 @@ struct SwipeDeleteRow<ID: Equatable, Content: View>: View {
     var body: some View {
         let progress = revealed > 0 ? min(1, -offset / revealed) : 0
         ZStack(alignment: .trailing) {
-            Button {
-                withAnimation(.snappy) { openID = nil }
-                onDelete()
-            } label: {
-                VStack(spacing: 3) {
-                    Image(systemName: "trash.fill").font(.system(size: 16))
-                    Text("删除").font(.system(size: 11, weight: .semibold))
+            // 关闭态按钮必须整个移出视图树：透明按钮仍留在无障碍树里，
+            // 多行列表会积一堆隐形「删除」（VoiceOver 乱报、UI 测试匹配不唯一）
+            if progress > 0 {
+                Button {
+                    withAnimation(.snappy) { openID = nil }
+                    onDelete()
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: "trash.fill").font(.system(size: 16))
+                        if showsLabel {
+                            Text("删除").font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: buttonWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(RoundedRectangle(cornerRadius: cornerRadius).fill(DS.dsRed))
+                    .padding(.vertical, buttonInset)
                 }
-                .foregroundStyle(.white)
-                .frame(width: buttonWidth)
-                .frame(maxHeight: .infinity)
-                .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.dsRed))
+                .opacity(progress)
+                .scaleEffect(0.85 + 0.15 * progress)
+                .allowsHitTesting(isOpen)
             }
-            .opacity(progress)
-            .scaleEffect(0.85 + 0.15 * progress)
-            .allowsHitTesting(isOpen)
 
             content()
                 .overlay {

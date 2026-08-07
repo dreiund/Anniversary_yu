@@ -116,6 +116,7 @@ extension MeetingRepository {
     /// 按 openedAt 时间顺序重编 dayIndex（第 1 天恒为最早；先例：deletePlanned 的序号重排）
     func renumberDays(in meeting: CDMeeting) {
         let sorted = ((meeting.dateDays as? Set<CDDateDay>) ?? [])
+            .filter { !$0.isDeleted }   // deleteDay 删后立即重排，关系集里可能还挂着已删对象
             .sorted { ($0.openedAt ?? .distantPast) < ($1.openedAt ?? .distantPast) }
         for (i, day) in sorted.enumerated() where day.dayIndex != Int32(i + 1) {
             day.dayIndex = Int32(i + 1)
@@ -151,7 +152,7 @@ extension MeetingRepository {
 }
 
 extension MeetingRepository {
-    enum EditError: Error { case notPlanned }
+    enum EditError: Error { case notPlanned, dayNotEmpty }
 
     /// 三态可改基本信息：日期按状态落位（planned→计划日期对；ongoing→仅 startedAt；finished→startedAt+endedAt）
     func update(_ meeting: CDMeeting, title: String?, city: String?,
@@ -172,20 +173,43 @@ extension MeetingRepository {
     }
 
     /// 任意状态删除（足迹列表左滑）：约会日/记忆/照片/评价/行前日程随模型级联规则一并删除
-    /// （亲密记录只解挂归 couple 保留）；其后所有见面序号 -1 保持连续。
+    /// （亲密记录只解挂归 couple 保留）；其后所有见面序号前移保持连续。
     func delete(_ meeting: CDMeeting) throws {
-        let couple = meeting.couple
-        let removedIndex = meeting.index
-        context.delete(meeting)
-        ((couple?.meetings as? Set<CDMeeting>) ?? [])
-            .filter { $0.index > removedIndex }
-            .forEach { $0.index -= 1 }
+        try delete([meeting])
+    }
+
+    /// 批量删除（管理模式多选）：一次删完统一重排序号、单次保存
+    func delete(_ meetings: [CDMeeting]) throws {
+        guard let couple = meetings.first?.couple else { return }
+        meetings.forEach(context.delete)
+        renumberMeetings(in: couple)
         try context.save()
+    }
+
+    /// 按既有 index 顺序重编 1..n（与 renumberDays 同构）
+    private func renumberMeetings(in couple: CDCouple) {
+        ((couple.meetings as? Set<CDMeeting>) ?? [])
+            .filter { !$0.isDeleted }
+            .sorted { $0.index < $1.index }
+            .enumerated()
+            .forEach { i, m in
+                if m.index != Int32(i + 1) { m.index = Int32(i + 1) }
+            }
     }
 
     /// 仅计划中可删的守卫入口（见面表单的「删除这次计划」沿用）
     func deletePlanned(_ meeting: CDMeeting) throws {
         guard status(of: meeting) == .planned else { throw EditError.notPlanned }
         try delete(meeting)
+    }
+
+    /// 删除约会日（时间线左滑封盘卡）：仅空天可删——还有记忆时抛错，由 UI 弹「先删记忆」提示；
+    /// 亲密记录随模型规则解挂保留。删后天序号前移保持连续。
+    func deleteDay(_ day: CDDateDay) throws {
+        guard ((day.moments as? Set<CDMoment>) ?? []).isEmpty else { throw EditError.dayNotEmpty }
+        guard let meeting = day.meeting else { return }
+        context.delete(day)
+        renumberDays(in: meeting)
+        try context.save()
     }
 }

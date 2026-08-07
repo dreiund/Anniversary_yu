@@ -4,13 +4,22 @@ import CoreData
 struct TimelineListView: View {
     @Environment(\.managedObjectContext) private var context
     let meeting: CDMeeting
+    let selecting: Bool
+    @Binding var selected: Set<NSManagedObjectID>
     @FetchRequest private var momentsFetch: FetchedResults<CDMoment>
     @FetchRequest private var daysFetch: FetchedResults<CDDateDay>
     @FetchRequest private var evalsFetch: FetchedResults<CDEvaluation>
     @State private var showSeal = false
+    @State private var openSwipeID: NSManagedObjectID?
+    @State private var pendingDeleteMoment: CDMoment?
+    @State private var pendingDeleteDay: CDDateDay?
+    @State private var blockedDayCount: Int?
 
-    init(meeting: CDMeeting) {
+    init(meeting: CDMeeting, selecting: Bool = false,
+         selected: Binding<Set<NSManagedObjectID>> = .constant([])) {
         self.meeting = meeting
+        self.selecting = selecting
+        _selected = selected
         _momentsFetch = FetchRequest(sortDescriptors: [],
                                      predicate: NSPredicate(format: "dateDay.meeting == %@", meeting))
         _daysFetch = FetchRequest(sortDescriptors: [],
@@ -36,6 +45,37 @@ struct TimelineListView: View {
             }
         }
         .sheet(isPresented: $showSeal) { SealSheet(meeting: meeting) }
+        .alert("删除这条记忆？", isPresented: Binding(get: { pendingDeleteMoment != nil },
+                                                set: { if !$0 { pendingDeleteMoment = nil } })) {
+            Button("删除记忆", role: .destructive) {
+                if let moment = pendingDeleteMoment {
+                    try? MomentRepository(context: context).delete(moment)
+                }
+                pendingDeleteMoment = nil
+            }
+            Button("取消", role: .cancel) { pendingDeleteMoment = nil }
+        } message: {
+            Text("这条记忆和它的照片、评价会一并删除，无法恢复。")
+        }
+        .alert("删除第 \(pendingDeleteDay?.dayIndex ?? 0) 天？",
+               isPresented: Binding(get: { pendingDeleteDay != nil },
+                                    set: { if !$0 { pendingDeleteDay = nil } })) {
+            Button("删除这天", role: .destructive) {
+                if let day = pendingDeleteDay {
+                    try? MeetingRepository(context: context).deleteDay(day)
+                }
+                pendingDeleteDay = nil
+            }
+            Button("取消", role: .cancel) { pendingDeleteDay = nil }
+        } message: {
+            Text("这一天的封盘记录会删除，之后的天序号自动前移。")
+        }
+        .alert("还不能删除", isPresented: Binding(get: { blockedDayCount != nil },
+                                            set: { if !$0 { blockedDayCount = nil } })) {
+            Button("好") { blockedDayCount = nil }
+        } message: {
+            Text("这一天还有 \(blockedDayCount ?? 0) 条记忆，先删掉记忆再删封盘。")
+        }
     }
 
     @ViewBuilder
@@ -47,21 +87,49 @@ struct TimelineListView: View {
             }
         }
         ForEach(moments, id: \.objectID) { moment in
-            NavigationLink {
-                MomentDetailView(moment: moment)
-            } label: {
-                momentCard(moment, repo: repo)
+            if selecting {
+                Button {
+                    if selected.contains(moment.objectID) { selected.remove(moment.objectID) }
+                    else { selected.insert(moment.objectID) }
+                } label: {
+                    HStack(spacing: 10) {
+                        SelectionCircle(isOn: selected.contains(moment.objectID))
+                        momentCard(moment, repo: repo)
+                    }
+                }
+                .buttonStyle(DSPressEffect())
+            } else {
+                SwipeDeleteRow(id: moment.objectID, openID: $openSwipeID) {
+                    pendingDeleteMoment = moment
+                } content: {
+                    NavigationLink {
+                        MomentDetailView(moment: moment)
+                    } label: {
+                        momentCard(moment, repo: repo)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(.plain)
         }
         if let closed = day.closedAt {
-            DarkCard {
+            let sealCard = DarkCard {
                 HStack {
                     Text("\(Fmt.hm.string(from: closed)) 封盘 · 晚安")
                         .font(.system(size: 15, weight: .semibold))
                     Spacer()
                     Text("\(moments.count) 条记忆")
                         .font(.system(size: 12)).foregroundStyle(DS.onDarkMuted)
+                }
+            }
+            if selecting {
+                sealCard
+            } else {
+                // 封盘卡左滑删这一天：仅空天可删（还有记忆先弹提示），序号自动前移
+                SwipeDeleteRow(id: day.objectID, openID: $openSwipeID) {
+                    if moments.isEmpty { pendingDeleteDay = day }
+                    else { blockedDayCount = moments.count }
+                } content: {
+                    sealCard
                 }
             }
         } else if meeting.statusRaw == MeetingStatus.ongoing.rawValue {

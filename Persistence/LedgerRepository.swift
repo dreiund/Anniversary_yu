@@ -52,6 +52,12 @@ struct LedgerRepository {
         try context.save()
     }
 
+    /// 批量删除（管理模式多选，UI 只传作者是自己的条目）：单次保存
+    func delete(_ entries: [CDLedgerEntry]) throws {
+        entries.forEach(context.delete)
+        try context.save()
+    }
+
     func delete(_ entry: CDLedgerEntry) throws {
         context.delete(entry)
         try context.save()

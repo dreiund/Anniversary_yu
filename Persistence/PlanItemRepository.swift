@@ -47,6 +47,12 @@ struct PlanItemRepository {
         try context.save()
     }
 
+    /// 批量删除（管理模式多选）：单次保存
+    func delete(_ items: [CDPlanItem]) throws {
+        items.forEach(context.delete)
+        try context.save()
+    }
+
     /// 排序规则（spec §6，测试锁死）：日期升序；同日内先全天（time==nil）后按时间升序，再 sortIndex；无日期归备忘区按 sortIndex
     func sections(for meeting: CDMeeting, calendar: Calendar) -> PlanSections {
         let all = ((meeting.planItems as? Set<CDPlanItem>) ?? [])

@@ -72,6 +72,60 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "4-切回全部")
     }
 
+    /// 时间线：封盘卡左滑（有记忆先拦截）、记忆左滑确认、管理模式多选
+    @MainActor
+    func testTimelineSwipeAndManage() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        let tab = app.buttons["足迹"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "底栏足迹未出现")
+        tab.tap()
+        let card = app.staticTexts["上海"]
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "进行中卡未出现")
+        card.tap()   // 进见面详情（时间线）
+
+        // 封盘卡左滑：第 1 天还有 1 条记忆 → 应弹「还不能删除」
+        let seal = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "封盘 · 晚安")).firstMatch
+        XCTAssertTrue(seal.waitForExistence(timeout: 5), "封盘卡未出现")
+        let sealY = seal.frame.midY / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: sealY))
+            .press(forDuration: 0.05,
+                   thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: sealY)))
+        sleep(1)
+        XCTAssertTrue(app.buttons["删除"].waitForExistence(timeout: 2), "封盘卡左滑未展开")
+        app.buttons["删除"].tap()
+        XCTAssertTrue(app.alerts["还不能删除"].waitForExistence(timeout: 3), "拦截弹窗未出现")
+        attach(app, name: "T1-封盘拦截")
+        app.alerts.firstMatch.buttons["好"].tap()
+        sleep(1)
+
+        // 记忆卡左滑 → 删除确认
+        let moment = app.staticTexts["演示昨日"]
+        XCTAssertTrue(moment.waitForExistence(timeout: 5), "昨日记忆未出现")
+        let momentY = moment.frame.midY / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: momentY))
+            .press(forDuration: 0.05,
+                   thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: momentY)))
+        sleep(1)
+        XCTAssertTrue(app.buttons["删除"].waitForExistence(timeout: 2), "记忆卡左滑未展开")
+        app.buttons["删除"].tap()
+        XCTAssertTrue(app.alerts["删除这条记忆？"].waitForExistence(timeout: 3), "记忆删除确认未出现")
+        attach(app, name: "T2-记忆删除确认")
+        app.alerts.firstMatch.buttons["取消"].tap()
+        sleep(1)
+
+        // 管理模式：勾一条 → 底栏出现删除所选
+        app.buttons["管理"].tap()
+        sleep(1)
+        app.staticTexts["演示午餐"].tap()
+        sleep(1)
+        attach(app, name: "T3-管理模式")
+        XCTAssertTrue(app.staticTexts["已选 1 项"].exists, "底栏计数未出现")
+        app.buttons["完成"].tap()
+    }
+
     /// 小本本详情页观感截图
     @MainActor
     func testLedgerDetailLook() throws {

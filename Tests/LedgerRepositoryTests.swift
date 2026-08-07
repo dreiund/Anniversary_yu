@@ -88,4 +88,14 @@ final class LedgerRepositoryTests: XCTestCase {
         let left = try pc.viewContext.fetch(NSFetchRequest<CDEvidence>(entityName: "CDEvidence"))
         XCTAssertTrue(left.isEmpty)                    // 模型级联删证据
     }
+
+    // 反馈：批量管理——多选删除，未选中的保留
+    func testDeleteEntriesBatch() throws {
+        let e1 = try makeEntry()
+        _ = try makeEntry()
+        let e3 = try makeEntry()
+        try repo.delete([e1, e3])
+        let left = try pc.viewContext.fetch(NSFetchRequest<CDLedgerEntry>(entityName: "CDLedgerEntry"))
+        XCTAssertEqual(left.count, 1)
+    }
 }

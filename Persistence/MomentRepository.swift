@@ -71,6 +71,12 @@ struct MomentRepository {
         try context.save()
     }
 
+    /// 批量删除（管理模式多选）：单次保存。空出来的封盘天有意保留——由时间线左滑封盘卡另删
+    func delete(_ moments: [CDMoment]) throws {
+        moments.forEach(context.delete)
+        try context.save()
+    }
+
     func move(_ moment: CDMoment, to day: CDDateDay) throws {
         let oldDay = moment.dateDay
         moment.dateDay = day

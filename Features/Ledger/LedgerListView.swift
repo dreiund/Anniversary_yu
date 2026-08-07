@@ -23,6 +23,11 @@ struct LedgerListView: View {
 
     @State private var segment: LedgerSegment = .praise
     @State private var filter: LedgerFilter = .all
+    @State private var selecting = false
+    @State private var selected: Set<NSManagedObjectID> = []
+    @State private var confirmBatch = false
+    @State private var openSwipeID: NSManagedObjectID?
+    @State private var pendingDelete: CDLedgerEntry?
 
     private var myID: UUID? {
         couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
@@ -53,6 +58,48 @@ struct LedgerListView: View {
         .navigationTitle("小本本")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { header }
+        .toolbar {
+            if entries.contains(where: { LedgerRules.canEdit(authorID: $0.authorPartnerID, myID: myID) }) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(selecting ? "完成" : "管理") {
+                        selecting.toggle()
+                        selected = []
+                        openSwipeID = nil
+                    }
+                    .font(.system(size: 14))
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if selecting {
+                FrostedBottomBar {
+                    BatchDeleteBar(count: selected.count) { confirmBatch = true }
+                }
+            }
+        }
+        .alert("删除所选 \(selected.count) 项？", isPresented: $confirmBatch) {
+            Button("删除所选", role: .destructive) {
+                let picked = selected.compactMap {
+                    try? context.existingObject(with: $0) as? CDLedgerEntry
+                }
+                try? LedgerRepository(context: context).delete(picked)
+                selected = []
+                selecting = false
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("所选记录会删除，无法恢复。")
+        }
+        .alert("删除这条记录？", isPresented: Binding(get: { pendingDelete != nil },
+                                              set: { if !$0 { pendingDelete = nil } })) {
+            Button("删除", role: .destructive) {
+                if let entry = pendingDelete {
+                    try? LedgerRepository(context: context).delete(entry)
+                }
+                pendingDelete = nil
+            }
+            Button("取消", role: .cancel) { pendingDelete = nil }
+        }
     }
 
     private var header: some View {
@@ -90,8 +137,7 @@ struct LedgerListView: View {
             emptyHint
         } else {
             ForEach(list, id: \.objectID) { entry in
-                NavigationLink { LedgerDetailView(entry: entry) } label: { entryCard(entry) }
-                    .buttonStyle(.plain)
+                entryRow(entry) { entryCard(entry) }
             }
         }
     }
@@ -106,17 +152,49 @@ struct LedgerListView: View {
             if !likes.isEmpty {
                 Text("❤ 喜欢").font(.system(size: 14, weight: .bold))
                 ForEach(likes, id: \.objectID) { entry in
-                    NavigationLink { LedgerDetailView(entry: entry) } label: { moodCard(entry, accent: DS.dsGreen) }
-                        .buttonStyle(.plain)
+                    entryRow(entry) { moodCard(entry, accent: DS.dsGreen) }
                 }
             }
             if !triggers.isEmpty {
                 Text("⚡ 雷区").font(.system(size: 14, weight: .bold)).padding(.top, 4)
                 ForEach(triggers, id: \.objectID) { entry in
-                    NavigationLink { LedgerDetailView(entry: entry) } label: { moodCard(entry, accent: DS.dsOrange) }
-                        .buttonStyle(.plain)
+                    entryRow(entry) { moodCard(entry, accent: DS.dsOrange) }
                 }
             }
+        }
+    }
+
+    /// 行包装：删除只有作者能做（LedgerRules.canEdit）——我的条目给左滑与勾选，
+    /// 对方的照常进详情；管理模式下对方条目淡显示意不可选
+    @ViewBuilder
+    private func entryRow<Card: View>(_ entry: CDLedgerEntry,
+                                      @ViewBuilder card: @escaping () -> Card) -> some View {
+        let mine = LedgerRules.canEdit(authorID: entry.authorPartnerID, myID: myID)
+        if selecting {
+            if mine {
+                Button {
+                    if selected.contains(entry.objectID) { selected.remove(entry.objectID) }
+                    else { selected.insert(entry.objectID) }
+                } label: {
+                    HStack(spacing: 10) {
+                        SelectionCircle(isOn: selected.contains(entry.objectID), size: 20)
+                        card()
+                    }
+                }
+                .buttonStyle(DSPressEffect())
+            } else {
+                card().opacity(0.45)
+            }
+        } else if mine {
+            SwipeDeleteRow(id: entry.objectID, openID: $openSwipeID) {
+                pendingDelete = entry
+            } content: {
+                NavigationLink { LedgerDetailView(entry: entry) } label: { card() }
+                    .buttonStyle(.plain)
+            }
+        } else {
+            NavigationLink { LedgerDetailView(entry: entry) } label: { card() }
+                .buttonStyle(.plain)
         }
     }
 

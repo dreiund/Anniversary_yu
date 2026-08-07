@@ -45,6 +45,10 @@ enum DebugSeeder {
         _ = try? moments.create(in: meeting, type: .sight, title: "演示散步", body: nil,
                                 happenedAt: Date().addingTimeInterval(-900), photoDatas: [],
                                 myEvaluation: nil, authorID: authorID, place: park)
+        // 昨天的补录：自动生成一个已封盘的第 1 天（封盘卡左滑删除的验证场景；无地点不进地图）
+        _ = try? moments.create(in: meeting, type: .other, title: "演示昨日", body: nil,
+                                happenedAt: Date().addingTimeInterval(-90_000), photoDatas: [],
+                                myEvaluation: nil, authorID: authorID, place: nil)
 
         // 带地点的小本本条目：地图「小本本」筛选与角标的演示（逛街类，保持咖啡甜品恒空）
         let bookstore = CDPlace(context: context)
