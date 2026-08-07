@@ -21,6 +21,8 @@ final class MapFilterReproTests: XCTestCase {
         let tab = app.buttons["足迹"]
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "底栏足迹未出现")
         tab.tap()
+        sleep(1)
+        attach(app, name: "0-列表")
 
         let mapChip = app.buttons["地图"]
         XCTAssertTrue(mapChip.waitForExistence(timeout: 5), "地图分段未出现")

@@ -1,4 +1,5 @@
 import XCTest
+import CoreData
 @testable import Anniversary
 
 final class MeetingEditTests: XCTestCase {
@@ -73,6 +74,36 @@ final class MeetingEditTests: XCTestCase {
         XCTAssertEqual(m3.index, 2)                                // 不论状态整体前移
         let items = try pc.viewContext.fetch(CDPlanItem.fetchRequest())
         XCTAssertTrue(items.isEmpty)                               // 日程级联删除
+    }
+
+    // 反馈：足迹列表左滑删除——任意状态可删（含级联与重编号），开发期清理瞎建数据
+    func testDeleteAnyStatusCascadesAndRenumbers() throws {
+        let (pc, couple) = try makeCouple()
+        let repo = MeetingRepository(context: pc.viewContext)
+        let moments = MomentRepository(context: pc.viewContext)
+        let m1 = try repo.createPlanned(couple: couple, title: nil, city: nil, plannedStart: nil, plannedEnd: nil)
+        try repo.start(m1, at: Date(timeIntervalSince1970: 100))
+        _ = try moments.create(in: m1, type: .other, title: "留下", body: nil,
+                               happenedAt: Date(timeIntervalSince1970: 150), photoDatas: [],
+                               myEvaluation: nil, authorID: nil, place: nil)
+        try repo.end(m1, at: Date(timeIntervalSince1970: 200))
+        let m2 = try repo.createPlanned(couple: couple, title: "要删", city: nil, plannedStart: nil, plannedEnd: nil)
+        try repo.start(m2, at: Date(timeIntervalSince1970: 300))
+        _ = try moments.create(in: m2, type: .other, title: "陪葬", body: nil,
+                               happenedAt: Date(timeIntervalSince1970: 350), photoDatas: [],
+                               myEvaluation: nil, authorID: nil, place: nil)
+        try repo.end(m2, at: Date(timeIntervalSince1970: 400))
+        let m3 = try repo.createPlanned(couple: couple, title: "殿后", city: nil, plannedStart: nil, plannedEnd: nil)
+
+        try repo.delete(m2)                                        // 已结束的也能删
+
+        XCTAssertEqual(try repo.meetingsSorted(couple: couple).count, 2)
+        XCTAssertEqual(m1.index, 1)
+        XCTAssertEqual(m3.index, 2)                                // 序号前移保持连续
+        let leftMoments = try pc.viewContext.fetch(NSFetchRequest<CDMoment>(entityName: "CDMoment"))
+        XCTAssertEqual(leftMoments.compactMap(\.title), ["留下"])   // m2 的记忆级联删除，m1 的保留
+        let leftDays = try pc.viewContext.fetch(NSFetchRequest<CDDateDay>(entityName: "CDDateDay"))
+        XCTAssertEqual(leftDays.count, 1)                          // 只剩 m1 的约会日
     }
 
     func testDeleteNonPlannedThrows() throws {

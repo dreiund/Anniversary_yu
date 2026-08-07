@@ -7,6 +7,11 @@ struct MeetingsView: View {
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
     private var meetings: FetchedResults<CDMeeting>
     @State private var showForm = false
+    @State private var pendingDelete: CDMeeting?
+
+    private var deleteIsPlanned: Bool {
+        pendingDelete.map { MeetingStatus(rawValue: $0.statusRaw) == .planned } ?? false
+    }
     @State private var segment = 0
     @State private var selectedDay: SelectedCalendarDay?
 
@@ -41,22 +46,75 @@ struct MeetingsView: View {
             DaySheet(day: sel.id, mode: sel.mode)
                 .presentationDetents([.medium, .large])
         }
+        .alert(deleteIsPlanned ? "删除这次计划？" : "删除这次见面？",
+               isPresented: Binding(get: { pendingDelete != nil },
+                                    set: { if !$0 { pendingDelete = nil } })) {
+            Button(deleteIsPlanned ? "删除计划" : "删除见面", role: .destructive) {
+                if let meeting = pendingDelete {
+                    try? MeetingRepository(context: context).delete(meeting)
+                }
+                pendingDelete = nil
+            }
+            Button("取消", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text(deleteIsPlanned
+                 ? "行前计划的日程会一起删除。"
+                 : "这次见面的所有约会日、记忆和照片会一并删除，无法恢复。")
+        }
     }
 
     private var listContent: some View {
-        ScrollView {
-            VStack(spacing: DS.Spacing.md) {
-                ForEach(meetings, id: \.objectID) { meeting in
-                    card(for: meeting)
+        // List 容器：为左滑删除（swipeActions 仅 List 可用）；行样式抹平还原卡片观感
+        List {
+            ForEach(meetings, id: \.objectID) { meeting in
+                ZStack {
+                    NavigationLink { destination(for: meeting) } label: { EmptyView() }
+                        .opacity(0)   // 隐藏链接：行点击照常推入，卡片上不出现 List 的角标
+                    cardBody(for: meeting)
                 }
+                .listRowInsets(EdgeInsets(top: 6, leading: DS.Spacing.md,
+                                          bottom: 6, trailing: DS.Spacing.md))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button("删除", role: .destructive) { pendingDelete = meeting }
+                }
+            }
+            Group {
                 if meetings.isEmpty {
-                    Text("还没有见面记录").dsCaption().padding(.top, 48)
+                    Text("还没有见面记录").dsCaption()
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 48)
                 }
                 Button("计划见面") { showForm = true }
                     .buttonStyle(GhostPillButtonStyle())
+                    .frame(maxWidth: .infinity)
                     .padding(.top, DS.Spacing.xs)
             }
-            .padding(DS.Spacing.md)
+            .listRowInsets(EdgeInsets(top: 6, leading: DS.Spacing.md,
+                                      bottom: 6, trailing: DS.Spacing.md))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(DS.canvas)
+    }
+
+    @ViewBuilder
+    private func destination(for meeting: CDMeeting) -> some View {
+        switch MeetingStatus(rawValue: meeting.statusRaw) ?? .planned {
+        case .planned: PlanView(meeting: meeting)
+        default: MeetingDetailView(meeting: meeting)
+        }
+    }
+
+    @ViewBuilder
+    private func cardBody(for meeting: CDMeeting) -> some View {
+        switch MeetingStatus(rawValue: meeting.statusRaw) ?? .planned {
+        case .planned: plannedCard(meeting)
+        case .ongoing: ongoingCard(meeting)
+        case .finished: finishedCard(meeting)
         }
     }
 
@@ -71,20 +129,6 @@ struct MeetingsView: View {
     }
 
     @ViewBuilder
-    private func card(for meeting: CDMeeting) -> some View {
-        switch MeetingStatus(rawValue: meeting.statusRaw) ?? .planned {
-        case .planned:
-            NavigationLink { PlanView(meeting: meeting) } label: { plannedCard(meeting) }
-                .buttonStyle(DSPressEffect())
-        case .ongoing:
-            NavigationLink { MeetingDetailView(meeting: meeting) } label: { ongoingCard(meeting) }
-                .buttonStyle(DSPressEffect())
-        case .finished:
-            NavigationLink { MeetingDetailView(meeting: meeting) } label: { finishedCard(meeting) }
-                .buttonStyle(DSPressEffect())
-        }
-    }
-
     private func plannedCard(_ meeting: CDMeeting) -> some View {
         let stats = PlanItemRepository(context: context).stats(for: meeting)
         let days = meeting.plannedStart.map {

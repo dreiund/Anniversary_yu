@@ -171,17 +171,21 @@ extension MeetingRepository {
         try context.save()
     }
 
-    /// 仅计划中可删；级联删行前计划项；其后所有见面（不论状态）序号 -1 保持连续——
-    /// 没发生过的计划被拿掉后，后面那次在现实里就是第 N-1 次见面。
-    func deletePlanned(_ meeting: CDMeeting) throws {
-        guard status(of: meeting) == .planned else { throw EditError.notPlanned }
+    /// 任意状态删除（足迹列表左滑）：约会日/记忆/照片/评价/行前日程随模型级联规则一并删除
+    /// （亲密记录只解挂归 couple 保留）；其后所有见面序号 -1 保持连续。
+    func delete(_ meeting: CDMeeting) throws {
         let couple = meeting.couple
         let removedIndex = meeting.index
-        ((meeting.planItems as? Set<CDPlanItem>) ?? []).forEach(context.delete)
         context.delete(meeting)
         ((couple?.meetings as? Set<CDMeeting>) ?? [])
             .filter { $0.index > removedIndex }
             .forEach { $0.index -= 1 }
         try context.save()
+    }
+
+    /// 仅计划中可删的守卫入口（见面表单的「删除这次计划」沿用）
+    func deletePlanned(_ meeting: CDMeeting) throws {
+        guard status(of: meeting) == .planned else { throw EditError.notPlanned }
+        try delete(meeting)
     }
 }
