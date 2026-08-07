@@ -117,7 +117,9 @@ struct HerView: View {
                 Spacer()
                 Text(monthTitle(anchor)).dsSectionTitle()
                 Spacer()
-                Button("统计") {}.hidden()   // 占宽对称；T6 换成真入口
+                NavigationLink { CycleStatsView() } label: {
+                    Text("统计").font(.system(size: 13)).foregroundStyle(DS.actionBlue)
+                }
             }
             TabView(selection: $monthOffset) {
                 ForEach(-24...12, id: \.self) { offset in
