@@ -6,6 +6,8 @@ enum PanelAction {
     case seal
     case ledgerEntry
     case quickEntry
+    case intimacy
+    case cycle
 }
 
 struct ActionPanel: View {
@@ -24,8 +26,8 @@ struct ActionPanel: View {
             Tile(symbol: "square.and.pencil", title: "互评", action: .ledgerEntry),
             Tile(symbol: "face.smiling", title: "心情", action: .mood),
             Tile(symbol: "heart", title: "喜怒", action: .quickEntry),
-            Tile(symbol: "sparkles", title: "亲密", action: nil),
-            Tile(symbol: "drop", title: "经期", action: nil),
+            Tile(symbol: "sparkles", title: "亲密", action: .intimacy),
+            Tile(symbol: "drop", title: "经期", action: .cycle),
         ]
     }
 
@@ -60,7 +62,7 @@ struct ActionPanel: View {
                 Button("封盘") { onAction(.seal) }
                     .buttonStyle(BluePillButtonStyle(fullWidth: true))
             }
-            Text(hasOngoing ? "封盘：今天到此为止，晚安" : "灰色入口在后续阶段开启")
+            Text(hasOngoing ? "封盘：今天到此为止，晚安" : "记一笔，两个人都看得见")
                 .dsFootnote()
                 .frame(maxWidth: .infinity)
         }

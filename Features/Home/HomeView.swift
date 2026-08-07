@@ -196,12 +196,39 @@ struct HomeView: View {
         let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date(), recordAt: Date()) } ?? nil
         let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
         let pendingEvals = Array(momentsAll.lazy.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
+        let cycleRepo = CycleRepository(context: context)
+        let cycleInputs = cycleRepo.cyclesSorted(couple: couple).compactMap { c -> (start: Date, end: Date?)? in
+            c.startDate.map { ($0, c.endDate) }
+        }
+        let cycleOngoing = cycleRepo.ongoing(couple: couple)
+        let cycleDelay = cycleInputs.isEmpty ? nil
+            : CyclePredictor.predict(cycles: cycleInputs, calendar: .current).nextStarts.first.flatMap {
+                CyclePredictor.delayDays(nextStart: $0, hasOngoing: cycleOngoing != nil,
+                                         today: Date(), calendar: .current)
+            }
 
         Text("提醒").dsSectionTitle()
         GroupedSection {
-            if stale == nil && pendingEvals.isEmpty {
+            if stale == nil && pendingEvals.isEmpty && cycleDelay == nil && cycleOngoing == nil {
                 GroupedRow(title: "一切都好", value: "去足迹翻翻回忆 ›", showsDivider: false)
             } else {
+                if let cycleDelay {
+                    NavigationLink { HerView() } label: {
+                        GroupedRow(title: "🕐 已推迟 \(cycleDelay) 天", value: "去看看 ›",
+                                   valueColor: DS.actionBlue,
+                                   showsDivider: stale != nil || !pendingEvals.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                } else if let cycleOngoing, let start = cycleOngoing.startDate {
+                    let n = (Calendar.current.dateComponents([.day], from: start,
+                              to: Calendar.current.startOfDay(for: Date())).day ?? 0) + 1
+                    NavigationLink { HerView() } label: {
+                        GroupedRow(title: "经期第 \(n) 天", value: "去看看 ›",
+                                   valueColor: DS.actionBlue,
+                                   showsDivider: stale != nil || !pendingEvals.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                }
                 if let ongoing, stale != nil {
                     NavigationLink {
                         MeetingDetailView(meeting: ongoing)

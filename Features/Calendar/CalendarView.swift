@@ -11,6 +11,8 @@ struct CalendarView: View {
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index)])
     private var meetings: FetchedResults<CDMeeting>
+    @AppStorage("footprintsCycleTintOn") private var cycleTintOn = true
+    @FetchRequest(sortDescriptors: []) private var cyclesFetch: FetchedResults<CDCycle>
 
     @State private var monthAnchor = Calendar.current.startOfDay(for: Date())
     @State private var mode: CalendarMode = .natural
@@ -106,6 +108,23 @@ struct CalendarView: View {
                                        meetings: meetingInputs, calendar: cal)
     }
 
+    /// 经期天集合（浅粉底用）：每段 start…(end ?? 今天) 逐日展开（样板照 HerView.marks）
+    private var cycleDaySet: Set<Date> {
+        var result: Set<Date> = []
+        let today = cal.startOfDay(for: Date())
+        for cycle in cyclesFetch {
+            guard let start = cycle.startDate else { continue }
+            var day = cal.startOfDay(for: start)
+            let upper = cal.startOfDay(for: cycle.endDate ?? today)
+            while day <= upper {
+                result.insert(day)
+                guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+                day = next
+            }
+        }
+        return result
+    }
+
     private var calendarCard: some View {
         VStack(spacing: 6) {
             HStack {
@@ -115,10 +134,11 @@ struct CalendarView: View {
                 }
             }
             let cells = projectedCells
+            let cycleDays = cycleDaySet
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7),
                       spacing: 4) {
                 ForEach(cells, id: \.day) { cell in
-                    CalendarDayCell(cell: cell)
+                    CalendarDayCell(cell: cell, isCycleDay: cycleTintOn && cycleDays.contains(cell.day))
                         .contentShape(Rectangle())
                         .onTapGesture { if cell.inMonth { onDayTap(cell.day, mode) } }
                 }
@@ -175,6 +195,7 @@ struct CalendarView: View {
 /// 单格：日期 + 心情 emoji 对 + 记录墨点 + 见面带底 + D 标（spec §3.1/3.2）
 struct CalendarDayCell: View {
     let cell: CalCell
+    var isCycleDay: Bool = false
 
     var body: some View {
         VStack(spacing: 1) {
@@ -201,7 +222,14 @@ struct CalendarDayCell: View {
         .frame(height: 44)
         .frame(maxWidth: .infinity)
         .opacity(cell.faded ? 0.35 : 1)
-        .background(bandBackground)
+        .background {
+            ZStack {
+                if isCycleDay {
+                    RoundedRectangle(cornerRadius: 8).fill(DS.roseCell)
+                }
+                bandBackground
+            }
+        }
         .overlay(alignment: .topLeading) {
             if let label = cell.bandLabel {
                 Text(label).font(.system(size: 7, weight: .semibold))

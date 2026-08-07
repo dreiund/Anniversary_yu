@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("newMomentAlertOn") private var newMomentAlertOn = true
     @AppStorage("newLedgerAlertOn") private var newLedgerAlertOn = true
     @AppStorage("cycleStartAlertOn") private var cycleStartAlertOn = true
+    @AppStorage("footprintsCycleTintOn") private var footprintsCycleTintOn = true
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var partnerName = ""
@@ -17,6 +18,7 @@ struct SettingsView: View {
     @State private var accountAvailable = true
     @State private var creatingShare = false
     @State private var confirmUnpair = false
+    @State private var showTrackedPicker = false
 
     var body: some View {
         ScrollView {
@@ -80,6 +82,18 @@ struct SettingsView: View {
                         .padding(.horizontal, 14).padding(.vertical, 8)
                     DS.hairline.frame(height: 1).padding(.leading, 14)
                     Toggle("经期开始提醒", isOn: $cycleStartAlertOn)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                }
+
+                Text("经期").dsSectionTitle()
+                GroupedSection {
+                    Button {
+                        showTrackedPicker = true
+                    } label: {
+                        GroupedRow(title: "经期归属", value: trackedPartnerName, valueColor: DS.actionBlue)
+                    }
+                    .buttonStyle(.plain)
+                    Toggle("足迹日历经期底色", isOn: $footprintsCycleTintOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
 
@@ -168,6 +182,11 @@ struct SettingsView: View {
             let status = try? await CKContainer(identifier: PersistenceController.cloudContainerID).accountStatus()
             accountAvailable = status == .available
         }
+        .sheet(isPresented: $showTrackedPicker) {
+            if let couple = couples.first {
+                TrackedPickerView(couple: couple)
+            }
+        }
         .alert("解除配对？", isPresented: $confirmUnpair) {
             Button("解除配对", role: .destructive) {
                 guard let couple = couples.first else { return }
@@ -206,6 +225,11 @@ struct SettingsView: View {
             repo.otherPartner(of: couple)?.name = partnerName
         }
         try? context.save()
+    }
+
+    private var trackedPartnerName: String {
+        guard let couple = couples.first else { return "未设置" }
+        return CycleRepository(context: context).trackedPartner(couple: couple)?.name ?? "未设置"
     }
 
     private var isParticipant: Bool {

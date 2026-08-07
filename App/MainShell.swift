@@ -27,6 +27,8 @@ struct MainShell: View {
         case seal(CDMeeting)
         case ledgerForm
         case quickLedger
+        case cycleDay(CycleSheetSegment)
+        case trackedPicker
 
         var id: String {
             switch self {
@@ -35,6 +37,8 @@ struct MainShell: View {
             case .seal: "seal"
             case .ledgerForm: "ledgerForm"
             case .quickLedger: "quickLedger"
+            case .cycleDay: "cycleDay"
+            case .trackedPicker: "trackedPicker"
             }
         }
     }
@@ -83,6 +87,16 @@ struct MainShell: View {
                 if let couple = try? CoupleRepository(context: context).fetchCouple() {
                     QuickLedgerSheet(mode: .create(couple))
                 }
+            case .cycleDay(let segment):
+                if let couple = try? CoupleRepository(context: context).fetchCouple() {
+                    CycleDaySheet(couple: couple,
+                                  selection: SelectedCycleDay(id: Calendar.current.startOfDay(for: Date()),
+                                                              segment: segment))
+                }
+            case .trackedPicker:
+                if let couple = try? CoupleRepository(context: context).fetchCouple() {
+                    TrackedPickerView(couple: couple)
+                }
             }
         }
         .alert("还没有进行中的见面", isPresented: $showNoMeetingAlert) {
@@ -107,6 +121,14 @@ struct MainShell: View {
             activeSheet = .ledgerForm
         case .quickEntry:
             activeSheet = .quickLedger
+        case .intimacy, .cycle:
+            let segment: CycleSheetSegment = action == .intimacy ? .intimacy : .period
+            if let couple = try? CoupleRepository(context: context).fetchCouple(),
+               CycleRepository(context: context).trackedPartner(couple: couple) != nil {
+                activeSheet = .cycleDay(segment)
+            } else {
+                activeSheet = .trackedPicker
+            }
         }
     }
 
