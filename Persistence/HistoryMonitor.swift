@@ -3,6 +3,7 @@ import CoreData
 protocol MomentNotifying {
     func notifyNewMoments(titles: [String])
     func notifyNewLedgerEntries(count: Int)
+    func notifyCycleStart()
 }
 
 /// 远程导入监听：镜像把对方的写入合进本地库时（NSPersistentStoreRemoteChange），
@@ -17,6 +18,7 @@ final class HistoryMonitor {
     private let defaults: UserDefaults
     private let isEnabled: () -> Bool
     private let isLedgerEnabled: () -> Bool
+    private let isCycleEnabled: () -> Bool
     /// 在 monitor 的后台 context 队列内被调用，实现只能用传入的 context 取数
     private let myPartnerID: (NSManagedObjectContext) -> UUID?
     private var observer: NSObjectProtocol?
@@ -27,13 +29,15 @@ final class HistoryMonitor {
     init(container: NSPersistentContainer, localAuthor: String, notifier: MomentNotifying,
          defaults: UserDefaults = .standard,
          isEnabled: @escaping () -> Bool,
-         isLedgerEnabled: @escaping () -> Bool, myPartnerID: @escaping (NSManagedObjectContext) -> UUID?) {
+         isLedgerEnabled: @escaping () -> Bool,
+         isCycleEnabled: @escaping () -> Bool, myPartnerID: @escaping (NSManagedObjectContext) -> UUID?) {
         self.container = container
         self.localAuthor = localAuthor
         self.notifier = notifier
         self.defaults = defaults
         self.isEnabled = isEnabled
         self.isLedgerEnabled = isLedgerEnabled
+        self.isCycleEnabled = isCycleEnabled
         self.myPartnerID = myPartnerID
     }
 
@@ -61,11 +65,15 @@ final class HistoryMonitor {
 
                 var insertedMomentIDs: [NSManagedObjectID] = []
                 var ledgerIDs = Set<NSManagedObjectID>()
+                var cycleIDs = Set<NSManagedObjectID>()
                 for transaction in transactions where transaction.author != localAuthor {
                     for change in transaction.changes ?? [] {
                         let entity = change.changedObjectID.entity.name
                         if change.changeType == .insert && entity == "CDMoment" {
                             insertedMomentIDs.append(change.changedObjectID)
+                        }
+                        if change.changeType == .insert && entity == "CDCycle" {
+                            cycleIDs.insert(change.changedObjectID)
                         }
                         if entity == "CDLedgerEntry" {
                             switch change.changeType {
@@ -104,6 +112,14 @@ final class HistoryMonitor {
                     }
                     if count > 0 { notifier.notifyNewLedgerEntries(count: count) }
                 }
+
+                if isCycleEnabled(), !cycleIDs.isEmpty {
+                    let started = cycleIDs.contains { id in
+                        guard let cycle = try? context.existingObject(with: id) as? CDCycle else { return false }
+                        return Self.cycleNotifiable(endDate: cycle.endDate)
+                    }
+                    if started { notifier.notifyCycleStart() }
+                }
             }
         }
     }
@@ -124,4 +140,7 @@ final class HistoryMonitor {
         guard !authorIsMe else { return false }
         return visibilityRaw == EntryVisibility.sharedImmediately.rawValue || revealedAt != nil
     }
+
+    /// 只有「经期开始」（endDate 为空的插入）才提醒；补录起止俱全不惊动（spec §六）
+    nonisolated static func cycleNotifiable(endDate: Date?) -> Bool { endDate == nil }
 }

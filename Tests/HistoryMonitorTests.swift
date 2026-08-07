@@ -5,8 +5,10 @@ import CoreData
 private final class SpyNotifier: MomentNotifying {
     var calls: [[String]] = []
     var ledgerCounts: [Int] = []
+    var cycleStartCalled = false
     func notifyNewMoments(titles: [String]) { calls.append(titles) }
     func notifyNewLedgerEntries(count: Int) { ledgerCounts.append(count) }
+    func notifyCycleStart() { cycleStartCalled = true }
 }
 
 final class HistoryMonitorTests: XCTestCase {
@@ -101,7 +103,8 @@ final class HistoryMonitorTests: XCTestCase {
                              me: UUID) -> HistoryMonitor {
         HistoryMonitor(container: container, localAuthor: "AnniversaryApp",
                        notifier: notifier, defaults: defaults,
-                       isEnabled: { enabled }, isLedgerEnabled: { ledgerEnabled }, myPartnerID: { _ in me })
+                       isEnabled: { enabled }, isLedgerEnabled: { ledgerEnabled },
+                       isCycleEnabled: { true }, myPartnerID: { _ in me })
     }
 
     func testPartnerImportTriggersNotificationOnce() throws {

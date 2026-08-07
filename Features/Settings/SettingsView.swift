@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("sealReminderOn") private var sealReminderOn = true
     @AppStorage("newMomentAlertOn") private var newMomentAlertOn = true
     @AppStorage("newLedgerAlertOn") private var newLedgerAlertOn = true
+    @AppStorage("cycleStartAlertOn") private var cycleStartAlertOn = true
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var partnerName = ""
@@ -76,6 +77,9 @@ struct SettingsView: View {
                         .padding(.horizontal, 14).padding(.vertical, 8)
                     DS.hairline.frame(height: 1).padding(.leading, 14)
                     Toggle("TA 记了小本本", isOn: $newLedgerAlertOn)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                    DS.hairline.frame(height: 1).padding(.leading, 14)
+                    Toggle("经期开始提醒", isOn: $cycleStartAlertOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
 

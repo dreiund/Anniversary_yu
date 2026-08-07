@@ -10,6 +10,7 @@ enum AppServices {
             notifier: LocalNotifier(),
             isEnabled: { (UserDefaults.standard.object(forKey: "newMomentAlertOn") as? Bool) ?? true },
             isLedgerEnabled: { (UserDefaults.standard.object(forKey: "newLedgerAlertOn") as? Bool) ?? true },
+            isCycleEnabled: { (UserDefaults.standard.object(forKey: "cycleStartAlertOn") as? Bool) ?? true },
             myPartnerID: { backgroundContext in
                 // 闭包在 monitor 的后台队列执行，只能用传入的 context——严禁碰 viewContext
                 let repo = CoupleRepository(context: backgroundContext)
