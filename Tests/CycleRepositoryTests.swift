@@ -90,4 +90,38 @@ final class CycleRepositoryTests: XCTestCase {
         XCTAssertEqual(logs.count, 1)                          // 同一天只有一条
         XCTAssertEqual(repo.dayLog(in: c, day: d(10), calendar: cal)?.note, "改了")
     }
+
+    func testAddIntimacyTimeAndMeetingAttachment() throws {
+        // 今天 + 见面进行中 → happenedAt=now、挂开着的约会日；过去天 → 当天 12:00、不挂
+        let meetings = MeetingRepository(context: pc.viewContext)
+        let m = try meetings.createPlanned(couple: couple, title: nil, city: nil,
+                                           plannedStart: nil, plannedEnd: nil)
+        try meetings.start(m, at: d(10))
+        let now = d(10).addingTimeInterval(80_000)
+        _ = try meetings.dayForRecord(in: m, at: d(10).addingTimeInterval(3_600), now: now, calendar: cal)
+        let today = try repo.addIntimacy(couple: couple, day: d(10), protected: true,
+                                         note: nil, now: now, calendar: cal)
+        XCTAssertEqual(today.happenedAt, now)
+        XCTAssertNotNil(today.dateDay)
+        XCTAssertEqual(today.protectionUsed, true)
+        let past = try repo.addIntimacy(couple: couple, day: d(5), protected: false,
+                                        note: "补", now: now, calendar: cal)
+        XCTAssertEqual(past.happenedAt, cal.date(bySettingHour: 12, minute: 0, second: 0, of: d(5)))
+        XCTAssertNil(past.dateDay)
+        XCTAssertEqual(repo.intimacy(on: d(5), couple: couple, calendar: cal).count, 1)
+        try repo.updateIntimacy(past, protected: true, note: "改")
+        XCTAssertEqual(past.protectionUsed, true)
+        try repo.deleteIntimacy(past)
+        XCTAssertTrue(repo.intimacy(on: d(5), couple: couple, calendar: cal).isEmpty)
+    }
+
+    func testTrackedPartnerExclusive() throws {
+        let partners = CoupleRepository(context: pc.viewContext).partners(of: couple)
+        XCTAssertNil(repo.trackedPartner(couple: couple))
+        try repo.setTracked(partners[0], couple: couple)
+        XCTAssertEqual(repo.trackedPartner(couple: couple)?.objectID, partners[0].objectID)
+        try repo.setTracked(partners[1], couple: couple)      // 独占：换人旧的置 false
+        XCTAssertEqual(repo.trackedPartner(couple: couple)?.objectID, partners[1].objectID)
+        XCTAssertFalse(partners[0].tracksCycle)
+    }
 }

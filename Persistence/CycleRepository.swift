@@ -120,3 +120,57 @@ struct CycleRepository {
         return log
     }
 }
+
+extension CycleRepository {
+    /// 亲密（spec §二）：今天=now 时刻；过去=当天 12:00；今天且见面进行中挂开着的约会日
+    @discardableResult
+    func addIntimacy(couple: CDCouple, day: Date, protected: Bool, note: String?,
+                     now: Date, calendar: Calendar) throws -> CDIntimacyRecord {
+        let record = CDIntimacyRecord(context: context)
+        record.id = UUID()
+        record.protectionUsed = NSNumber(value: protected)
+        record.note = note
+        record.couple = couple
+        if calendar.isDate(day, inSameDayAs: now) {
+            record.happenedAt = now
+            if let meeting = try? MeetingRepository(context: context).ongoingMeeting(couple: couple),
+               let open = try? MeetingRepository(context: context).openDay(in: meeting) {
+                record.dateDay = open
+            }
+        } else {
+            record.happenedAt = calendar.date(bySettingHour: 12, minute: 0, second: 0,
+                                              of: calendar.startOfDay(for: day))
+        }
+        try context.save()
+        return record
+    }
+
+    func intimacy(on day: Date, couple: CDCouple, calendar: Calendar) -> [CDIntimacyRecord] {
+        ((couple.intimacyRecords as? Set<CDIntimacyRecord>) ?? [])
+            .filter { $0.happenedAt.map { calendar.isDate($0, inSameDayAs: day) } ?? false }
+            .sorted { ($0.happenedAt ?? .distantPast) < ($1.happenedAt ?? .distantPast) }
+    }
+
+    func updateIntimacy(_ record: CDIntimacyRecord, protected: Bool, note: String?) throws {
+        record.protectionUsed = NSNumber(value: protected)
+        record.note = note
+        try context.save()
+    }
+
+    func deleteIntimacy(_ record: CDIntimacyRecord) throws {
+        context.delete(record)
+        try context.save()
+    }
+
+    /// 归属（spec §七）：独占单选；改归属不动周期数据
+    func trackedPartner(couple: CDCouple) -> CDPartner? {
+        CoupleRepository(context: context).partners(of: couple).first(where: \.tracksCycle)
+    }
+
+    func setTracked(_ partner: CDPartner, couple: CDCouple) throws {
+        for p in CoupleRepository(context: context).partners(of: couple) {
+            p.tracksCycle = (p.objectID == partner.objectID)
+        }
+        try context.save()
+    }
+}
