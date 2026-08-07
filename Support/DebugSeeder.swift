@@ -65,6 +65,30 @@ enum DebugSeeder {
             place: bookstore,
             evidenceDatas: [solidImageData(.systemTeal), solidImageData(.systemPink)],
             authorID: authorID)
+
+        // 她页种子：被追踪人=小于；两段历史 + 今天进行中 + 点选 + 亲密（截图/演示用）
+        let cycleRepo = CycleRepository(context: context)
+        let cal = Calendar.current
+        if let partner = CoupleRepository(context: context).partners(of: couple)
+            .first(where: { $0.name == "小于" }) {
+            try? cycleRepo.setTracked(partner, couple: couple)
+        }
+        let day: (Int) -> Date = { cal.date(byAdding: .day, value: $0, to: cal.startOfDay(for: Date()))! }
+        _ = try? cycleRepo.backfill(couple: couple, start: day(-58), end: day(-53),
+                                    today: Date(), calendar: cal)
+        _ = try? cycleRepo.backfill(couple: couple, start: day(-30), end: day(-25),
+                                    today: Date(), calendar: cal)
+        if let current = try? cycleRepo.start(couple: couple, on: day(-1), predictedStart: day(-2),
+                                              today: Date(), calendar: cal) {
+            _ = try? cycleRepo.setDayLog(in: current, day: day(-1), painRaw: 2, flowRaw: 3,
+                                         colorRaw: 3, note: nil, calendar: cal)
+            _ = try? cycleRepo.setDayLog(in: current, day: day(0), painRaw: 1, flowRaw: 2,
+                                         colorRaw: 2, note: nil, calendar: cal)
+        }
+        _ = try? cycleRepo.addIntimacy(couple: couple, day: day(-9), protected: true,
+                                       note: nil, now: Date(), calendar: cal)
+        _ = try? cycleRepo.addIntimacy(couple: couple, day: day(-3), protected: false,
+                                       note: nil, now: Date(), calendar: cal)
     }
 
     /// 清空整库：逐实体逐对象删除。CloudKit 店不支持 NSBatchDeleteRequest（绕过历史追踪会被拒），

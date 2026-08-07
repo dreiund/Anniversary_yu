@@ -150,6 +150,32 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "L1-小本本详情")
     }
 
+    /// 她页三屏观感截图：主页四点月历 / 记录卡 / 统计页
+    @MainActor
+    func testHerPageLook() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        let tab = app.buttons["她"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "底栏她未出现")
+        tab.tap()
+        sleep(2)
+        attach(app, name: "H1-她页主页")
+
+        // 点今天 → 记录卡（种子里今天在经期中：应见三排点选）
+        let todayNum = Calendar.current.component(.day, from: Date())
+        app.staticTexts["\(todayNum)"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["疼痛"].waitForExistence(timeout: 3), "点选排未出现")
+        attach(app, name: "H2-记录卡")
+        app.buttons["完成"].tap()
+        sleep(1)
+
+        app.buttons["统计"].tap()
+        XCTAssertTrue(app.staticTexts["历史周期"].waitForExistence(timeout: 3), "统计页未出现")
+        attach(app, name: "H3-统计页")
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
