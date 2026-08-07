@@ -39,6 +39,17 @@ final class MapFilterReproTests: XCTestCase {
         sleep(1)
         attach(app, name: "0c-点卡收起")
 
+        // 再滑开点「删除」：确认弹窗必须出现（收起层挡按钮的回归验证）
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: rowY))
+            .press(forDuration: 0.05,
+                   thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: rowY)))
+        sleep(1)
+        app.buttons["删除"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3), "删除确认弹窗未出现")
+        attach(app, name: "0d-删除确认")
+        app.alerts.firstMatch.buttons["取消"].tap()
+        sleep(1)
+
         let mapChip = app.buttons["地图"]
         XCTAssertTrue(mapChip.waitForExistence(timeout: 5), "地图分段未出现")
         mapChip.tap()
@@ -59,6 +70,23 @@ final class MapFilterReproTests: XCTestCase {
         app.buttons["全部"].tap()
         sleep(2)
         attach(app, name: "4-切回全部")
+    }
+
+    /// 小本本详情页观感截图
+    @MainActor
+    func testLedgerDetailLook() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        let tab = app.buttons["小本本"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "底栏小本本未出现")
+        tab.tap()
+        let row = app.staticTexts["陪我逛了一下午书店"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "种子条目未出现")
+        row.tap()
+        sleep(2)
+        attach(app, name: "L1-小本本详情")
     }
 
     @MainActor

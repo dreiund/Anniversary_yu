@@ -1,11 +1,14 @@
 #if DEBUG
-import Foundation
+import UIKit
 import CoreData
 
-/// UI 测试/演示数据种子（仅 DEBUG；`--seed-map-demo` 启动参数触发；空库才种，幂等）。
+/// UI 测试/演示数据种子（仅 DEBUG；`--seed-map-demo` 启动参数触发）。
+/// 每次先清空整库再播种——UI 测试反复跑会留下改过状态的旧数据（结束的见面、旧版种子），
+/// 靠"空库才种"的幂等挡不住，必须每次从确定状态开始。
 /// 种出：情侣 + 进行中见面 + 两条带地点记忆（美食 1 / 景点公园 3）——咖啡甜品等类目恒为空，供筛选空类目复现。
 enum DebugSeeder {
     static func seedMapDemoIfEmpty(context: NSManagedObjectContext) {
+        wipeAll(context: context)
         let coupleRepo = CoupleRepository(context: context)
         guard (try? coupleRepo.fetchCouple()) == nil else { return }
         guard let couple = try? coupleRepo.bootstrapIfNeeded(
@@ -55,7 +58,31 @@ enum DebugSeeder {
         _ = try? LedgerRepository(context: context).createEntry(
             couple: couple, category: .praise, title: "陪我逛了一下午书店", detail: "全程没催我",
             happenedAt: Date().addingTimeInterval(-600), visibility: .sharedImmediately,
-            place: bookstore, evidenceDatas: [], authorID: authorID)
+            place: bookstore,
+            evidenceDatas: [solidImageData(.systemTeal), solidImageData(.systemPink)],
+            authorID: authorID)
+    }
+
+    /// 清空整库：逐实体逐对象删除。CloudKit 店不支持 NSBatchDeleteRequest（绕过历史追踪会被拒），
+    /// 只能对象级删；级联导致的重复删除是无害 no-op，演示库量级极小。
+    private static func wipeAll(context: NSManagedObjectContext) {
+        let entities = context.persistentStoreCoordinator?.managedObjectModel.entities ?? []
+        for entity in entities {
+            guard let name = entity.name else { continue }
+            let fetch = NSFetchRequest<NSManagedObject>(entityName: name)
+            fetch.includesPropertyValues = false
+            (try? context.fetch(fetch))?.forEach(context.delete)
+        }
+        try? context.save()
+    }
+
+    /// 纯色演示图（证据/照片占位；Thumbnailer 需要真图，非图字节会得 nil）
+    private static func solidImageData(_ color: UIColor) -> Data {
+        UIGraphicsImageRenderer(size: CGSize(width: 600, height: 450))
+            .jpegData(withCompressionQuality: 0.8) { ctx in
+                color.setFill()
+                ctx.fill(CGRect(x: 0, y: 0, width: 600, height: 450))
+            }
     }
 }
 #endif

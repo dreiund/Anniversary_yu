@@ -46,13 +46,15 @@ struct SwipeDeleteRow<ID: Equatable, Content: View>: View {
             .allowsHitTesting(isOpen)
 
             content()
-                .offset(x: offset)
                 .overlay {
                     if isOpen {   // 开着时点卡片 = 收起，不触发卡片自身的跳转
                         Color.clear.contentShape(Rectangle())
                             .onTapGesture { withAnimation(.snappy) { openID = nil } }
                     }
                 }
+                // 收起层必须在 offset 之前挂：offset 不改布局框，挂在其后收起层会停在
+                // 卡片原位、盖住露出的删除按钮，点删除全被收起层吃掉
+                .offset(x: offset)
         }
         // highPriorityGesture：压过卡片内 NavigationLink（子视图手势默认优先，普通 .gesture
         // 抢不到，横划会被按钮当点击）；竖向滚动仍归 ScrollView 的 UIKit pan，不受影响

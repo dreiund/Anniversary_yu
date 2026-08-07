@@ -39,35 +39,60 @@ struct LedgerDetailView: View {
     private var content: some View {
         let evidences = LedgerRepository(context: context).evidencesSorted(entry)
         return ScrollView {
-            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                HStack(spacing: 6) {
-                    Text(category.title)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(accent)
-                        .padding(.vertical, 2).padding(.horizontal, 8)
-                        .overlay(Capsule().stroke(accent, lineWidth: 1))
-                    if !revealed {
-                        Text("🔒 仅自己可见").dsFootnote()
-                    }
-                }
-                Text(entry.title ?? "").dsPageTitle()
-                Text(metaLine).dsFootnote()
-                if let detail = entry.detail, !detail.isEmpty {
-                    Text(detail).dsBody().padding(.top, 4)
-                }
-                if !evidences.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(Array(evidences.enumerated()), id: \.element.objectID) { i, evidence in
-                            if let data = evidence.thumbnailData, let ui = UIImage(data: data) {
-                                Image(uiImage: ui).resizable().scaledToFill()
-                                    .frame(width: 74, height: 74)
-                                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
-                                    .onTapGesture { viewerIndex = i }
+            VStack(alignment: .leading, spacing: DS.Spacing.md) {
+                // 主体卡：实底类别徽章 + 标题 + 正文
+                ParchmentCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text(category.title)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(accent)
+                                .padding(.vertical, 4).padding(.horizontal, 10)
+                                .background(Capsule().fill(accent.opacity(0.14)))
+                            Spacer()
+                            if !revealed {
+                                Text("🔒 仅自己可见").dsFootnote()
                             }
                         }
+                        Text(entry.title ?? "").dsPageTitle()
+                        if let detail = entry.detail, !detail.isEmpty {
+                            Text(detail).dsBody().lineSpacing(5)
+                        }
                     }
-                    .padding(.top, 6)
-                    Text("证据 \(evidences.count) 张 · 点开大图").dsFootnote()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                // 信息行：记录人 / 事发 / 地点 / 可见性
+                GroupedSection {
+                    ForEach(Array(infoRows.enumerated()), id: \.offset) { i, row in
+                        GroupedRow(title: row.title, value: row.value,
+                                   valueColor: row.color,
+                                   showsDivider: i < infoRows.count - 1)
+                    }
+                }
+
+                if !evidences.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("证据").dsSectionTitle()
+                            Text("\(evidences.count) 张 · 点开大图").dsFootnote()
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(Array(evidences.enumerated()), id: \.element.objectID) { i, evidence in
+                                    if let data = evidence.thumbnailData, let ui = UIImage(data: data) {
+                                        Image(uiImage: ui).resizable().scaledToFill()
+                                            .frame(width: 110, height: 110)
+                                            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                                            .dsPhotoShadow()
+                                            .onTapGesture { viewerIndex = i }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 2)
+                            .padding(.vertical, 8)   // 给照片投影留出呼吸空间
+                        }
+                    }
                 }
             }
             .padding(DS.Spacing.md)
@@ -126,15 +151,24 @@ struct LedgerDetailView: View {
         }
     }
 
-    private var metaLine: String {
-        var parts = ["\(authorName) 记"]
-        if let at = entry.happenedAt { parts.append("事发 \(Fmt.monthDay.string(from: at))") }
-        if let placeName = entry.place?.name, !placeName.isEmpty { parts.append(placeName) }
-        if entry.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue,
-           let revealedAt = entry.revealedAt {
-            parts.append("\(Fmt.monthDay.string(from: revealedAt)) 已公开")
+    private var infoRows: [(title: String, value: String, color: Color)] {
+        var rows: [(String, String, Color)] = [("记录人", authorName.isEmpty ? "—" : authorName, DS.inkMuted)]
+        if let at = entry.happenedAt {
+            rows.append(("事发", Fmt.monthDay.string(from: at), DS.inkMuted))
         }
-        return parts.joined(separator: " · ")
+        if let placeName = entry.place?.name, !placeName.isEmpty {
+            rows.append(("地点", placeName, DS.inkMuted))
+        }
+        if entry.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue {
+            if let revealedAt = entry.revealedAt {
+                rows.append(("可见性", "\(Fmt.monthDay.string(from: revealedAt)) 已公开", DS.dsGreen))
+            } else {
+                rows.append(("可见性", "仅自己可见 🔒", DS.inkMuted))
+            }
+        } else {
+            rows.append(("可见性", "双方可见", DS.dsGreen))
+        }
+        return rows
     }
 
     private var authorName: String {
