@@ -8,6 +8,7 @@ struct MeetingsView: View {
     private var meetings: FetchedResults<CDMeeting>
     @State private var showForm = false
     @State private var pendingDelete: CDMeeting?
+    @State private var openSwipeID: NSManagedObjectID?
 
     private var deleteIsPlanned: Bool {
         pendingDelete.map { MeetingStatus(rawValue: $0.statusRaw) == .planned } ?? false
@@ -64,41 +65,29 @@ struct MeetingsView: View {
     }
 
     private var listContent: some View {
-        // List 容器：为左滑删除（swipeActions 仅 List 可用）；行样式抹平还原卡片观感
-        List {
-            ForEach(meetings, id: \.objectID) { meeting in
-                ZStack {
-                    NavigationLink { destination(for: meeting) } label: { EmptyView() }
-                        .opacity(0)   // 隐藏链接：行点击照常推入，卡片上不出现 List 的角标
-                    cardBody(for: meeting)
+        ScrollView {
+            VStack(spacing: DS.Spacing.md) {
+                ForEach(meetings, id: \.objectID) { meeting in
+                    SwipeDeleteRow(id: meeting.objectID, openID: $openSwipeID) {
+                        pendingDelete = meeting
+                    } content: {
+                        card(for: meeting)
+                    }
                 }
-                .listRowInsets(EdgeInsets(top: 6, leading: DS.Spacing.md,
-                                          bottom: 6, trailing: DS.Spacing.md))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button("删除", role: .destructive) { pendingDelete = meeting }
-                }
-            }
-            Group {
                 if meetings.isEmpty {
-                    Text("还没有见面记录").dsCaption()
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 48)
+                    Text("还没有见面记录").dsCaption().padding(.top, 48)
                 }
                 Button("计划见面") { showForm = true }
                     .buttonStyle(GhostPillButtonStyle())
-                    .frame(maxWidth: .infinity)
                     .padding(.top, DS.Spacing.xs)
             }
-            .listRowInsets(EdgeInsets(top: 6, leading: DS.Spacing.md,
-                                      bottom: 6, trailing: DS.Spacing.md))
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
+            .padding(DS.Spacing.md)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(DS.canvas)
+    }
+
+    private func card(for meeting: CDMeeting) -> some View {
+        NavigationLink { destination(for: meeting) } label: { cardBody(for: meeting) }
+            .buttonStyle(DSPressEffect())
     }
 
     @ViewBuilder

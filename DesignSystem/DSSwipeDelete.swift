@@ -1,0 +1,82 @@
+import SwiftUI
+
+/// 卡片左滑删除：系统 swipeActions 的通高方角红条与圆角卡片不搭，改为自绘——
+/// 卡片左移露出同高圆角红按钮（淡入 + 微缩放），松手过半程吸附展开，否则弹回。
+/// `openID` 由列表持有，保证同时只开一行；滑新行/点卡片/点删除都会收起。
+struct SwipeDeleteRow<ID: Equatable, Content: View>: View {
+    let id: ID
+    @Binding var openID: ID?
+    let onDelete: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    // 手势取消（如被竖向滚动抢走）时自动归零并带回弹动画，避免卡片停在半路
+    @GestureState(resetTransaction: Transaction(animation: .snappy))
+    private var drag: CGFloat = 0
+
+    private let buttonWidth: CGFloat = 68
+    private let gap: CGFloat = 8
+    private var revealed: CGFloat { buttonWidth + gap }
+    private var isOpen: Bool { openID == id }
+
+    /// 卡片位移 = 静止位 + 手势位移；超出露出量走 1/3 橡皮筋，向右不越 0
+    private var offset: CGFloat {
+        let base = (isOpen ? -revealed : 0) + drag
+        if base < -revealed { return -revealed + (base + revealed) / 3 }
+        return min(base, 0)
+    }
+
+    var body: some View {
+        let progress = revealed > 0 ? min(1, -offset / revealed) : 0
+        ZStack(alignment: .trailing) {
+            Button {
+                withAnimation(.snappy) { openID = nil }
+                onDelete()
+            } label: {
+                VStack(spacing: 3) {
+                    Image(systemName: "trash.fill").font(.system(size: 16))
+                    Text("删除").font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(width: buttonWidth)
+                .frame(maxHeight: .infinity)
+                .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.dsRed))
+            }
+            .opacity(progress)
+            .scaleEffect(0.85 + 0.15 * progress)
+            .allowsHitTesting(isOpen)
+
+            content()
+                .offset(x: offset)
+                .overlay {
+                    if isOpen {   // 开着时点卡片 = 收起，不触发卡片自身的跳转
+                        Color.clear.contentShape(Rectangle())
+                            .onTapGesture { withAnimation(.snappy) { openID = nil } }
+                    }
+                }
+        }
+        // highPriorityGesture：压过卡片内 NavigationLink（子视图手势默认优先，普通 .gesture
+        // 抢不到，横划会被按钮当点击）；竖向滚动仍归 ScrollView 的 UIKit pan，不受影响
+        .highPriorityGesture(dragGesture)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .updating($drag) { value, state, _ in
+                // 首次落笔竖向占优则交还滚动，不接管；一旦接管则持续跟手
+                guard state != 0
+                        || abs(value.translation.width) > abs(value.translation.height)
+                else { return }
+                if openID != nil, openID != id {
+                    withAnimation(.snappy) { openID = nil }   // 滑新行时收起旧行
+                }
+                state = value.translation.width
+            }
+            .onEnded { value in
+                // 用预测终点吸附：轻快一甩也能展开
+                let projected = (isOpen ? -revealed : 0) + value.predictedEndTranslation.width
+                withAnimation(.snappy) {
+                    openID = projected < -revealed * 0.6 ? id : nil
+                }
+            }
+    }
+}

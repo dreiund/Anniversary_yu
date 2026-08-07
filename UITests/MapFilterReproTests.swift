@@ -24,6 +24,21 @@ final class MapFilterReproTests: XCTestCase {
         sleep(1)
         attach(app, name: "0-列表")
 
+        // 坐标级横划（元素级 swipeLeft 距离太短，会被当成点击触发跳转）
+        let cityText = app.staticTexts["上海"]
+        XCTAssertTrue(cityText.waitForExistence(timeout: 5), "进行中卡未出现")
+        let rowY = cityText.frame.midY / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: rowY))
+            .press(forDuration: 0.05,
+                   thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: rowY)))
+        sleep(1)
+        attach(app, name: "0b-左滑删除")
+
+        // 点卡片空白处应收起而非跳转
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: rowY)).tap()
+        sleep(1)
+        attach(app, name: "0c-点卡收起")
+
         let mapChip = app.buttons["地图"]
         XCTAssertTrue(mapChip.waitForExistence(timeout: 5), "地图分段未出现")
         mapChip.tap()
