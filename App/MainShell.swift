@@ -5,6 +5,7 @@ enum AppTab {
     case us
     case footprints
     case ledger
+    case her
 }
 
 struct MainShell: View {
@@ -45,6 +46,7 @@ struct MainShell: View {
                 case .us: NavigationStack { HomeView() }
                 case .footprints: NavigationStack { MeetingsView() }
                 case .ledger: NavigationStack { LedgerListView() }
+                case .her: NavigationStack { HerView() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -131,7 +133,7 @@ struct MainShell: View {
                 Spacer()
                 tabButton("小本本", tab: .ledger)
                 Spacer()
-                disabledTab("她")
+                tabButton("她", tab: .her)
             }
         }
     }
