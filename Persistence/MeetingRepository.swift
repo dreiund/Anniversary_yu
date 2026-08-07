@@ -154,7 +154,9 @@ extension MeetingRepository {
 extension MeetingRepository {
     enum EditError: Error { case notPlanned, dayNotEmpty }
 
-    /// 三态可改基本信息：日期按状态落位（planned→计划日期对；ongoing→仅 startedAt；finished→startedAt+endedAt）
+    /// 三态可改基本信息：日期按状态落位（planned→计划日期对；ongoing→startedAt+plannedEnd
+    /// ——还没结束没有 endedAt，但行程延后要能改「预计结束」，列表日期范围显示的正是它；
+    /// finished→startedAt+endedAt）
     func update(_ meeting: CDMeeting, title: String?, city: String?,
                 start: Date?, end: Date?) throws {
         meeting.title = title
@@ -165,6 +167,7 @@ extension MeetingRepository {
             meeting.plannedEnd = end
         case .ongoing:
             meeting.startedAt = start ?? meeting.startedAt
+            meeting.plannedEnd = end ?? meeting.plannedEnd
         case .finished:
             meeting.startedAt = start ?? meeting.startedAt
             meeting.endedAt = end ?? meeting.endedAt

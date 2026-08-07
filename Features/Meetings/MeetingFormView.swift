@@ -25,11 +25,14 @@ struct MeetingFormView: View {
         editingMeeting.map { MeetingRepository(context: context).status(of: $0) } ?? .planned
     }
 
-    /// 进行中只有实际开始可改（还没结束，无结束日期可言）
-    private var showsEndDate: Bool { editingStatus != .ongoing }
-
+    /// 结束行按状态取字段：planned→plannedEnd；ongoing→plannedEnd（反馈：行程延后要能改
+    /// 「预计结束」，列表日期范围显示的正是它）；finished→endedAt
     private var dateLabels: (start: String, end: String) {
-        editingStatus == .planned ? ("开始日期", "结束日期") : ("实际开始", "实际结束")
+        switch editingStatus {
+        case .planned: return ("开始日期", "结束日期")
+        case .ongoing: return ("实际开始", "预计结束")
+        case .finished: return ("实际开始", "实际结束")
+        }
     }
 
     var body: some View {
@@ -51,11 +54,9 @@ struct MeetingFormView: View {
                         DS.hairline.frame(height: 1).padding(.leading, 14)
                         DatePicker(dateLabels.start, selection: $start, displayedComponents: .date)
                             .padding(.horizontal, 14).padding(.vertical, 6)
-                        if showsEndDate {
-                            DS.hairline.frame(height: 1).padding(.leading, 14)
-                            DatePicker(dateLabels.end, selection: $end, in: start..., displayedComponents: .date)
-                                .padding(.horizontal, 14).padding(.vertical, 6)
-                        }
+                        DS.hairline.frame(height: 1).padding(.leading, 14)
+                        DatePicker(dateLabels.end, selection: $end, in: start..., displayedComponents: .date)
+                            .padding(.horizontal, 14).padding(.vertical, 6)
                     }
 
                     if editingMeeting != nil, editingStatus == .planned {
@@ -109,6 +110,7 @@ struct MeetingFormView: View {
             end = m.plannedEnd ?? end
         case .ongoing:
             start = m.startedAt ?? start
+            end = m.plannedEnd ?? end
         case .finished:
             start = m.startedAt ?? start
             end = m.endedAt ?? end
@@ -124,7 +126,7 @@ struct MeetingFormView: View {
                 couple: couple, title: t, city: c, plannedStart: start, plannedEnd: end)
         case .edit(let m):
             try? MeetingRepository(context: context).update(
-                m, title: t, city: c, start: start, end: showsEndDate ? end : nil)
+                m, title: t, city: c, start: start, end: end)
         }
         dismiss()
     }

@@ -124,6 +124,13 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "T3-管理模式")
         XCTAssertTrue(app.staticTexts["已选 1 项"].exists, "底栏计数未出现")
         app.buttons["完成"].tap()
+        sleep(1)
+
+        // 进行中编辑表单：实际开始 + 预计结束（反馈：行程延后要能改结束）
+        app.buttons["编辑"].tap()
+        XCTAssertTrue(app.staticTexts["预计结束"].waitForExistence(timeout: 3), "预计结束行未出现")
+        attach(app, name: "T4-进行中编辑")
+        app.buttons["取消"].tap()
     }
 
     /// 小本本详情页观感截图

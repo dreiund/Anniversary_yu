@@ -26,7 +26,7 @@ final class MeetingEditTests: XCTestCase {
         XCTAssertNil(m.startedAt)
     }
 
-    func testUpdateOngoingWritesStartedAtOnly() throws {
+    func testUpdateOngoingWritesStartedAtAndPlannedEnd() throws {
         let (pc, couple) = try makeCouple()
         let repo = MeetingRepository(context: pc.viewContext)
         let m = try repo.createPlanned(couple: couple, title: nil, city: nil,
@@ -36,8 +36,9 @@ final class MeetingEditTests: XCTestCase {
                         start: Date(timeIntervalSince1970: 600),
                         end: Date(timeIntervalSince1970: 700))
         XCTAssertEqual(m.startedAt, Date(timeIntervalSince1970: 600))
-        XCTAssertNil(m.endedAt)                                    // ongoing 不写结束
-        XCTAssertEqual(m.plannedStart, Date(timeIntervalSince1970: 100))  // 计划日期不动
+        XCTAssertNil(m.endedAt)                                    // ongoing 不写实际结束
+        XCTAssertEqual(m.plannedEnd, Date(timeIntervalSince1970: 700))    // 反馈：行程延后，预计结束可改
+        XCTAssertEqual(m.plannedStart, Date(timeIntervalSince1970: 100))  // 计划开始不动
     }
 
     func testUpdateFinishedWritesStartedAndEnded() throws {
