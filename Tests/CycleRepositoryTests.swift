@@ -115,6 +115,27 @@ final class CycleRepositoryTests: XCTestCase {
         XCTAssertTrue(repo.intimacy(on: d(5), couple: couple, calendar: cal).isEmpty)
     }
 
+    /// I1：backfill 的结束日、updateRange 的起止都不能落在未来（今天显式传参，固定日期）
+    func testBackfillAndUpdateRangeRejectFutureDates() throws {
+        XCTAssertThrowsError(try repo.backfill(couple: couple, start: d(10), end: d(60),
+                                               today: d(50), calendar: cal)) {
+            XCTAssertEqual($0 as? CycleRepository.CycleError, .future)
+        }
+        let c = try repo.backfill(couple: couple, start: d(10), end: d(15), today: d(50), calendar: cal)
+        XCTAssertThrowsError(try repo.updateRange(c, start: d(11), end: d(60),
+                                                   today: d(50), calendar: cal)) {
+            XCTAssertEqual($0 as? CycleRepository.CycleError, .future)
+        }
+        XCTAssertThrowsError(try repo.updateRange(c, start: d(60), end: d(65),
+                                                   today: d(50), calendar: cal)) {
+            XCTAssertEqual($0 as? CycleRepository.CycleError, .future)
+        }
+        // 未越界的照常成功
+        try repo.updateRange(c, start: d(11), end: d(16), today: d(50), calendar: cal)
+        XCTAssertEqual(c.startDate, cal.startOfDay(for: d(11)))
+        XCTAssertEqual(c.endDate, cal.startOfDay(for: d(16)))
+    }
+
     func testTrackedPartnerExclusive() throws {
         let partners = CoupleRepository(context: pc.viewContext).partners(of: couple)
         XCTAssertNil(repo.trackedPartner(couple: couple))

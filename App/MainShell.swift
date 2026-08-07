@@ -170,11 +170,4 @@ struct MainShell: View {
         }
         .buttonStyle(DSPressEffect())
     }
-
-    private func disabledTab(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 13))
-            .foregroundStyle(DS.inkMuted)
-            .opacity(0.35)
-    }
 }

@@ -115,7 +115,15 @@ struct HerView: View {
                     .font(.system(size: 13)).foregroundStyle(DS.actionBlue)
                     .opacity(monthOffset == 0 ? 0.35 : 1)
                 Spacer()
+                Button { stepMonth(-1) } label: {
+                    Text("‹").font(.system(size: 20, weight: .semibold))
+                }
+                .foregroundStyle(DS.actionBlue)
                 Text(monthTitle(anchor)).dsSectionTitle()
+                Button { stepMonth(1) } label: {
+                    Text("›").font(.system(size: 20, weight: .semibold))
+                }
+                .foregroundStyle(DS.actionBlue)
                 Spacer()
                 NavigationLink { CycleStatsView() } label: {
                     Text("统计").font(.system(size: 13)).foregroundStyle(DS.actionBlue)
@@ -151,6 +159,11 @@ struct HerView: View {
         let base = "左右滑动换月 · 浅红=经期 · 虚线=预测 · 墨环=今天"
         return CyclePredictor.predict(cycles: inputs, calendar: cal).isDefault && !inputs.isEmpty
             ? base + " · 数据积累中" : base
+    }
+
+    /// spec §一.4：‹ › 步进（clamp 到 TabView 的 -24...12 范围，样式同统计页）
+    private func stepMonth(_ delta: Int) {
+        monthOffset = max(-24, min(12, monthOffset + delta))
     }
 
     private func monthTitle(_ anchor: Date) -> String {

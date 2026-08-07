@@ -21,6 +21,7 @@ struct CycleDaySheet: View {
     @State private var note = ""
     @State private var intimacyProtected = true
     @State private var intimacyNote = ""
+    @State private var editingIntimacy: CDIntimacyRecord?
     @State private var overlapMessage: String?
     @State private var confirmDeleteIntimacy: CDIntimacyRecord?
     @State private var loaded = false
@@ -195,36 +196,71 @@ struct CycleDaySheet: View {
         }
     }
 
-    // MARK: 亲密段（spec §二）
+    // MARK: 亲密段（spec §二；未来天只看预测，不给表单）
 
     @ViewBuilder
     private var intimacySection: some View {
-        let records = repo.intimacy(on: day, couple: couple, calendar: cal)
-        ForEach(records, id: \.objectID) { record in
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.happenedAt.map { Fmt.hm.string(from: $0) } ?? "").dsBody()
-                    Text(record.protectionUsed?.boolValue == true ? "有措施" : "无措施").dsFootnote()
-                    if let n = record.note, !n.isEmpty { Text(n).dsFootnote() }
+        let today = cal.startOfDay(for: Date())
+        if cal.startOfDay(for: day) > today {
+            Text("未来的日子只能看预测").dsCaption()
+                .frame(maxWidth: .infinity).padding(.top, 24)
+        } else {
+            let records = repo.intimacy(on: day, couple: couple, calendar: cal)
+            ForEach(records, id: \.objectID) { record in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(record.happenedAt.map { Fmt.hm.string(from: $0) } ?? "").dsBody()
+                        Text(record.protectionUsed?.boolValue == true ? "有措施" : "无措施").dsFootnote()
+                        if let n = record.note, !n.isEmpty { Text(n).dsFootnote() }
+                    }
+                    Spacer()
+                    HStack(spacing: 12) {
+                        Button("编辑") { startEditingIntimacy(record) }
+                            .font(.system(size: 14)).foregroundStyle(DS.actionBlue)
+                        Button("删除") { confirmDeleteIntimacy = record }
+                            .font(.system(size: 14)).foregroundStyle(DS.dsRed)
+                    }
                 }
-                Spacer()
-                Button("删除") { confirmDeleteIntimacy = record }
-                    .font(.system(size: 14)).foregroundStyle(DS.dsRed)
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
             }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
+            Toggle("有措施", isOn: $intimacyProtected).dsBody()
+            TextField("备注（可选）", text: $intimacyNote, axis: .vertical)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.parchment))
+            Button(editingIntimacy == nil ? "保存" : "保存修改") { saveIntimacy() }
+                .buttonStyle(BluePillButtonStyle(fullWidth: true))
+            if editingIntimacy != nil {
+                Button("取消") { cancelEditingIntimacy() }
+                    .font(.system(size: 13)).foregroundStyle(DS.inkMuted)
+                    .frame(maxWidth: .infinity)
+            }
         }
-        Toggle("有措施", isOn: $intimacyProtected).dsBody()
-        TextField("备注（可选）", text: $intimacyNote, axis: .vertical)
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.parchment))
-        Button("保存") {
+    }
+
+    private func startEditingIntimacy(_ record: CDIntimacyRecord) {
+        editingIntimacy = record
+        intimacyProtected = record.protectionUsed?.boolValue ?? true
+        intimacyNote = record.note ?? ""
+    }
+
+    private func cancelEditingIntimacy() {
+        editingIntimacy = nil
+        intimacyNote = ""
+    }
+
+    /// 编辑态=updateIntimacy 改既有条；非编辑态=addIntimacy 新增（行为不变）
+    private func saveIntimacy() {
+        if let record = editingIntimacy {
+            try? repo.updateIntimacy(record, protected: intimacyProtected,
+                                     note: intimacyNote.isEmpty ? nil : intimacyNote)
+            editingIntimacy = nil
+        } else {
             try? repo.addIntimacy(couple: couple, day: day,
                                   protected: intimacyProtected,
                                   note: intimacyNote.isEmpty ? nil : intimacyNote,
                                   now: Date(), calendar: cal)
-            intimacyNote = ""
         }
-        .buttonStyle(BluePillButtonStyle(fullWidth: true))
+        intimacyNote = ""
     }
 }

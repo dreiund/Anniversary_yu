@@ -1,15 +1,24 @@
 import SwiftUI
 
-/// 首次选人 / 设置改归属（spec §七）
+/// 首次选人 / 设置改归属（spec §七）：首次选人不给退路（requireChoice=true），
+/// 设置里改归属可以取消（requireChoice=false）
 struct TrackedPickerView: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     let couple: CDCouple
+    var requireChoice: Bool = true
     @State private var picked: CDPartner?
 
     var body: some View {
         let partners = CoupleRepository(context: context).partners(of: couple)
         VStack(spacing: DS.Spacing.md) {
+            if !requireChoice {
+                HStack {
+                    Button("取消") { dismiss() }
+                        .font(.system(size: 15)).foregroundStyle(DS.actionBlue)
+                    Spacer()
+                }
+            }
             Text("记录谁的经期？").dsPageTitle()
             Text("只问一次，设置里随时可改").dsFootnote()
             HStack(spacing: DS.Spacing.sm) {
@@ -42,6 +51,9 @@ struct TrackedPickerView: View {
         }
         .padding(DS.Spacing.md)
         .presentationDetents([.medium])
-        .interactiveDismissDisabled()
+        .interactiveDismissDisabled(requireChoice)
+        .onAppear {
+            picked = CycleRepository(context: context).trackedPartner(couple: couple)
+        }
     }
 }

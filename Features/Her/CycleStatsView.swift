@@ -279,11 +279,11 @@ private struct CycleRangeSheet: View {
         NavigationStack {
             ScrollView {
                 GroupedSection {
-                    DatePicker("开始日期", selection: $start, displayedComponents: .date)
+                    DatePicker("开始日期", selection: $start, in: ...Date(), displayedComponents: .date)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                     if !mode.isOngoingEdit {
                         DS.hairline.frame(height: 1).padding(.leading, 14)
-                        DatePicker("结束日期", selection: $end, displayedComponents: .date)
+                        DatePicker("结束日期", selection: $end, in: ...Date(), displayedComponents: .date)
                             .padding(.horizontal, 14).padding(.vertical, 6)
                     }
                 }

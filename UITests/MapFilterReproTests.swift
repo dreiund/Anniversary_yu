@@ -168,6 +168,11 @@ final class MapFilterReproTests: XCTestCase {
         app.staticTexts["\(todayNum)"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["疼痛"].waitForExistence(timeout: 3), "点选排未出现")
         attach(app, name: "H2-记录卡")
+
+        app.buttons["亲密活动"].tap()
+        XCTAssertTrue(app.staticTexts["有措施"].waitForExistence(timeout: 3), "亲密段未出现")
+        attach(app, name: "H2b-记录卡亲密段")
+
         app.buttons["完成"].tap()
         sleep(1)
 

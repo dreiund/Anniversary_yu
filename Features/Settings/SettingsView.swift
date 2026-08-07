@@ -184,7 +184,7 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showTrackedPicker) {
             if let couple = couples.first {
-                TrackedPickerView(couple: couple)
+                TrackedPickerView(couple: couple, requireChoice: false)
             }
         }
         .alert("解除配对？", isPresented: $confirmUnpair) {

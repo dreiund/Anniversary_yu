@@ -58,7 +58,9 @@ struct CycleRepository {
                   today: Date, calendar: Calendar) throws -> CDCycle {
         let s = calendar.startOfDay(for: start), e = calendar.startOfDay(for: end)
         guard e >= s else { throw CycleError.endBeforeStart }
-        guard s <= calendar.startOfDay(for: today) else { throw CycleError.future }
+        let todayStart = calendar.startOfDay(for: today)
+        guard s <= todayStart else { throw CycleError.future }
+        guard e <= todayStart else { throw CycleError.future }
         try assertNoOverlap(start: s, end: e, excluding: nil, couple: couple)
         let cycle = CDCycle(context: context)
         cycle.id = UUID()
@@ -69,10 +71,14 @@ struct CycleRepository {
         return cycle
     }
 
-    func updateRange(_ cycle: CDCycle, start: Date, end: Date?, calendar: Calendar) throws {
+    func updateRange(_ cycle: CDCycle, start: Date, end: Date?,
+                      today: Date = Date(), calendar: Calendar) throws {
         let s = calendar.startOfDay(for: start)
         let e = end.map { calendar.startOfDay(for: $0) }
         if let e, e < s { throw CycleError.endBeforeStart }
+        let todayStart = calendar.startOfDay(for: today)
+        guard s <= todayStart else { throw CycleError.future }
+        if let e { guard e <= todayStart else { throw CycleError.future } }
         guard let couple = cycle.couple else { return }
         try assertNoOverlap(start: s, end: e, excluding: cycle, couple: couple)
         cycle.startDate = s
