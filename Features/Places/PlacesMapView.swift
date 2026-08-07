@@ -2,25 +2,51 @@ import SwiftUI
 import MapKit
 import CoreData
 
-/// 足迹·地图段（spec §四）：弱化底图 + 照片钉 + 屏幕空间聚合 + 七类筛选。
+/// 足迹地图的筛选：全部 / 七类 / 小本本（与类目并列，反馈需求）
+enum PlacesMapFilter: Hashable {
+    case all
+    case category(PlaceCategory)
+    case ledger
+}
+
+/// 足迹·地图段（spec §四）：弱化底图 + 照片钉 + 屏幕空间聚合 + 七类筛选 + 小本本筛选。
 struct PlacesMapView: View {
     @Environment(\.managedObjectContext) private var context
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDPlace.createdAt)])
     private var places: FetchedResults<CDPlace>
+    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
 
     @State private var camera: MapCameraPosition = .automatic
-    @State private var filter: PlaceCategory?          // nil = 全部
+    @State private var filter: PlacesMapFilter = .all
     @State private var selectedPlace: CDPlace?
     @State private var profilePlace: CDPlace?   // 程序化推档案：目标页在正常视图环境构建，不进 Map overlay 的链接邪路
     @State private var cameraTick = 0                  // 相机停稳后自增，触发聚合重算
     @State private var currentRegion: MKCoordinateRegion?
 
-    /// 有坐标且挂着记忆的地点，经筛选（spec §4.1）
+    private var myID: UUID? {
+        couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+    }
+
+    /// 地点是否含对我可见的小本本条目（私密过滤不旁路：只挂对方私密条目的地点隐形）
+    private func hasVisibleLedger(_ place: CDPlace) -> Bool {
+        let entries = ((place.ledgerEntries as? Set<CDLedgerEntry>) ?? []).map {
+            (authorID: $0.authorPartnerID, visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }
+        return LedgerRules.anyVisible(myID: myID, entries: entries)
+    }
+
+    /// 有坐标、且挂着记忆或可见小本本条目的地点，经筛选（spec §4.1 + 反馈扩展）
     private var visiblePlaces: [CDPlace] {
         places.filter { p in
-            (p.latitude != 0 || p.longitude != 0)
-            && ((p.moments as? Set<CDMoment>)?.isEmpty == false)
-            && (filter == nil || p.categoryRaw == filter!.rawValue)
+            guard p.latitude != 0 || p.longitude != 0 else { return false }
+            let hasMoments = (p.moments as? Set<CDMoment>)?.isEmpty == false
+            let hasLedger = hasVisibleLedger(p)
+            guard hasMoments || hasLedger else { return false }
+            switch filter {
+            case .all: return true
+            case .category(let cat): return p.categoryRaw == cat.rawValue
+            case .ledger: return hasLedger
+            }
         }
     }
 
@@ -47,11 +73,14 @@ struct PlacesMapView: View {
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                chip(title: "全部", selected: filter == nil) { filter = nil }
+                chip(title: "全部", selected: filter == .all) { filter = .all }
                 ForEach(PlaceCategory.allCases, id: \.rawValue) { cat in
-                    chip(title: cat.label, selected: filter == cat) {
-                        filter = filter == cat ? nil : cat
+                    chip(title: cat.label, selected: filter == .category(cat)) {
+                        filter = filter == .category(cat) ? .all : .category(cat)
                     }
+                }
+                chip(title: "小本本", selected: filter == .ledger) {
+                    filter = filter == .ledger ? .all : .ledger
                 }
             }
             .padding(.horizontal, DS.Spacing.md)
@@ -125,6 +154,19 @@ struct PlacesMapView: View {
                                             lineWidth: selectedPlace == place ? 2 : 0)
                                     .padding(-2)
                             )
+                            .overlay(alignment: .bottomTrailing) {
+                                // 小本本角标：与记忆钉在图上区分（反馈需求）
+                                if hasVisibleLedger(place) {
+                                    Text("本")
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 13, height: 13)
+                                        .background(Circle().fill(DS.ink))
+                                        .overlay(Circle().stroke(.white, lineWidth: 1))
+                                        .offset(x: 4, y: 4)
+                                        .allowsHitTesting(false)
+                                }
+                            }
                             .onTapGesture { selectedPlace = place }
                             .position(point)
                             .transition(.scale(scale: 0.9).combined(with: .opacity))

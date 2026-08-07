@@ -52,6 +52,22 @@ final class LedgerRulesTests: XCTestCase {
         XCTAssertFalse(LedgerRules.matches(filter: .privateBox, authorID: ta, myID: me, visibilityRaw: priv, revealedAt: nil))
     }
 
+    // 反馈：足迹地图的「小本本地点」判定——任一条目对我可见即算；
+    // 只挂对方私密条目的地点不算（否则钉子会泄露私密条目的位置）
+    func testAnyVisibleForMapPin() {
+        XCTAssertTrue(LedgerRules.anyVisible(myID: me, entries: [
+            (authorID: ta, visibilityRaw: priv, revealedAt: nil),
+            (authorID: me, visibilityRaw: priv, revealedAt: nil),
+        ]))                                                            // 我的私密对我可见
+        XCTAssertTrue(LedgerRules.anyVisible(myID: me, entries: [
+            (authorID: ta, visibilityRaw: shared, revealedAt: nil),
+        ]))                                                            // 对方公开可见
+        XCTAssertFalse(LedgerRules.anyVisible(myID: me, entries: [
+            (authorID: ta, visibilityRaw: priv, revealedAt: nil),
+        ]))                                                            // 只有对方私密 → 不可见
+        XCTAssertFalse(LedgerRules.anyVisible(myID: me, entries: []))
+    }
+
     func testFilterLabels() {
         XCTAssertEqual(LedgerFilter.all.label, "全部")
         XCTAssertEqual(LedgerFilter.theirs.label, "TA 记的")

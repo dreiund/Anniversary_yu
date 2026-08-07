@@ -42,6 +42,20 @@ enum DebugSeeder {
         _ = try? moments.create(in: meeting, type: .sight, title: "演示散步", body: nil,
                                 happenedAt: Date().addingTimeInterval(-900), photoDatas: [],
                                 myEvaluation: nil, authorID: authorID, place: park)
+
+        // 带地点的小本本条目：地图「小本本」筛选与角标的演示（逛街类，保持咖啡甜品恒空）
+        let bookstore = CDPlace(context: context)
+        bookstore.id = UUID()
+        bookstore.name = "演示书店"
+        bookstore.latitude = 31.2204
+        bookstore.longitude = 121.4537
+        bookstore.categoryRaw = PlaceCategory.shopping.rawValue
+        bookstore.createdAt = Date()
+        bookstore.couple = couple
+        _ = try? LedgerRepository(context: context).createEntry(
+            couple: couple, category: .praise, title: "陪我逛了一下午书店", detail: "全程没催我",
+            happenedAt: Date().addingTimeInterval(-600), visibility: .sharedImmediately,
+            place: bookstore, evidenceDatas: [], authorID: authorID)
     }
 }
 #endif

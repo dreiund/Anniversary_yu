@@ -34,6 +34,16 @@ enum LedgerRules {
         return isRevealed(visibilityRaw: visibilityRaw, revealedAt: revealedAt)
     }
 
+    /// 地点是否含任一「对我可见」的小本本条目（足迹地图小本本钉的判定；
+    /// 只挂对方私密条目的地点必须隐形——否则钉子会泄露私密条目的位置）
+    static func anyVisible(myID: UUID?,
+                           entries: [(authorID: UUID?, visibilityRaw: Int16, revealedAt: Date?)]) -> Bool {
+        entries.contains { entry in
+            isVisible(authorID: entry.authorID, myID: myID,
+                      visibilityRaw: entry.visibilityRaw, revealedAt: entry.revealedAt)
+        }
+    }
+
     static func matches(filter: LedgerFilter, authorID: UUID?, myID: UUID?,
                         visibilityRaw: Int16, revealedAt: Date?) -> Bool {
         guard isVisible(authorID: authorID, myID: myID,

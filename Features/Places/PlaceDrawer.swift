@@ -114,6 +114,13 @@ struct PlaceDrawer: View {
         if let addr = place.address, !addr.isEmpty { parts.append(addr) }
         parts.append("来过 \(visits) 次")
         if let lastDate { parts.append("上次 \(Fmt.monthDay.string(from: lastDate))") }
+        // 该地点对我可见的小本本条数（私密过滤同地图钉判定）
+        let myID = couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+        let ledgerCount = ((place.ledgerEntries as? Set<CDLedgerEntry>) ?? []).filter {
+            LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                  visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }.count
+        if ledgerCount > 0 { parts.append("小本本 \(ledgerCount) 条") }
         return parts.joined(separator: " · ")
     }
 
