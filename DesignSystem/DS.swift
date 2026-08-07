@@ -37,6 +37,8 @@ enum DS {
     static let roseCycle = Color(hex: 0xD96450)
     static let dsOrange = Color(hex: 0xFF9F0A)   // 警示语义色：消极徽章 / 雷区描边（P4，不作行动色）
     static let bandBlue = Color(hex: 0xEDF4FC)   // 日历见面带淡蓝（P3 spec §3.1）
+    static let rosePale = Color(hex: 0xFDF1EF)   // 她页横幅/粉卡底（P5）
+    static let roseCell = Color(hex: 0xF8E3DF)   // 经期天格浅粉底（P5，实红改浅红保四点可辨）
 
     enum Spacing {
         static let xxs: CGFloat = 4
