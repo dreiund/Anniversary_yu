@@ -19,7 +19,7 @@ struct CalendarView: View {
 
     private var cal: Calendar { Calendar.current }
 
-    /// 当前显示月锚点：由 monthOffset 派生（反馈⑥ T7，配合 TabView(.page) 分页与回今天同步；本视图无 ‹› 步进钮）
+    /// 当前显示月锚点：由 monthOffset 派生（反馈⑥ T7，配合 TabView(.page) 分页，与 ‹›/回今天共用同一状态自动同步）
     private var monthAnchor: Date {
         cal.date(byAdding: .month, value: monthOffset, to: cal.startOfDay(for: Date())) ?? Date()
     }
@@ -32,7 +32,7 @@ struct CalendarView: View {
         ScrollView {
             VStack(spacing: DS.Spacing.sm) {
                 modeToggle
-                Text(monthTitle).dsCaption()
+                monthTitleRow
                 calendarCard
                 if mode == .dateDay { summaryCard }
             }
@@ -54,6 +54,26 @@ struct CalendarView: View {
     private var monthTitle: String {
         let c = cal.dateComponents([.year, .month], from: monthAnchor)
         return "\(c.year!) 年 \(c.month!) 月"
+    }
+
+    /// 月份标题 + ‹ › 步进钮（反馈⑥ T7 补件：与她页 HerView.calendarCard 顶行同款样式，和滑动/回今天共用 monthOffset 自动同步）
+    private var monthTitleRow: some View {
+        HStack(spacing: DS.Spacing.sm) {
+            Button { stepMonth(-1) } label: {
+                Text("‹").font(.system(size: 20, weight: .semibold))
+            }
+            .foregroundStyle(DS.actionBlue)
+            Text(monthTitle).dsCaption()
+            Button { stepMonth(1) } label: {
+                Text("›").font(.system(size: 20, weight: .semibold))
+            }
+            .foregroundStyle(DS.actionBlue)
+        }
+    }
+
+    /// ‹ › 步进：clamp 到 TabView 的 -24...12 范围（同 HerView.stepMonth 语义）
+    private func stepMonth(_ delta: Int) {
+        withAnimation(.snappy) { monthOffset = max(-24, min(12, monthOffset + delta)) }
     }
 
     private var modeToggle: some View {
