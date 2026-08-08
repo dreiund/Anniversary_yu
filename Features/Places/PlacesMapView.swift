@@ -27,6 +27,7 @@ struct PlacesMapView: View {
     @State private var profilePlace: CDPlace?   // 程序化推档案：目标页在正常视图环境构建，不进 Map overlay 的链接邪路
     @State private var cameraTick = 0                  // 相机停稳后自增，触发聚合重算
     @State private var currentRegion: MKCoordinateRegion?
+    @State private var didInitialFit = false           // 反馈⑦：初始取景只认这面旗
 
     private var myID: UUID? {
         couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
@@ -100,6 +101,12 @@ struct PlacesMapView: View {
         .navigationDestination(item: $profilePlace) { place in
             PlaceProfileView(place: place)
         }
+    }
+
+    private func initialFitIfNeeded() {
+        guard !didInitialFit, let region = boundingRegion(of: visiblePlaces) else { return }
+        didInitialFit = true
+        camera = .region(region)
     }
 
     /// 取景规则（用户定稿）：空集合或新集合全在当前视野内 → 区域不动只换钉；
@@ -192,11 +199,10 @@ struct PlacesMapView: View {
                     Text("还没有带地点的记忆").dsCaption()
                 }
             }
-            .onAppear {
-                if currentRegion == nil, let region = boundingRegion(of: visiblePlaces) {
-                    camera = .region(region)
-                }
-            }
+            .onAppear { initialFitIfNeeded() }
+            // 真机上相机回调常先于 onAppear 把 currentRegion 占住，旧的「currentRegion 为空才取景」
+            // 会永远不飞——bug3 元凶（真机全国图无钉）。改为一次性旗标 + 数据迟到重试（CloudKit 首启）
+            .onChange(of: places.count) { initialFitIfNeeded() }
             .overlay(alignment: .bottom) {
                 // 对方远端删除该地点时不渲染已删对象（spec §九，沿用 PlanView 守卫模式）
                 if let selected = selectedPlace,
