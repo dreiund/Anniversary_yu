@@ -14,10 +14,15 @@ struct CalendarView: View {
     @AppStorage("footprintsCycleTintOn") private var cycleTintOn = true
     @FetchRequest(sortDescriptors: []) private var cyclesFetch: FetchedResults<CDCycle>
 
-    @State private var monthAnchor = Calendar.current.startOfDay(for: Date())
+    @State private var monthOffset = 0
     @State private var mode: CalendarMode = .natural
 
     private var cal: Calendar { Calendar.current }
+
+    /// 当前显示月锚点：由 monthOffset 派生（反馈⑥ T7，配合 TabView(.page) 分页与 ‹›/回今天同步）
+    private var monthAnchor: Date {
+        cal.date(byAdding: .month, value: monthOffset, to: cal.startOfDay(for: Date())) ?? Date()
+    }
 
     private var isCurrentMonth: Bool {
         cal.isDate(monthAnchor, equalTo: Date(), toGranularity: .month)
@@ -38,7 +43,7 @@ struct CalendarView: View {
             if !isCurrentMonth {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("今天") {
-                        withAnimation(.snappy) { monthAnchor = cal.startOfDay(for: Date()) }
+                        withAnimation(.snappy) { monthOffset = 0 }
                     }
                     .font(.system(size: 14))
                 }
@@ -83,7 +88,8 @@ struct CalendarView: View {
         .buttonStyle(DSPressEffect())
     }
 
-    private var projectedCells: [CalCell] {
+    /// 单月格子投影（反馈⑥ T7 改吃传入 anchor，供 TabView 各分页各自取数；投影规则零改动）
+    private func projectedCells(for anchor: Date) -> [CalCell] {
         guard let couple = couples.first else { return [] }
         let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
         let momentInputs = moments.map { m in
@@ -103,7 +109,7 @@ struct CalendarView: View {
                                    firstDay: cal.startOfDay(for: start),
                                    lastDay: cal.startOfDay(for: last))
         }
-        return CalendarProjector.cells(monthAnchor: monthAnchor, today: Date(), mode: mode,
+        return CalendarProjector.cells(monthAnchor: anchor, today: Date(), mode: mode,
                                        moments: momentInputs, moods: moodInputs,
                                        meetings: meetingInputs, calendar: cal)
     }
@@ -150,35 +156,38 @@ struct CalendarView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            let cells = projectedCells
-            let cycleDays = cycleDaySet
-            let ovulationDays = ovulationDaySet
-            let ovulationFlowerDays = ovulationFlowerDaySet
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7),
-                      spacing: 4) {
-                ForEach(cells, id: \.day) { cell in
-                    CalendarDayCell(cell: cell,
-                                    isCycleDay: cycleTintOn && cycleDays.contains(cell.day),
-                                    isOvulationDay: cycleTintOn && ovulationDays.contains(cell.day),
-                                    isOvulationFlower: cycleTintOn && ovulationFlowerDays.contains(cell.day))
-                        .contentShape(Rectangle())
-                        .onTapGesture { if cell.inMonth { onDayTap(cell.day, mode) } }
+            TabView(selection: $monthOffset) {
+                ForEach(-24...12, id: \.self) { offset in
+                    let anchor = cal.date(byAdding: .month, value: offset, to: cal.startOfDay(for: Date())) ?? Date()
+                    monthGrid(anchor: anchor)
+                        .tag(offset)
                 }
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 296)   // 6 行网格：44×6+行间距 4×5=284，+12pt 余量防止内容被裁（同 HerView.calendarCard 样板）
         }
         .padding(.vertical, 10).padding(.horizontal, 6)
         .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
         .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
-        .gesture(
-            DragGesture(minimumDistance: 30).onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                withAnimation(.snappy) {
-                    monthAnchor = cal.date(byAdding: .month,
-                                           value: value.translation.width < 0 ? 1 : -1,
-                                           to: monthAnchor)!
-                }
+    }
+
+    /// 单月格子网格（反馈⑥ T7 从 calendarCard 抽出，按 anchor 供 TabView 各分页渲染；格内容/点天/经期排卵底色零改动）
+    private func monthGrid(anchor: Date) -> some View {
+        let cells = projectedCells(for: anchor)
+        let cycleDays = cycleDaySet
+        let ovulationDays = ovulationDaySet
+        let ovulationFlowerDays = ovulationFlowerDaySet
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7),
+                  spacing: 4) {
+            ForEach(cells, id: \.day) { cell in
+                CalendarDayCell(cell: cell,
+                                isCycleDay: cycleTintOn && cycleDays.contains(cell.day),
+                                isOvulationDay: cycleTintOn && ovulationDays.contains(cell.day),
+                                isOvulationFlower: cycleTintOn && ovulationFlowerDays.contains(cell.day))
+                    .contentShape(Rectangle())
+                    .onTapGesture { if cell.inMonth { onDayTap(cell.day, mode) } }
             }
-        )
+        }
     }
 
     private var summaryCard: some View {
