@@ -229,8 +229,29 @@ struct MeetingsView: View {
             .compactMap { momentsRepo.photosSorted($0).first?.thumbnailData }
             .first
 
-        return ZStack(alignment: .bottomLeading) {
+        return Group {
             if let cover, let ui = UIImage(data: cover) {
+                photoFinishedCard(meeting, cover: ui, momentCount: momentCount)
+            } else {
+                // 反馈⑧bug2：无照片的结束卡原来是一大块封面占位+底部小字，标题看似消失——
+                // 改为文字版式（与计划卡同构，大标题当家）
+                ParchmentCard {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("第 \(meeting.index) 次见面 · 已结束").dsFootnote()
+                        Text(finishedName(meeting)).dsPageTitle()
+                        Text("\(dateRange(meeting)) · \(momentCount) 条记忆").dsCaption()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func photoFinishedCard(_ meeting: CDMeeting, cover ui: UIImage,
+                                   momentCount: Int) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
                 Image(uiImage: ui)
                     .resizable().scaledToFill()
                     .frame(height: 180)
@@ -242,18 +263,14 @@ struct MeetingsView: View {
                     )
                     .dsPhotoShadow()
                     .allowsHitTesting(false)   // 溢出不抢相邻卡点击
-            } else {
-                RoundedRectangle(cornerRadius: DS.Radius.image)
-                    .fill(DS.parchment)
-                    .frame(height: 120)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text("第 \(meeting.index) 次见面")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(cover != nil ? DS.onDarkMuted : DS.inkMuted)
+                    .foregroundStyle(DS.onDarkMuted)
                 Text("\(finishedName(meeting)) · \(dateRange(meeting)) · \(momentCount) 条记忆")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(cover != nil ? .white : DS.ink)
+                    .foregroundStyle(.white)
             }
             .padding(12)
         }
