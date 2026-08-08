@@ -8,6 +8,8 @@ import CoreData
 /// 种出：情侣 + 进行中见面 + 两条带地点记忆（美食 1 / 景点公园 3）——咖啡甜品等类目恒为空，供筛选空类目复现。
 enum DebugSeeder {
     static func seedMapDemoIfEmpty(context: NSManagedObjectContext) {
+        // --seed-single-place：只留餐厅一个带地点记忆（反馈⑧bug1 单钉回归场景）
+        let singleOnly = ProcessInfo.processInfo.arguments.contains("--seed-single-place")
         wipeAll(context: context)
         let coupleRepo = CoupleRepository(context: context)
         guard (try? coupleRepo.fetchCouple()) == nil else { return }
@@ -44,7 +46,7 @@ enum DebugSeeder {
                                 myEvaluation: nil, authorID: authorID, place: restaurant)
         _ = try? moments.create(in: meeting, type: .sight, title: "演示散步", body: nil,
                                 happenedAt: Date().addingTimeInterval(-900), photoDatas: [],
-                                myEvaluation: nil, authorID: authorID, place: park)
+                                myEvaluation: nil, authorID: authorID, place: singleOnly ? nil : park)
         // 昨天的补录：自动生成一个已封盘的第 1 天（封盘卡左滑删除的验证场景；无地点不进地图）
         _ = try? moments.create(in: meeting, type: .other, title: "演示昨日", body: nil,
                                 happenedAt: Date().addingTimeInterval(-90_000), photoDatas: [],
@@ -62,7 +64,7 @@ enum DebugSeeder {
         _ = try? LedgerRepository(context: context).createEntry(
             couple: couple, category: .praise, title: "陪我逛了一下午书店", detail: "全程没催我",
             happenedAt: Date().addingTimeInterval(-600), visibility: .sharedImmediately,
-            place: bookstore,
+            place: singleOnly ? nil : bookstore,
             evidenceDatas: [solidImageData(.systemTeal), solidImageData(.systemPink)],
             authorID: authorID)
 
@@ -98,7 +100,7 @@ enum DebugSeeder {
         pier.createdAt = Date(); pier.couple = couple
         _ = try? PlanItemRepository(context: context).add(
             to: meeting, day: Date(), time: nil, title: "去码头拍日落", note: nil,
-            placeText: "演示码头", authorID: authorID, place: pier)
+            placeText: "演示码头", authorID: authorID, place: singleOnly ? nil : pier)
         let florist = CDPlace(context: context)
         florist.id = UUID(); florist.name = "演示花店"
         florist.latitude = 31.2254; florist.longitude = 121.4637
@@ -111,7 +113,7 @@ enum DebugSeeder {
         let herID = CoupleRepository(context: context).otherPartner(of: couple)?.id
         _ = try? todoRepo.create(couple: couple, title: "帮她带充电宝", detail: nil,
                                  dueAt: Date(), assigneeID: myID, authorID: herID,
-                                 visibility: .sharedImmediately, place: florist, remindAt: nil,
+                                 visibility: .sharedImmediately, place: singleOnly ? nil : florist, remindAt: nil,
                                  calendar: cal)
         _ = try? todoRepo.create(couple: couple, title: "查演出票", detail: "周五开票",
                                  dueAt: day(3), assigneeID: herID, authorID: myID,

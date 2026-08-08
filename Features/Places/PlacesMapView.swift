@@ -25,8 +25,8 @@ struct PlacesMapView: View {
     @State private var meetingIndex: Int32?          // 反馈⑦ 3A：按第几次见面筛选，nil=全部
     @State private var selectedPlace: CDPlace?
     @State private var profilePlace: CDPlace?   // 程序化推档案：目标页在正常视图环境构建，不进 Map overlay 的链接邪路
-    @State private var cameraTick = 0                  // 相机停稳后自增，触发聚合重算
-    @State private var currentRegion: MKCoordinateRegion?
+    @State private var currentRegion: MKCoordinateRegion?   // 相机事件的实际可见区域
+    @State private var fittedRegion: MKCoordinateRegion?     // 我们主动取景的目标区域（首帧投影兜底）
     @State private var didInitialFit = false           // 反馈⑦：初始取景只认这面旗
 
     private var myID: UUID? {
@@ -106,7 +106,8 @@ struct PlacesMapView: View {
     private func initialFitIfNeeded() {
         guard !didInitialFit, let region = boundingRegion(of: visiblePlaces) else { return }
         didInitialFit = true
-        camera = .region(region)
+        fittedRegion = region
+        withAnimation(.smooth(duration: 0.6)) { camera = .region(region) }
     }
 
     /// 取景规则（用户定稿）：空集合或新集合全在当前视野内 → 区域不动只换钉；
@@ -117,6 +118,7 @@ struct PlacesMapView: View {
         }
         guard let target = boundingRegion(of: visiblePlaces) else { return }
         if let current = currentRegion, contains(current, allOf: visiblePlaces) { return }
+        fittedRegion = target
         withAnimation(.smooth(duration: 0.8)) { camera = .region(target) }
     }
 
@@ -185,15 +187,13 @@ struct PlacesMapView: View {
     private var mapBody: some View {
         // 钉层不进 Map 内容（MapContentBuilder 延迟求值不追踪外部状态，筛选切换会残留旧钉——
         // 反馈⑤截图实证）；改为屏幕坐标 overlay 直渲，与路线图同款：即时响应、可动画、相机不被动
-        MapReader { proxy in
-            Map(position: $camera)
+        Map(position: $camera)
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
             .onMapCameraChange(frequency: .continuous) { context in
                 currentRegion = context.region
-                cameraTick += 1
-                }
+            }
             .onTapGesture { selectedPlace = nil }
-            .overlay { pinLayer(proxy: proxy).clipped() }
+            .overlay { GeometryReader { geo in pinLayer(size: geo.size).clipped() } }
             .overlay {
                 if visiblePlaces.isEmpty {
                     Text("还没有带地点的记忆").dsCaption()
@@ -213,7 +213,6 @@ struct PlacesMapView: View {
                 }
             }
             .animation(.snappy, value: selectedPlace)
-        }
     }
 
     private func pinBadge(_ text: String, fill: Color) -> some View {
@@ -225,13 +224,16 @@ struct PlacesMapView: View {
             .overlay(Circle().stroke(.white, lineWidth: 1))
     }
 
-    /// 钉层：屏幕坐标直渲（普通 ViewBuilder，筛选/相机变化即时重投）。
+    /// 钉层（反馈⑧bug1 架构重写）：弃 MapProxy.convert——其首帧就绪时机不可控且失败后
+    /// 子树可能不再重投（探针多轮实证）。改为 currentRegion（相机事件）∥ fittedRegion（主动取景）
+    /// + 墨卡托纯数学投影：首帧即确定性可算，与 Map 内部状态彻底解耦。
     /// 动画只绑 filter——切筛选淡入淡出；拖拽缩放的连续重投不做动画（跟手优先）。
     @ViewBuilder
-    private func pinLayer(proxy: MapProxy) -> some View {
-        let _ = cameraTick   // 连续重投影依赖注册
+    private func pinLayer(size: CGSize) -> some View {
+        let region = currentRegion ?? fittedRegion
+        let items = displayItems(size: size)
         ZStack {
-            ForEach(displayItems(proxy: proxy, tick: cameraTick), id: \.key) { item in
+            ForEach(items, id: \.key) { item in
                 switch item.output {
                 case .pin(let id, let point):
                     if let place = visiblePlaces.first(where: { $0.id == id }) {
@@ -265,8 +267,8 @@ struct PlacesMapView: View {
                         .background(RoundedRectangle(cornerRadius: 8).fill(DS.darkCard))
                         .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
                         .onTapGesture {
-                            if let coord = proxy.convert(point, from: .local) {
-                                zoomInto(coordinate: coord)
+                            if let region {
+                                zoomInto(coordinate: inverseProject(point, in: region, size: size))
                             }
                         }
                         .position(point)
@@ -275,6 +277,53 @@ struct PlacesMapView: View {
             }
         }
         .animation(.smooth, value: filter)
+    }
+
+    private var projectionRegion: MKCoordinateRegion? { currentRegion ?? fittedRegion }
+
+    /// Web-Mercator 投影：region（相机事件给的实际可见区域）→ 屏幕点
+    private func project(_ coord: CLLocationCoordinate2D, in region: MKCoordinateRegion,
+                         size: CGSize) -> CGPoint {
+        let left = region.center.longitude - region.span.longitudeDelta / 2
+        let x = (coord.longitude - left) / region.span.longitudeDelta * size.width
+        let top = mercY(region.center.latitude + region.span.latitudeDelta / 2)
+        let bottom = mercY(region.center.latitude - region.span.latitudeDelta / 2)
+        let y = (top - mercY(coord.latitude)) / (top - bottom) * size.height
+        return CGPoint(x: x, y: y)
+    }
+
+    private func inverseProject(_ point: CGPoint, in region: MKCoordinateRegion,
+                                size: CGSize) -> CLLocationCoordinate2D {
+        let left = region.center.longitude - region.span.longitudeDelta / 2
+        let lon = left + Double(point.x / size.width) * region.span.longitudeDelta
+        let top = mercY(region.center.latitude + region.span.latitudeDelta / 2)
+        let bottom = mercY(region.center.latitude - region.span.latitudeDelta / 2)
+        let merc = top - Double(point.y / size.height) * (top - bottom)
+        let lat = (2 * atan(exp(merc)) - .pi / 2) * 180 / .pi
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+
+    private func mercY(_ lat: Double) -> Double {
+        let phi = max(min(lat, 85.0), -85.0) * .pi / 180
+        return log(tan(.pi / 4 + phi / 2))
+    }
+
+    private func displayItems(size: CGSize) -> [(key: String, output: ClusterOutput)] {
+        guard let region = projectionRegion, size.width > 0, size.height > 0 else { return [] }
+        let inputs = visiblePlaces.compactMap { place -> ClusterInput? in
+            guard let id = place.id else { return nil }
+            let pt = project(CLLocationCoordinate2D(latitude: place.latitude,
+                                                    longitude: place.longitude),
+                             in: region, size: size)
+            return ClusterInput(id: id, point: pt)
+        }
+        return MapClusterer.cluster(inputs, threshold: 44).map { out in
+            switch out {
+            case .pin(let id, _): return (key: "p-\(id)", output: out)
+            case .cluster(let ids, _):
+                return (key: "c-" + ids.map(\.uuidString).sorted().joined(separator: "-"), output: out)
+            }
+        }
     }
 
     /// 可见地点的取景边界（1.5 倍留白，最小跨度兜底）；空集合返回 nil
@@ -298,22 +347,6 @@ struct PlacesMapView: View {
     }
 
     /// 屏幕空间聚合：坐标→屏幕点→聚合。ForEach 需要稳定 key。
-    private func displayItems(proxy: MapProxy, tick: Int) -> [(key: String, output: ClusterOutput)] {
-        let inputs = visiblePlaces.compactMap { place -> ClusterInput? in
-            guard let id = place.id,
-                  let pt = proxy.convert(CLLocationCoordinate2D(latitude: place.latitude,
-                                                                longitude: place.longitude),
-                                         to: .local) else { return nil }
-            return ClusterInput(id: id, point: pt)
-        }
-        return MapClusterer.cluster(inputs, threshold: 44).map { out in
-            switch out {
-            case .pin(let id, _): return (key: "p-\(id)", output: out)
-            case .cluster(let ids, _):
-                return (key: "c-" + ids.map(\.uuidString).sorted().joined(separator: "-"), output: out)
-            }
-        }
-    }
 
     private func zoomInto(coordinate: CLLocationCoordinate2D) {
         withAnimation(.smooth) {

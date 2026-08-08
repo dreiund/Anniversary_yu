@@ -213,6 +213,27 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "R3-她月历紫窗")
     }
 
+    /// 反馈⑧bug1 回归：单地点打开地图，钉必须渲染（点中心命中钉 → 抽屉出现）
+    @MainActor
+    func testSinglePinRenders() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo", "--seed-single-place"]
+        app.launch()
+        app.buttons["足迹"].tap()
+        let mapChip = app.buttons["地图"]
+        XCTAssertTrue(mapChip.waitForExistence(timeout: 8))
+        mapChip.tap()
+        sleep(4)
+        attach(app, name: "S1-单钉")
+        // 演示餐厅无照片 → 钉显示 fallback 首字「演」，直接按元素点（不依赖屏幕坐标）
+        let pin = app.staticTexts["演"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 6), "单钉未渲染（反馈⑧bug1 回归）")
+        pin.tap()
+        XCTAssertTrue(app.staticTexts["演示餐厅"].waitForExistence(timeout: 3),
+                      "点钉未打开地点抽屉")
+        attach(app, name: "S2-单钉抽屉")
+    }
+
     /// 反馈⑦：计划/记得做钉与按次筛选
     @MainActor
     func testRound7MapLook() throws {
