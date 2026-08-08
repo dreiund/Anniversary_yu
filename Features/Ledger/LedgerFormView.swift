@@ -121,18 +121,16 @@ struct LedgerFormView: View {
                         }
                         .buttonStyle(.plain)
                         DS.hairline.frame(height: 1).padding(.leading, 14)
-                        HStack(spacing: 8) {
-                            Text("可见性").dsBody()
-                            Spacer()
-                            visibilityChip("公开", .sharedImmediately)
-                            visibilityChip("🔒 私密", .privateUntilRevealed)
-                        }
-                        .padding(.horizontal, 14).padding(.vertical, 9)
+                        Toggle("私密", isOn: Binding(
+                            get: { visibility == .privateUntilRevealed },
+                            set: { visibility = $0 ? .privateUntilRevealed : .sharedImmediately }))
+                            .disabled(visibilityLocked)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
                     }
 
                     Text(visibilityLocked
-                         ? "已公开的记录不能改回私密"
-                         : "私密＝仅自己可见，之后可在详情页公开给 TA（不可撤回）")
+                         ? "已公开，不可改回私密"
+                         : "开着=公开前只有你看得到")
                         .dsFootnote().padding(.horizontal, 4)
                 }
                 .padding(DS.Spacing.md)
@@ -189,21 +187,6 @@ struct LedgerFormView: View {
                             lineWidth: category == target ? 1.5 : 1))
         }
         .buttonStyle(DSPressEffect())
-    }
-
-    private func visibilityChip(_ label: String, _ target: EntryVisibility) -> some View {
-        Button {
-            if !visibilityLocked { visibility = target }
-        } label: {
-            Text(label)
-                .font(.system(size: 11, weight: visibility == target ? .semibold : .regular))
-                .foregroundStyle(visibility == target ? .white : DS.ink)
-                .padding(.vertical, 4).padding(.horizontal, 10)
-                .background(Capsule().fill(visibility == target ? DS.actionBlue : DS.canvas))
-                .overlay(Capsule().stroke(visibility == target ? DS.actionBlue : DS.chipBorder, lineWidth: 1))
-        }
-        .buttonStyle(DSPressEffect())
-        .opacity(visibilityLocked && target == .privateUntilRevealed ? 0.35 : 1)
     }
 
     private func evidenceThumb(_ evidence: CDEvidence) -> some View {
