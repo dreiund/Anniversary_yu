@@ -32,6 +32,7 @@ final class TodoTests: XCTestCase {
         XCTAssertTrue(TodoRules.canToggleDone(authorID: her, assigneeID: me, myID: me))   // 我是 assignee
         XCTAssertTrue(TodoRules.canToggleDone(authorID: me, assigneeID: her, myID: me))   // 我是作者
         XCTAssertFalse(TodoRules.canToggleDone(authorID: her, assigneeID: her, myID: me)) // 都不是
+        XCTAssertFalse(TodoRules.isVisible(authorID: nil, myID: nil, visibilityRaw: 1, revealedAt: nil))
     }
 
     func testSortKeyOrdersOpenByDueThenDoneSinks() {

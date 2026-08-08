@@ -211,3 +211,4 @@ final class CDTodoItem: NSManagedObject {
 
 extension CDPlanItem: Identifiable {}
 extension CDPlace: Identifiable {}
+extension CDTodoItem: Identifiable {}

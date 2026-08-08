@@ -3,7 +3,7 @@ import Foundation
 /// 记得做规则（spec ⑥ §二）：可见性与小本本同构；编辑删除仅作者；勾选=作者或 assignee
 enum TodoRules {
     static func isVisible(authorID: UUID?, myID: UUID?, visibilityRaw: Int16, revealedAt: Date?) -> Bool {
-        if authorID == myID { return true }
+        if let authorID, let myID, authorID == myID { return true }
         return LedgerRules.isRevealed(visibilityRaw: visibilityRaw, revealedAt: revealedAt)
     }
 
