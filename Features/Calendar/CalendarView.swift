@@ -19,7 +19,7 @@ struct CalendarView: View {
 
     private var cal: Calendar { Calendar.current }
 
-    /// 当前显示月锚点：由 monthOffset 派生（反馈⑥ T7，配合 TabView(.page) 分页与 ‹›/回今天同步）
+    /// 当前显示月锚点：由 monthOffset 派生（反馈⑥ T7，配合 TabView(.page) 分页与回今天同步；本视图无 ‹› 步进钮）
     private var monthAnchor: Date {
         cal.date(byAdding: .month, value: monthOffset, to: cal.startOfDay(for: Date())) ?? Date()
     }
