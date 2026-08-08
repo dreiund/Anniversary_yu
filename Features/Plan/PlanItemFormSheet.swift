@@ -13,6 +13,8 @@ struct PlanItemFormSheet: View {
     @State private var day = Date()
     @State private var hasTime = false
     @State private var time = Date()
+    @State private var remindOn = false
+    @State private var remindDate = Date()
 
     var body: some View {
         NavigationStack {
@@ -38,6 +40,17 @@ struct PlanItemFormSheet: View {
                                     .padding(.horizontal, 14).padding(.vertical, 6)
                             }
                         }
+                        Toggle("提醒我", isOn: $remindOn.animation())
+                            .padding(.horizontal, 14).padding(.vertical, 6)
+                            .onChange(of: remindOn) { _, newValue in
+                                if newValue { remindDate = defaultRemindDate() }
+                            }
+                        if remindOn {
+                            DatePicker("提醒时刻", selection: $remindDate)
+                                .padding(.horizontal, 14).padding(.vertical, 6)
+                            Text("提醒只响在设置它的手机上").dsFootnote()
+                                .padding(.horizontal, 14).padding(.bottom, 6)
+                        }
                     }
                     GroupedSection {
                         HStack {
@@ -54,7 +67,9 @@ struct PlanItemFormSheet: View {
                     }
                     if let item {
                         Button("删除此项") {
+                            let id = item.id
                             try? PlanItemRepository(context: context).delete(item)
+                            if let id { ReminderScheduler.cancel(id: ReminderPlanner.planID(id)) }
                             dismiss()
                         }
                         .font(.system(size: 15))
@@ -84,6 +99,12 @@ struct PlanItemFormSheet: View {
         placeText = item.placeText ?? ""
         if let d = item.day { hasDay = true; day = d }
         if let t = item.time { hasTime = true; time = t }
+        if let r = item.remindAt { remindOn = true; remindDate = r }
+    }
+
+    private func defaultRemindDate() -> Date {
+        let cal = Calendar.current
+        return cal.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? Date()
     }
 
     private func save() {
@@ -92,14 +113,27 @@ struct PlanItemFormSheet: View {
         let timeValue = (hasDay && hasTime) ? time : nil
         let noteValue = note.isEmpty ? nil : note
         let placeValue = placeText.isEmpty ? nil : placeText
+        let remindValue: Date? = remindOn ? remindDate : nil
+        var savedItem: CDPlanItem?
         if let item {
             try? repo.update(item, day: dayValue, time: timeValue, title: title,
-                             note: noteValue, placeText: placeValue, remindAt: item.remindAt)
+                             note: noteValue, placeText: placeValue, remindAt: remindValue)
+            savedItem = item
         } else {
             let couples = CoupleRepository(context: context)
             let authorID = (try? couples.fetchCouple()).flatMap { couples.currentPartnerID(of: $0) }
-            _ = try? repo.add(to: meeting, day: dayValue, time: timeValue, title: title,
-                              note: noteValue, placeText: placeValue, authorID: authorID)
+            savedItem = try? repo.add(to: meeting, day: dayValue, time: timeValue, title: title,
+                                      note: noteValue, placeText: placeValue, authorID: authorID,
+                                      remindAt: remindValue)
+        }
+        if let id = savedItem?.id {
+            let key = ReminderPlanner.planID(id)
+            if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindValue, now: Date()) {
+                ReminderScheduler.schedule(id: key, title: title,
+                                           body: "行前日程", at: remindDate)
+            } else {
+                ReminderScheduler.cancel(id: key)
+            }
         }
         dismiss()
     }

@@ -42,6 +42,7 @@ struct HomeView: View {
                     hero(couple)
                     statusCard(couple)
                     moodCard(couple)
+                    todayCard(couple)
                     reminders(couple)
                 }
                 .padding(DS.Spacing.md)
@@ -189,13 +190,16 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func reminders(_ couple: CDCouple) -> some View {
-        let meetingRepo = MeetingRepository(context: context)
-        let momentRepo = MomentRepository(context: context)
-        let ongoing = meetings.first { $0.statusRaw == MeetingStatus.ongoing.rawValue }
-        let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date(), recordAt: Date()) } ?? nil
-        let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
-        let pendingEvals = Array(momentsAll.lazy.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
+    private func todayCard(_ couple: CDCouple) -> some View {
+        let today = Calendar.current.startOfDay(for: Date())
+        let planRows: [(CDMeeting, CDPlanItem)] = meetings
+            .filter { $0.statusRaw != MeetingStatus.finished.rawValue }
+            .flatMap { meeting in
+                (((meeting.planItems as? Set<CDPlanItem>) ?? []))
+                    .filter { $0.day.map { Calendar.current.isDate($0, inSameDayAs: today) } ?? false }
+                    .sorted { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
+                    .map { (meeting, $0) }
+            }
         let cycleRepo = CycleRepository(context: context)
         let cycleInputs = cycleRepo.cyclesSorted(couple: couple).compactMap { c -> (start: Date, end: Date?)? in
             c.startDate.map { ($0, c.endDate) }
@@ -206,29 +210,71 @@ struct HomeView: View {
                 CyclePredictor.delayDays(nextStart: $0, hasOngoing: cycleOngoing != nil,
                                          today: Date(), calendar: .current)
             }
+        let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
+        let dueTodos = TodoRepository(context: context).todos(couple: couple).filter {
+            !$0.isDone
+            && ($0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: today) } ?? false)
+            && TodoRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                   visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }
+        let visiblePlanRows = Array(planRows.prefix(3))
+        if !planRows.isEmpty || cycleOngoing != nil || cycleDelay != nil || !dueTodos.isEmpty {
+            DarkCard {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("今天 · \(Fmt.monthDayWeek.string(from: Date()))")
+                        .font(.system(size: 12)).foregroundStyle(DS.onDarkMuted)
+                    ForEach(Array(visiblePlanRows.enumerated()), id: \.offset) { _, pair in
+                        todayRow(icon: "🕐",
+                                 text: "\(pair.1.time.map { Fmt.hm.string(from: $0) } ?? "全天") \(pair.1.title ?? "")",
+                                 link: "行前 ›") { PlanView(meeting: pair.0) }
+                    }
+                    if planRows.count > 3 {
+                        Text("还有 \(planRows.count - 3) 条")
+                            .font(.system(size: 12)).foregroundStyle(DS.onDarkMuted)
+                    }
+                    if let cycleDelay {
+                        todayRow(icon: "🕐", text: "已推迟 \(cycleDelay) 天", link: "她 ›") { HerView() }
+                    } else if let cycleOngoing, let start = cycleOngoing.startDate {
+                        let n = (Calendar.current.dateComponents([.day], from: start, to: today).day ?? 0) + 1
+                        todayRow(icon: "🩷", text: "经期第 \(n) 天", link: "她 ›") { HerView() }
+                    }
+                    ForEach(dueTodos, id: \.objectID) { todo in
+                        todayRow(icon: todo.assigneePartnerID == myID ? "📌" : "👉",
+                                 text: todo.title ?? "", link: "记得做 ›") {
+                            LedgerListView(initialSegment: .todos)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func todayRow<D: View>(icon: String, text: String, link: String,
+                                   @ViewBuilder destination: @escaping () -> D) -> some View {
+        NavigationLink { destination() } label: {
+            HStack {
+                Text("\(icon) \(text)").font(.system(size: 15)).foregroundStyle(.white)
+                Spacer()
+                Text(link).font(.system(size: 12)).foregroundStyle(DS.skyBlue)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func reminders(_ couple: CDCouple) -> some View {
+        let meetingRepo = MeetingRepository(context: context)
+        let momentRepo = MomentRepository(context: context)
+        let ongoing = meetings.first { $0.statusRaw == MeetingStatus.ongoing.rawValue }
+        let stale = ongoing.flatMap { try? meetingRepo.staleOpenDay(in: $0, now: Date(), recordAt: Date()) } ?? nil
+        let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
+        let pendingEvals = Array(momentsAll.lazy.filter { momentRepo.evaluation(of: $0, by: myID) == nil }.prefix(3))
 
         Text("提醒").dsSectionTitle()
         GroupedSection {
-            if stale == nil && pendingEvals.isEmpty && cycleDelay == nil && cycleOngoing == nil {
+            if stale == nil && pendingEvals.isEmpty {
                 GroupedRow(title: "一切都好", value: "去足迹翻翻回忆 ›", showsDivider: false)
             } else {
-                if let cycleDelay {
-                    NavigationLink { HerView() } label: {
-                        GroupedRow(title: "🕐 已推迟 \(cycleDelay) 天", value: "去看看 ›",
-                                   valueColor: DS.actionBlue,
-                                   showsDivider: stale != nil || !pendingEvals.isEmpty)
-                    }
-                    .buttonStyle(.plain)
-                } else if let cycleOngoing, let start = cycleOngoing.startDate {
-                    let n = (Calendar.current.dateComponents([.day], from: start,
-                              to: Calendar.current.startOfDay(for: Date())).day ?? 0) + 1
-                    NavigationLink { HerView() } label: {
-                        GroupedRow(title: "经期第 \(n) 天", value: "去看看 ›",
-                                   valueColor: DS.actionBlue,
-                                   showsDivider: stale != nil || !pendingEvals.isEmpty)
-                    }
-                    .buttonStyle(.plain)
-                }
                 if let ongoing, stale != nil {
                     NavigationLink {
                         MeetingDetailView(meeting: ongoing)
