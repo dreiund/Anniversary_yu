@@ -11,6 +11,7 @@ struct HomeView: View {
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>
     @FetchRequest(sortDescriptors: []) private var dateDays: FetchedResults<CDDateDay>
     @FetchRequest(sortDescriptors: []) private var planItems: FetchedResults<CDPlanItem>
+    @FetchRequest(sortDescriptors: []) private var todoItems: FetchedResults<CDTodoItem>
     @FetchRequest(fetchRequest: {
         // 提醒区只关心最近的待补评：限量 50 条按时间倒序，年深日久也不全表扫描；
         // 更久远的未评价记忆不再入提醒（补评提醒本就该关注近期）。
@@ -27,7 +28,7 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            let _ = (moods.count, dateDays.count, planItems.count, momentsAll.count)  // 注册观察：心情/约会日/计划项/记忆（含对方同步进来的）变更均刷新首页
+            let _ = (moods.count, dateDays.count, planItems.count, todoItems.count, momentsAll.count)  // 注册观察：心情/约会日/计划项/记得做/记忆（含对方同步进来的）变更均刷新首页
             if let couple {
                 VStack(alignment: .leading, spacing: DS.Spacing.md) {
                     if !accountAvailable {

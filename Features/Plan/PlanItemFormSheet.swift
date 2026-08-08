@@ -40,11 +40,15 @@ struct PlanItemFormSheet: View {
                                     .padding(.horizontal, 14).padding(.vertical, 6)
                             }
                         }
-                        Toggle("提醒我", isOn: $remindOn.animation())
+                        Toggle("提醒我", isOn: Binding(
+                            get: { remindOn },
+                            set: { newValue in
+                                withAnimation {
+                                    remindOn = newValue
+                                    if newValue { remindDate = defaultRemindDate() }
+                                }
+                            }))
                             .padding(.horizontal, 14).padding(.vertical, 6)
-                            .onChange(of: remindOn) { _, newValue in
-                                if newValue { remindDate = defaultRemindDate() }
-                            }
                         if remindOn {
                             DatePicker("提醒时刻", selection: $remindDate)
                                 .padding(.horizontal, 14).padding(.vertical, 6)
