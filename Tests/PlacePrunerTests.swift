@@ -76,4 +76,18 @@ final class PlacePrunerTests: XCTestCase {
         try meetings.delete(m)                                     // 级联删记忆 → 地点成孤儿
         XCTAssertEqual(try placeCount(), 0)
     }
+
+    // 反馈⑥：记得做引用的地点不清（PlacePruner 计入 todoItems）
+    func testPlaceReferencedOnlyByTodoSurvives() throws {
+        let place = makePlace("只有记得做引用")
+        let todo = CDTodoItem(context: pc.viewContext)
+        todo.id = UUID(); todo.title = "买花"; todo.couple = couple; todo.place = place
+        try pc.viewContext.save()
+        PlacePruner.pruneOrphans(context: pc.viewContext)
+        XCTAssertEqual(try placeCount(), 1)
+        pc.viewContext.delete(todo)
+        try pc.viewContext.save()
+        PlacePruner.pruneOrphans(context: pc.viewContext)
+        XCTAssertEqual(try placeCount(), 0)
+    }
 }

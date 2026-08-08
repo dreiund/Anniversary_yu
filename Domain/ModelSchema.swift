@@ -187,6 +187,22 @@ enum ModelSchema {
             attr("authorPartnerID", .UUIDAttributeType),
             attr("sortIndex", .integer32AttributeType, optional: false, defaultValue: 0),
             attr("placeText", .stringAttributeType),
+            attr("remindAt", .dateAttributeType),
+        ])
+
+        let todo = entity("CDTodoItem", CDTodoItem.self, [
+            attr("id", .UUIDAttributeType),
+            attr("title", .stringAttributeType),
+            attr("detail", .stringAttributeType),
+            attr("dueAt", .dateAttributeType),
+            attr("assigneePartnerID", .UUIDAttributeType),
+            attr("authorPartnerID", .UUIDAttributeType),
+            attr("visibilityRaw", .integer16AttributeType, optional: false, defaultValue: 0),
+            attr("revealedAt", .dateAttributeType),
+            attr("isDone", .booleanAttributeType, optional: false, defaultValue: false),
+            attr("doneAt", .dateAttributeType),
+            attr("remindAt", .dateAttributeType),
+            attr("createdAt", .dateAttributeType),
         ])
 
         // 关系（父 → 子）
@@ -197,6 +213,7 @@ enum ModelSchema {
         oneToMany(couple, "ledgerEntries", ledger, "couple")
         oneToMany(couple, "cycles", cycle, "couple")
         oneToMany(couple, "intimacyRecords", intimacy, "couple")
+        oneToMany(couple, "todos", todo, "couple")
         oneToMany(meeting, "dateDays", dateDay, "meeting")
         oneToMany(meeting, "planItems", planItem, "meeting")
         oneToMany(dateDay, "moments", moment, "dateDay")
@@ -206,13 +223,14 @@ enum ModelSchema {
         oneToMany(place, "moments", moment, "place", cascade: false)
         oneToMany(place, "ledgerEntries", ledger, "place", cascade: false)
         oneToMany(place, "planItems", planItem, "place", cascade: false)
+        oneToMany(place, "todoItems", todo, "place", cascade: false)
         oneToMany(ledger, "evidences", evidence, "ledgerEntry")
         oneToMany(cycle, "dayLogs", cycleLog, "cycle")
 
         let model = NSManagedObjectModel()
         model.entities = [
             couple, partner, meeting, dateDay, moment, photo, evaluation, place,
-            dailyMood, ledger, evidence, cycle, cycleLog, intimacy, planItem,
+            dailyMood, ledger, evidence, cycle, cycleLog, intimacy, planItem, todo,
         ]
         return model
     }

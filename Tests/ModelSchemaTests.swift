@@ -10,7 +10,7 @@ final class ModelSchemaTests: XCTestCase {
         let expected: Set<String> = [
             "CDCouple", "CDPartner", "CDMeeting", "CDDateDay", "CDMoment",
             "CDPhoto", "CDEvaluation", "CDPlace", "CDDailyMood", "CDLedgerEntry",
-            "CDEvidence", "CDCycle", "CDCycleDayLog", "CDIntimacyRecord", "CDPlanItem",
+            "CDEvidence", "CDCycle", "CDCycleDayLog", "CDIntimacyRecord", "CDPlanItem", "CDTodoItem",
         ]
         XCTAssertEqual(names, expected)
     }

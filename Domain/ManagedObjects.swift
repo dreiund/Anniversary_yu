@@ -15,6 +15,7 @@ final class CDCouple: NSManagedObject {
     @NSManaged var ledgerEntries: NSSet?
     @NSManaged var cycles: NSSet?
     @NSManaged var intimacyRecords: NSSet?
+    @NSManaged var todos: NSSet?
 }
 
 @objc(CDPartner)
@@ -105,6 +106,7 @@ final class CDPlace: NSManagedObject {
     @NSManaged var moments: NSSet?
     @NSManaged var ledgerEntries: NSSet?
     @NSManaged var planItems: NSSet?
+    @NSManaged var todoItems: NSSet?
 }
 
 @objc(CDDailyMood)
@@ -184,7 +186,26 @@ final class CDPlanItem: NSManagedObject {
     @NSManaged var authorPartnerID: UUID?
     @NSManaged var sortIndex: Int32
     @NSManaged var placeText: String?
+    @NSManaged var remindAt: Date?
     @NSManaged var meeting: CDMeeting?
+    @NSManaged var place: CDPlace?
+}
+
+@objc(CDTodoItem)
+final class CDTodoItem: NSManagedObject {
+    @NSManaged var id: UUID?
+    @NSManaged var title: String?
+    @NSManaged var detail: String?
+    @NSManaged var dueAt: Date?
+    @NSManaged var assigneePartnerID: UUID?
+    @NSManaged var authorPartnerID: UUID?
+    @NSManaged var visibilityRaw: Int16
+    @NSManaged var revealedAt: Date?
+    @NSManaged var isDone: Bool
+    @NSManaged var doneAt: Date?
+    @NSManaged var remindAt: Date?
+    @NSManaged var createdAt: Date?
+    @NSManaged var couple: CDCouple?
     @NSManaged var place: CDPlace?
 }
 
