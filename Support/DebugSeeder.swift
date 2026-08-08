@@ -90,13 +90,28 @@ enum DebugSeeder {
         _ = try? cycleRepo.addIntimacy(couple: couple, day: day(-3), protected: false,
                                        note: nil, now: Date(), calendar: cal)
 
+        // 反馈⑦：计划钉与记得做钉的地点
+        let pier = CDPlace(context: context)
+        pier.id = UUID(); pier.name = "演示码头"
+        pier.latitude = 31.2354; pier.longitude = 121.4837
+        pier.categoryRaw = PlaceCategory.other.rawValue
+        pier.createdAt = Date(); pier.couple = couple
+        _ = try? PlanItemRepository(context: context).add(
+            to: meeting, day: Date(), time: nil, title: "去码头拍日落", note: nil,
+            placeText: "演示码头", authorID: authorID, place: pier)
+        let florist = CDPlace(context: context)
+        florist.id = UUID(); florist.name = "演示花店"
+        florist.latitude = 31.2254; florist.longitude = 121.4637
+        florist.categoryRaw = PlaceCategory.other.rawValue
+        florist.createdAt = Date(); florist.couple = couple
+
         // 记得做种子：我做一条今天到期 + Ta做一条私密（今天卡/第四段/🔒 演示）
         let todoRepo = TodoRepository(context: context)
         let myID = coupleRepo.currentPartnerID(of: couple)
         let herID = CoupleRepository(context: context).otherPartner(of: couple)?.id
         _ = try? todoRepo.create(couple: couple, title: "帮她带充电宝", detail: nil,
                                  dueAt: Date(), assigneeID: myID, authorID: herID,
-                                 visibility: .sharedImmediately, place: nil, remindAt: nil,
+                                 visibility: .sharedImmediately, place: florist, remindAt: nil,
                                  calendar: cal)
         _ = try? todoRepo.create(couple: couple, title: "查演出票", detail: "周五开票",
                                  dueAt: day(3), assigneeID: herID, authorID: myID,

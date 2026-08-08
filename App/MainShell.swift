@@ -112,7 +112,8 @@ struct MainShell: View {
         }
         .onAppear {
             SealReminder.refresh(context: context)
-            PlacePruner.pruneOrphans(context: context)   // 反馈⑥：清历史遗留的孤儿地点
+            // 反馈⑦撤掉启动清扫：真机首启 CloudKit 镜像导入顺序不保证，地点先于记忆到达的
+            // 窗口里清扫会误判孤儿并把删除同步回云端（疑似真机地图空钉元凶）；只保留删除后清扫
         }
     }
 

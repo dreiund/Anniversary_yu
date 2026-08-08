@@ -10,7 +10,8 @@ struct PlanItemRepository {
 
     @discardableResult
     func add(to meeting: CDMeeting, day: Date?, time: Date?, title: String,
-             note: String?, placeText: String?, authorID: UUID?, remindAt: Date? = nil) throws -> CDPlanItem {
+             note: String?, placeText: String?, authorID: UUID?, remindAt: Date? = nil,
+             place: CDPlace? = nil) throws -> CDPlanItem {
         let maxSort = ((meeting.planItems as? Set<CDPlanItem>) ?? [])
             .map(\.sortIndex).max() ?? -1
         let item = CDPlanItem(context: context)
@@ -23,6 +24,7 @@ struct PlanItemRepository {
         item.authorPartnerID = authorID
         item.remindAt = remindAt
         item.sortIndex = maxSort + 1
+        item.place = place
         item.meeting = meeting
         try context.save()
         return item
@@ -34,13 +36,14 @@ struct PlanItemRepository {
     }
 
     func update(_ item: CDPlanItem, day: Date?, time: Date?, title: String,
-                note: String?, placeText: String?, remindAt: Date?) throws {
+                note: String?, placeText: String?, remindAt: Date?, place: CDPlace?) throws {
         item.day = day
         item.time = time
         item.title = title
         item.note = note
         item.placeText = placeText
         item.remindAt = remindAt
+        item.place = place
         try context.save()
     }
 

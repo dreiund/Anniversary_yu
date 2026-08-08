@@ -17,6 +17,7 @@ struct PlanView: View {
     @State private var selected: Set<NSManagedObjectID> = []
     @State private var confirmBatch = false
     @State private var openSwipeID: NSManagedObjectID?
+    @State private var miniMapPlace: CDPlace?
     @Environment(\.dismiss) private var dismiss
 
     init(meeting: CDMeeting) {
@@ -139,6 +140,7 @@ struct PlanView: View {
         } message: {
             Text("所选日程会删除。")
         }
+        .sheet(item: $miniMapPlace) { PlaceMiniMapSheet(place: $0) }
         .sheet(isPresented: $showAdd) { PlanItemFormSheet(meeting: meeting, item: nil) }
         .sheet(item: $editingItem) { PlanItemFormSheet(meeting: meeting, item: $0) }
         .sheet(isPresented: $showEditForm, onDismiss: {
@@ -204,8 +206,16 @@ struct PlanView: View {
                 if let note = item.note, !note.isEmpty {
                     Text(note).dsFootnote()
                 }
-                if let place = item.placeText, !place.isEmpty {
-                    Text(place).font(.system(size: 12)).foregroundStyle(DS.actionBlue)
+                if let placeLabel = item.place?.name ?? item.placeText, !placeLabel.isEmpty {
+                    Text(placeLabel)
+                        .font(.system(size: 12)).foregroundStyle(DS.actionBlue)
+                        .onTapGesture {
+                            // 反馈⑦ 1A：点日程地点弹临时小地图——见面结束后仍可定位，不进地图页
+                            if !selecting, let place = item.place,
+                               place.latitude != 0 || place.longitude != 0 {
+                                miniMapPlace = place
+                            }
+                        }
                 }
             }
             Spacer()

@@ -57,7 +57,7 @@ final class PlanItemRepositoryTests: XCTestCase {
 
     func testUpdateAndDelete() throws {
         let a = try repo.add(to: meeting, day: nil, time: nil, title: "旧", note: nil, placeText: nil, authorID: nil)
-        try repo.update(a, day: date(2026, 8, 29), time: nil, title: "新", note: "备注", placeText: "湖滨路店", remindAt: nil)
+        try repo.update(a, day: date(2026, 8, 29), time: nil, title: "新", note: "备注", placeText: "湖滨路店", remindAt: nil, place: nil)
         XCTAssertEqual(a.title, "新")
         XCTAssertEqual(repo.sections(for: meeting, calendar: cal).dated.count, 1)
 

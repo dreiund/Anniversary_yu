@@ -8,7 +8,11 @@ struct PlanItemFormSheet: View {
 
     @State private var title = ""
     @State private var note = ""
-    @State private var placeText = ""
+    @State private var locationName = ""
+    @State private var coords: (Double, Double)?
+    @State private var locationCategoryRaw: Int16 = 0
+    @State private var linkedPlaceID: UUID?
+    @State private var showPlacePicker = false
     @State private var hasDay = false
     @State private var day = Date()
     @State private var hasTime = false
@@ -63,11 +67,27 @@ struct PlanItemFormSheet: View {
                         }
                         .padding(.horizontal, 14).padding(.vertical, 11)
                         DS.hairline.frame(height: 1).padding(.leading, 14)
-                        HStack {
-                            Text("地点").dsBody()
-                            TextField("可选，如 湖滨路店", text: $placeText).multilineTextAlignment(.trailing)
+                        Button {
+                            showPlacePicker = true
+                        } label: {
+                            HStack {
+                                Text("地点").dsBody()
+                                Spacer()
+                                Text(locationName.isEmpty ? "可跳过 ›" : locationName)
+                                    .dsCaption().lineLimit(1)
+                                if !locationName.isEmpty {
+                                    Button {
+                                        locationName = ""; coords = nil
+                                        locationCategoryRaw = 0; linkedPlaceID = nil
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 13)).foregroundStyle(DS.chipBorder)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 11)
                         }
-                        .padding(.horizontal, 14).padding(.vertical, 11)
+                        .buttonStyle(.plain)
                     }
                     if let item {
                         Button("删除此项") {
@@ -93,6 +113,19 @@ struct PlanItemFormSheet: View {
                 }
             }
             .onAppear { loadIfEditing() }
+            .sheet(isPresented: $showPlacePicker) {
+                PlacePickerSheet(initial: coords.map {
+                    PickedPlace(name: locationName, latitude: $0.0, longitude: $0.1,
+                                categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
+                } ?? (locationName.isEmpty ? nil
+                      : PickedPlace(name: locationName, latitude: 0, longitude: 0,
+                                    categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID))) { picked in
+                    locationName = picked.name
+                    coords = (picked.latitude, picked.longitude)
+                    locationCategoryRaw = picked.categoryRaw
+                    linkedPlaceID = picked.existingPlaceID
+                }
+            }
         }
     }
 
@@ -100,7 +133,17 @@ struct PlanItemFormSheet: View {
         guard let item else { return }
         title = item.title ?? ""
         note = item.note ?? ""
-        placeText = item.placeText ?? ""
+        if let place = item.place {
+            // 已关联真地点：预填全量，改选/清除都走选点页
+            locationName = place.name ?? ""
+            if place.latitude != 0 || place.longitude != 0 {
+                coords = (place.latitude, place.longitude)
+            }
+            locationCategoryRaw = place.categoryRaw
+            linkedPlaceID = place.id
+        } else {
+            locationName = item.placeText ?? ""   // 旧数据的手输文字照常显示
+        }
         if let d = item.day { hasDay = true; day = d }
         if let t = item.time { hasTime = true; time = t }
         if let r = item.remindAt { remindOn = true; remindDate = r }
@@ -116,19 +159,30 @@ struct PlanItemFormSheet: View {
         let dayValue = hasDay ? day : nil
         let timeValue = (hasDay && hasTime) ? time : nil
         let noteValue = note.isEmpty ? nil : note
-        let placeValue = placeText.isEmpty ? nil : placeText
         let remindValue: Date? = remindOn ? remindDate : nil
+        let couples = CoupleRepository(context: context)
+        let couple = try? couples.fetchCouple()
+        // 反馈⑦ 1A：地点走选点归并（与记忆/小本本同管线）；placeText 同步写名字兼容旧展示
+        var place: CDPlace?
+        let trimmedLocation = locationName.trimmingCharacters(in: .whitespaces)
+        if !trimmedLocation.isEmpty {
+            let picked = PickedPlace(name: trimmedLocation,
+                                     latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
+                                     categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
+            place = PlaceResolver.resolve(picked, context: context, couple: couple)
+        }
+        let placeValue = trimmedLocation.isEmpty ? nil : trimmedLocation
         var savedItem: CDPlanItem?
         if let item {
             try? repo.update(item, day: dayValue, time: timeValue, title: title,
-                             note: noteValue, placeText: placeValue, remindAt: remindValue)
+                             note: noteValue, placeText: placeValue, remindAt: remindValue,
+                             place: place)
             savedItem = item
         } else {
-            let couples = CoupleRepository(context: context)
-            let authorID = (try? couples.fetchCouple()).flatMap { couples.currentPartnerID(of: $0) }
+            let authorID = couple.flatMap { couples.currentPartnerID(of: $0) }
             savedItem = try? repo.add(to: meeting, day: dayValue, time: timeValue, title: title,
                                       note: noteValue, placeText: placeValue, authorID: authorID,
-                                      remindAt: remindValue)
+                                      remindAt: remindValue, place: place)
         }
         if let id = savedItem?.id {
             let key = ReminderPlanner.planID(id)

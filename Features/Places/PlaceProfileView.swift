@@ -54,7 +54,13 @@ struct PlaceProfileView: View {
                              bar: otherAvg)
                 }
                 HStack(spacing: 18) {
-                    Button("在地图中查看 ›") { showMiniMap = true }
+                    // 反馈⑦：手输老地点没有坐标，小地图会飘到大洋上——给明确提示
+                    if place.latitude != 0 || place.longitude != 0 {
+                        Button("在地图中查看 ›") { showMiniMap = true }
+                    } else {
+                        Text("该地点没有坐标 · 编辑记忆重新选点可补")
+                            .font(.system(size: 12)).foregroundStyle(DS.inkMuted)
+                    }
                     if place.latitude != 0 || place.longitude != 0 {
                         Button("导航到这里 ›") {
                             AmapNavigator.navigate(name: place.name ?? "目的地",
@@ -72,7 +78,7 @@ struct PlaceProfileView: View {
         .navigationTitle(place.name ?? "地点")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showCategoryPicker) { categoryPicker }
-        .sheet(isPresented: $showMiniMap) { miniMap }
+        .sheet(isPresented: $showMiniMap) { PlaceMiniMapSheet(place: place) }
     }
 
     private var header: some View {
@@ -238,25 +244,4 @@ struct PlaceProfileView: View {
         .presentationDetents([.medium])
     }
 
-    private var miniMap: some View {
-        NavigationStack {
-            Map(initialPosition: .region(MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude),
-                latitudinalMeters: 600, longitudinalMeters: 600))) {
-                Annotation("", coordinate: CLLocationCoordinate2D(
-                    latitude: place.latitude, longitude: place.longitude)) {
-                    PlacePin(image: place.latestThumbnail(context: context),
-                             fallbackText: place.name ?? "地")
-                }
-            }
-            .mapStyle(.standard(pointsOfInterest: .excludingAll))
-            .navigationTitle(place.name ?? "地点")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { showMiniMap = false }
-                }
-            }
-        }
-    }
 }

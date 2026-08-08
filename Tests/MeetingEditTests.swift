@@ -192,7 +192,8 @@ final class MeetingEditTests: XCTestCase {
         let item = try plans.add(to: m, day: nil, time: nil, title: "买票", note: nil,
                                  placeText: nil, authorID: nil, remindAt: Date(timeIntervalSince1970: 500))
         XCTAssertEqual(item.remindAt, Date(timeIntervalSince1970: 500))
-        try plans.update(item, day: nil, time: nil, title: "买票", note: nil, placeText: nil, remindAt: nil)
+        try plans.update(item, day: nil, time: nil, title: "买票", note: nil, placeText: nil,
+                         remindAt: nil, place: nil)
         XCTAssertNil(item.remindAt)
     }
 }

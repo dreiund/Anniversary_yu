@@ -2,11 +2,13 @@ import SwiftUI
 import MapKit
 import CoreData
 
-/// 足迹地图的筛选：全部 / 七类 / 小本本（与类目并列，反馈需求）
+/// 足迹地图的筛选：全部 / 七类 / 小本本 / 计划 / 记得做（反馈⑦扩展）
 enum PlacesMapFilter: Hashable {
     case all
     case category(PlaceCategory)
     case ledger
+    case plans
+    case todos
 }
 
 /// 足迹·地图段（spec §四）：弱化底图 + 照片钉 + 屏幕空间聚合 + 七类筛选 + 小本本筛选。
@@ -15,9 +17,12 @@ struct PlacesMapView: View {
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDPlace.createdAt)])
     private var places: FetchedResults<CDPlace>
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
+    private var meetings: FetchedResults<CDMeeting>
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var filter: PlacesMapFilter = .all
+    @State private var meetingIndex: Int32?          // 反馈⑦ 3A：按第几次见面筛选，nil=全部
     @State private var selectedPlace: CDPlace?
     @State private var profilePlace: CDPlace?   // 程序化推档案：目标页在正常视图环境构建，不进 Map overlay 的链接邪路
     @State private var cameraTick = 0                  // 相机停稳后自增，触发聚合重算
@@ -35,17 +40,53 @@ struct PlacesMapView: View {
         return LedgerRules.anyVisible(myID: myID, entries: entries)
     }
 
-    /// 有坐标、且挂着记忆或可见小本本条目的地点，经筛选（spec §4.1 + 反馈扩展）
+    /// 计划钉（反馈⑦ 1A）：挂着未结束见面日程的地点——见面结束即从地图消失（数据保留）
+    private func hasActivePlan(_ place: CDPlace) -> Bool {
+        ((place.planItems as? Set<CDPlanItem>) ?? []).contains {
+            guard let meeting = $0.meeting else { return false }
+            return meeting.statusRaw != MeetingStatus.finished.rawValue
+        }
+    }
+
+    /// 记得做钉（反馈⑦ 2A）：仅未完成且对我可见的（隐私沿用小本本规则，做完即从地图消失）
+    private func hasVisibleTodo(_ place: CDPlace) -> Bool {
+        ((place.todoItems as? Set<CDTodoItem>) ?? []).contains {
+            !$0.isDone && TodoRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                              visibilityRaw: $0.visibilityRaw,
+                                              revealedAt: $0.revealedAt)
+        }
+    }
+
+    private func matchesMeeting(_ place: CDPlace, index: Int32) -> Bool {
+        ((place.moments as? Set<CDMoment>) ?? []).contains {
+            $0.dateDay?.meeting?.index == index
+        }
+    }
+
+    /// 有坐标、且挂着记忆/可见小本本/未结束计划/未完成记得做的地点，经筛选（spec §4.1 + 反馈⑦）
     private var visiblePlaces: [CDPlace] {
         places.filter { p in
             guard p.latitude != 0 || p.longitude != 0 else { return false }
             let hasMoments = (p.moments as? Set<CDMoment>)?.isEmpty == false
+            // 3A：选定具体见面＝只看该次记忆钉，小本本/计划/记得做钉隐藏
+            if let index = meetingIndex {
+                guard hasMoments, matchesMeeting(p, index: index) else { return false }
+                switch filter {
+                case .all: return true
+                case .category(let cat): return p.categoryRaw == cat.rawValue
+                case .ledger, .plans, .todos: return false
+                }
+            }
             let hasLedger = hasVisibleLedger(p)
-            guard hasMoments || hasLedger else { return false }
+            let hasPlan = hasActivePlan(p)
+            let hasTodo = hasVisibleTodo(p)
+            guard hasMoments || hasLedger || hasPlan || hasTodo else { return false }
             switch filter {
             case .all: return true
             case .category(let cat): return p.categoryRaw == cat.rawValue
             case .ledger: return hasLedger
+            case .plans: return hasPlan
+            case .todos: return hasTodo
             }
         }
     }
@@ -55,24 +96,51 @@ struct PlacesMapView: View {
             filterChips
             mapBody
         }
-        .onChange(of: filter) {
-            if let selected = selectedPlace, !visiblePlaces.contains(selected) {
-                selectedPlace = nil
-            }
-            // 取景规则（用户定稿）：空类目或新集合全在当前视野内 → 区域不动只换钉；
-            // 新集合在视野外（如广州→苏州）→ 平滑飞过去
-            guard let target = boundingRegion(of: visiblePlaces) else { return }
-            if let current = currentRegion, contains(current, allOf: visiblePlaces) { return }
-            withAnimation(.smooth(duration: 0.8)) { camera = .region(target) }
-        }
+        .onChange(of: filter) { retargetCamera() }
         .navigationDestination(item: $profilePlace) { place in
             PlaceProfileView(place: place)
         }
     }
 
+    /// 取景规则（用户定稿）：空集合或新集合全在当前视野内 → 区域不动只换钉；
+    /// 新集合在视野外（如广州→苏州）→ 平滑飞过去
+    private func retargetCamera() {
+        if let selected = selectedPlace, !visiblePlaces.contains(selected) {
+            selectedPlace = nil
+        }
+        guard let target = boundingRegion(of: visiblePlaces) else { return }
+        if let current = currentRegion, contains(current, allOf: visiblePlaces) { return }
+        withAnimation(.smooth(duration: 0.8)) { camera = .region(target) }
+    }
+
+    /// 按第几次见面筛选（反馈⑦ 3A）：与类目叠加；选定具体见面时小本本/计划/记得做筛选回落「全部」
+    private var meetingMenu: some View {
+        Menu {
+            Button("全部见面") { selectMeeting(nil) }
+            ForEach(meetings, id: \.objectID) { m in
+                Button("第 \(m.index) 次见面") { selectMeeting(m.index) }
+            }
+        } label: {
+            Text(meetingIndex.map { "第 \($0) 次 ▾" } ?? "全部见面 ▾")
+                .font(.system(size: 12, weight: meetingIndex != nil ? .semibold : .regular))
+                .foregroundStyle(meetingIndex != nil ? .white : DS.ink)
+                .padding(.vertical, 4).padding(.horizontal, 10)
+                .background(Capsule().fill(meetingIndex != nil ? DS.actionBlue : DS.canvas))
+                .overlay(Capsule().stroke(meetingIndex != nil ? DS.actionBlue : DS.chipBorder,
+                                          lineWidth: 1))
+        }
+    }
+
+    private func selectMeeting(_ index: Int32?) {
+        meetingIndex = index
+        if index != nil, [.ledger, .plans, .todos].contains(filter) { filter = .all }
+        retargetCamera()
+    }
+
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                meetingMenu
                 chip(title: "全部", selected: filter == .all) { filter = .all }
                 ForEach(PlaceCategory.allCases, id: \.rawValue) { cat in
                     chip(title: cat.label, selected: filter == .category(cat)) {
@@ -81,6 +149,12 @@ struct PlacesMapView: View {
                 }
                 chip(title: "小本本", selected: filter == .ledger) {
                     filter = filter == .ledger ? .all : .ledger
+                }
+                chip(title: "计划", selected: filter == .plans) {
+                    filter = filter == .plans ? .all : .plans
+                }
+                chip(title: "记得做", selected: filter == .todos) {
+                    filter = filter == .todos ? .all : .todos
                 }
             }
             .padding(.horizontal, DS.Spacing.md)
@@ -136,6 +210,15 @@ struct PlacesMapView: View {
         }
     }
 
+    private func pinBadge(_ text: String, fill: Color) -> some View {
+        Text(text)
+            .font(.system(size: 7, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 13, height: 13)
+            .background(Circle().fill(fill))
+            .overlay(Circle().stroke(.white, lineWidth: 1))
+    }
+
     /// 钉层：屏幕坐标直渲（普通 ViewBuilder，筛选/相机变化即时重投）。
     /// 动画只绑 filter——切筛选淡入淡出；拖拽缩放的连续重投不做动画（跟手优先）。
     @ViewBuilder
@@ -155,17 +238,14 @@ struct PlacesMapView: View {
                                     .padding(-2)
                             )
                             .overlay(alignment: .bottomTrailing) {
-                                // 小本本角标：与记忆钉在图上区分（反馈需求）
-                                if hasVisibleLedger(place) {
-                                    Text("本")
-                                        .font(.system(size: 7, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 13, height: 13)
-                                        .background(Circle().fill(DS.ink))
-                                        .overlay(Circle().stroke(.white, lineWidth: 1))
-                                        .offset(x: 4, y: 4)
-                                        .allowsHitTesting(false)
+                                // 角标簇：小本本墨「本」/ 计划蓝「计」/ 记得做蓝「做」（反馈⑦）
+                                HStack(spacing: 2) {
+                                    if hasVisibleLedger(place) { pinBadge("本", fill: DS.ink) }
+                                    if hasActivePlan(place) { pinBadge("计", fill: DS.actionBlue) }
+                                    if hasVisibleTodo(place) { pinBadge("做", fill: DS.actionBlue) }
                                 }
+                                .offset(x: 4, y: 4)
+                                .allowsHitTesting(false)
                             }
                             .onTapGesture { selectedPlace = place }
                             .position(point)

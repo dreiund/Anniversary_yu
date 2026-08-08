@@ -213,6 +213,44 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "R3-她月历紫窗")
     }
 
+    /// 反馈⑦：计划/记得做钉与按次筛选
+    @MainActor
+    func testRound7MapLook() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+        app.buttons["足迹"].tap()
+        let mapChip = app.buttons["地图"]
+        XCTAssertTrue(mapChip.waitForExistence(timeout: 8))
+        mapChip.tap()
+        sleep(3)
+        XCTAssertTrue(app.buttons["计划"].exists, "计划筛选未出现")
+        // 筛选行变长，计划/记得做在屏幕右侧外：先把 chips 行横滑到底
+        let chipsY = app.buttons["美食"].frame.midY / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: chipsY))
+            .press(forDuration: 0.05,
+                   thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: chipsY)))
+        sleep(1)
+        app.buttons["计划"].tap()
+        sleep(2)
+        XCTAssertFalse(app.staticTexts["还没有带地点的记忆"].exists, "计划筛选下应有码头钉")
+        attach(app, name: "P1-计划筛选")
+        app.buttons["记得做"].tap()
+        sleep(2)
+        XCTAssertFalse(app.staticTexts["还没有带地点的记忆"].exists, "记得做筛选下应有花店钉")
+        attach(app, name: "P2-记得做筛选")
+        // 滑回行首再开见面菜单
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: chipsY))
+            .press(forDuration: 0.05,
+                   thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: chipsY)))
+        sleep(1)
+        app.buttons["全部见面 ▾"].tap()
+        sleep(1)
+        app.buttons["第 1 次见面"].tap()
+        sleep(2)
+        attach(app, name: "P3-按次筛选")
+    }
+
     /// 临时复现：记忆详情→档案→在地图中查看 的小地图点位
     @MainActor
     func testMiniMapPinRepro() throws {
