@@ -213,6 +213,29 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "R3-她月历紫窗")
     }
 
+    /// 临时复现：记忆详情→档案→在地图中查看 的小地图点位
+    @MainActor
+    func testMiniMapPinRepro() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+        app.buttons["足迹"].tap()
+        let card = app.staticTexts["上海"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8))
+        card.tap()
+        let moment = app.staticTexts["演示午餐"]
+        XCTAssertTrue(moment.waitForExistence(timeout: 5))
+        moment.tap()
+        let placeRow = app.buttons["演示餐厅"]
+        XCTAssertTrue(placeRow.waitForExistence(timeout: 5), "记忆详情地点行未出现")
+        placeRow.tap()
+        let mapBtn = app.buttons["在地图中查看 ›"]
+        XCTAssertTrue(mapBtn.waitForExistence(timeout: 5), "档案页未出现")
+        mapBtn.tap()
+        sleep(4)
+        attach(app, name: "M1-小地图")
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())

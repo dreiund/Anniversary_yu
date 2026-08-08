@@ -164,6 +164,12 @@ struct MeetingsView: View {
         }
     }
 
+    /// 反馈⑦：只填标题没填城市的见面，结束卡此前一个名字都不显示（原来只取 city）
+    private func finishedName(_ m: CDMeeting) -> String {
+        let name = [m.city, m.title].compactMap { $0 }.joined(separator: " · ")
+        return name.isEmpty ? "未命名的见面" : name
+    }
+
     private func dateRange(_ m: CDMeeting) -> String {
         let s = m.startedAt ?? m.plannedStart
         let e = m.endedAt ?? m.plannedEnd
@@ -245,7 +251,7 @@ struct MeetingsView: View {
                 Text("第 \(meeting.index) 次见面")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(cover != nil ? DS.onDarkMuted : DS.inkMuted)
-                Text("\(meeting.city ?? "") · \(dateRange(meeting)) · \(momentCount) 条记忆")
+                Text("\(finishedName(meeting)) · \(dateRange(meeting)) · \(momentCount) 条记忆")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(cover != nil ? .white : DS.ink)
             }
