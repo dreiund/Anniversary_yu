@@ -16,11 +16,15 @@ struct CycleDaySheet: View {
     let selection: SelectedCycleDay
     @FetchRequest(sortDescriptors: []) private var cycles: FetchedResults<CDCycle>
     @FetchRequest(sortDescriptors: []) private var intimacyAll: FetchedResults<CDIntimacyRecord>
+    // 点选档位改的是 CDCycleDayLog 的字段：不观察它，二次点选（update 不碰 CDCycle）不刷新，
+    // 视觉上就是「只有第一下会亮」（首次点选是 insert，恰好碰到 cycle.dayLogs 关系才刷）
+    @FetchRequest(sortDescriptors: []) private var dayLogsAll: FetchedResults<CDCycleDayLog>
 
     @State private var segment: CycleSheetSegment = .period
     @State private var note = ""
     @State private var intimacyProtected = true
     @State private var intimacyNote = ""
+    @State private var intimacyTime = Date()
     @State private var editingIntimacy: CDIntimacyRecord?
     @State private var overlapMessage: String?
     @State private var confirmDeleteIntimacy: CDIntimacyRecord?
@@ -31,7 +35,7 @@ struct CycleDaySheet: View {
     private var cal: Calendar { .current }
 
     var body: some View {
-        let _ = (cycles.count, intimacyAll.count)   // 注册刷新
+        let _ = (cycles.count, intimacyAll.count, dayLogsAll.count)   // 注册刷新
         let containing = repo.cycle(containing: day, couple: couple, calendar: cal)
         NavigationStack {
             ScrollView {
@@ -75,6 +79,10 @@ struct CycleDaySheet: View {
             guard !loaded else { return }
             loaded = true
             segment = selection.segment
+            if !cal.isDate(day, inSameDayAs: Date()) {
+                intimacyTime = cal.date(bySettingHour: 12, minute: 0, second: 0,
+                                        of: cal.startOfDay(for: day)) ?? Date()
+            }
             if let c = repo.cycle(containing: day, couple: couple, calendar: cal),
                let log = repo.dayLog(in: c, day: day, calendar: cal) {
                 note = log.note ?? ""
@@ -225,6 +233,8 @@ struct CycleDaySheet: View {
                 .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
             }
             Toggle("有措施", isOn: $intimacyProtected).dsBody()
+            DatePicker("时刻", selection: $intimacyTime, displayedComponents: .hourAndMinute)
+                .dsBody()
             TextField("备注（可选）", text: $intimacyNote, axis: .vertical)
                 .padding(10)
                 .background(RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.parchment))
@@ -242,6 +252,14 @@ struct CycleDaySheet: View {
         editingIntimacy = record
         intimacyProtected = record.protectionUsed?.boolValue ?? true
         intimacyNote = record.note ?? ""
+        if let at = record.happenedAt { intimacyTime = at }
+    }
+
+    /// 时刻选择器的时分落在所点日上（编辑用）
+    private func combinedTime() -> Date {
+        let hm = cal.dateComponents([.hour, .minute], from: intimacyTime)
+        return cal.date(bySettingHour: hm.hour ?? 12, minute: hm.minute ?? 0,
+                        second: 0, of: cal.startOfDay(for: day)) ?? intimacyTime
     }
 
     private func cancelEditingIntimacy() {
@@ -253,13 +271,14 @@ struct CycleDaySheet: View {
     private func saveIntimacy() {
         if let record = editingIntimacy {
             try? repo.updateIntimacy(record, protected: intimacyProtected,
-                                     note: intimacyNote.isEmpty ? nil : intimacyNote)
+                                     note: intimacyNote.isEmpty ? nil : intimacyNote,
+                                     happenedAt: combinedTime())
             editingIntimacy = nil
         } else {
             try? repo.addIntimacy(couple: couple, day: day,
                                   protected: intimacyProtected,
                                   note: intimacyNote.isEmpty ? nil : intimacyNote,
-                                  now: Date(), calendar: cal)
+                                  now: Date(), calendar: cal, time: intimacyTime)
         }
         intimacyNote = ""
     }

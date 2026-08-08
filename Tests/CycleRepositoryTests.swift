@@ -145,4 +145,16 @@ final class CycleRepositoryTests: XCTestCase {
         XCTAssertEqual(repo.trackedPartner(couple: couple)?.objectID, partners[1].objectID)
         XCTAssertFalse(partners[0].tracksCycle)
     }
+
+    // 反馈⑥：亲密可编辑具体时刻——显式 time 的时分落在所点日；update 可改 happenedAt
+    func testIntimacyExplicitTimeAndUpdateTime() throws {
+        let picked = cal.date(bySettingHour: 20, minute: 30, second: 0, of: d(5))!
+        let r = try repo.addIntimacy(couple: couple, day: d(5), protected: true, note: nil,
+                                     now: d(10), calendar: cal, time: picked)
+        XCTAssertEqual(r.happenedAt, picked)
+        let changed = cal.date(bySettingHour: 8, minute: 15, second: 0, of: d(5))!
+        try repo.updateIntimacy(r, protected: false, note: nil, happenedAt: changed)
+        XCTAssertEqual(r.happenedAt, changed)
+        XCTAssertEqual(r.protectionUsed, false)
+    }
 }

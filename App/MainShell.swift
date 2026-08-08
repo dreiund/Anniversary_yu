@@ -106,6 +106,7 @@ struct MainShell: View {
         }
         .onAppear {
             SealReminder.refresh(context: context)
+            PlacePruner.pruneOrphans(context: context)   // 反馈⑥：清历史遗留的孤儿地点
         }
     }
 

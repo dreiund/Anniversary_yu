@@ -131,21 +131,28 @@ extension CycleRepository {
     /// 亲密（spec §二）：今天=now 时刻；过去=当天 12:00；今天且见面进行中挂开着的约会日
     @discardableResult
     func addIntimacy(couple: CDCouple, day: Date, protected: Bool, note: String?,
-                     now: Date, calendar: Calendar) throws -> CDIntimacyRecord {
+                     now: Date, calendar: Calendar, time: Date? = nil) throws -> CDIntimacyRecord {
         let record = CDIntimacyRecord(context: context)
         record.id = UUID()
         record.protectionUsed = NSNumber(value: protected)
         record.note = note
         record.couple = couple
-        if calendar.isDate(day, inSameDayAs: now) {
+        if let time {
+            // 反馈⑥：可编辑具体时刻——取 time 的时分落在所点日上
+            let hm = calendar.dateComponents([.hour, .minute], from: time)
+            record.happenedAt = calendar.date(bySettingHour: hm.hour ?? 12, minute: hm.minute ?? 0,
+                                              second: 0, of: calendar.startOfDay(for: day))
+        } else if calendar.isDate(day, inSameDayAs: now) {
             record.happenedAt = now
-            if let meeting = try? MeetingRepository(context: context).ongoingMeeting(couple: couple),
-               let open = try? MeetingRepository(context: context).openDay(in: meeting) {
-                record.dateDay = open
-            }
         } else {
             record.happenedAt = calendar.date(bySettingHour: 12, minute: 0, second: 0,
                                               of: calendar.startOfDay(for: day))
+        }
+        // 挂靠与时刻来源无关：所点日=今天 且 见面进行中 → 归当前开着的约会日（spec §二既定）
+        if calendar.isDate(day, inSameDayAs: now),
+           let meeting = try? MeetingRepository(context: context).ongoingMeeting(couple: couple),
+           let open = try? MeetingRepository(context: context).openDay(in: meeting) {
+            record.dateDay = open
         }
         try context.save()
         return record
@@ -157,9 +164,11 @@ extension CycleRepository {
             .sorted { ($0.happenedAt ?? .distantPast) < ($1.happenedAt ?? .distantPast) }
     }
 
-    func updateIntimacy(_ record: CDIntimacyRecord, protected: Bool, note: String?) throws {
+    func updateIntimacy(_ record: CDIntimacyRecord, protected: Bool, note: String?,
+                        happenedAt: Date? = nil) throws {
         record.protectionUsed = NSNumber(value: protected)
         record.note = note
+        if let happenedAt { record.happenedAt = happenedAt }
         try context.save()
     }
 

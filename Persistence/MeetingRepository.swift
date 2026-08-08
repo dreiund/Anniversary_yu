@@ -187,6 +187,7 @@ extension MeetingRepository {
         meetings.forEach(context.delete)
         renumberMeetings(in: couple)
         try context.save()
+        PlacePruner.pruneOrphans(context: context)
     }
 
     /// 按既有 index 顺序重编 1..n（与 renumberDays 同构）
@@ -214,5 +215,6 @@ extension MeetingRepository {
         context.delete(day)
         renumberDays(in: meeting)
         try context.save()
+        PlacePruner.pruneOrphans(context: context)
     }
 }

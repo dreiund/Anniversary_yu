@@ -56,11 +56,13 @@ struct LedgerRepository {
     func delete(_ entries: [CDLedgerEntry]) throws {
         entries.forEach(context.delete)
         try context.save()
+        PlacePruner.pruneOrphans(context: context)
     }
 
     func delete(_ entry: CDLedgerEntry) throws {
         context.delete(entry)
         try context.save()
+        PlacePruner.pruneOrphans(context: context)
     }
 
     func evidencesSorted(_ entry: CDLedgerEntry) -> [CDEvidence] {
