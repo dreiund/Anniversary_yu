@@ -45,4 +45,25 @@ final class CyclePredictorTests: XCTestCase {
         XCTAssertEqual(CyclePredictor.deviationDays(predictedAtLogging: d(10), actualStart: d(8), calendar: cal), -2)
         XCTAssertNil(CyclePredictor.deviationDays(predictedAtLogging: nil, actualStart: d(8), calendar: cal))
     }
+
+    func testOvulationWindowsFromHistoryAndPredictions() {
+        // 历史两段（开始 d0、d28）→ 历史窗 1 个（依据 d28）：排卵日 d14，days d9…d18
+        // nextStarts [d56] → 未来窗 1 个：排卵日 d42，days d37…d46
+        let windows = CyclePredictor.ovulationWindows(
+            cycles: [(d(0), d(5)), (d(28), d(33))],
+            nextStarts: [d(56)], calendar: cal)
+        XCTAssertEqual(windows.count, 2)
+        XCTAssertEqual(windows[0].ovulationDay, d(14))
+        XCTAssertEqual(windows[0].days.first, d(9))
+        XCTAssertEqual(windows[0].days.count, 10)
+        XCTAssertEqual(windows[0].days.last, d(18))
+        XCTAssertEqual(windows[1].ovulationDay, d(42))
+    }
+
+    func testOvulationWindowsSingleCycleUsesPredictionsOnly() {
+        let windows = CyclePredictor.ovulationWindows(
+            cycles: [(d(0), nil)], nextStarts: [d(28), d(56), d(84)], calendar: cal)
+        XCTAssertEqual(windows.count, 3)                           // 无相邻历史对，只有预测窗
+        XCTAssertEqual(windows[0].ovulationDay, d(14))
+    }
 }

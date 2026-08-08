@@ -54,3 +54,23 @@ enum CyclePredictor {
                                        to: calendar.startOfDay(for: actualStart)).day
     }
 }
+
+struct OvulationWindow: Equatable {
+    let ovulationDay: Date
+    let days: [Date]
+}
+
+extension CyclePredictor {
+    /// 排卵窗（反馈⑥ 1A）：排卵日=「下一次开始日」−14 天；窗=前 5 后 4 共 10 天。
+    /// 历史区间回填（相邻两段中后一段的实际开始日）+ 未来预测（nextStarts 逐个）。
+    static func ovulationWindows(cycles: [(start: Date, end: Date?)],
+                                 nextStarts: [Date], calendar: Calendar) -> [OvulationWindow] {
+        let sortedStarts = cycles.map { calendar.startOfDay(for: $0.start) }.sorted()
+        let anchors = Array(sortedStarts.dropFirst()) + nextStarts.map { calendar.startOfDay(for: $0) }
+        return anchors.compactMap { nextStart in
+            guard let ovulation = calendar.date(byAdding: .day, value: -14, to: nextStart) else { return nil }
+            let days = (-5...4).compactMap { calendar.date(byAdding: .day, value: $0, to: ovulation) }
+            return OvulationWindow(ovulationDay: ovulation, days: days)
+        }
+    }
+}
