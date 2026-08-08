@@ -20,6 +20,7 @@ struct QuickLedgerSheet: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var photoDatas: [Data] = []
     @State private var evidencesToDelete: [CDEvidence] = []
+    @State private var confirmReveal = false
     @State private var loaded = false
 
     private var editingEntry: CDLedgerEntry? {
@@ -82,7 +83,15 @@ struct QuickLedgerSheet: View {
                         DS.hairline.frame(height: 1).padding(.leading, 14)
                         Toggle("私密", isOn: Binding(
                             get: { visibility == .privateUntilRevealed },
-                            set: { visibility = $0 ? .privateUntilRevealed : .sharedImmediately }))
+                            set: { newValue in
+                                // 编辑中把已私密条目关成公开＝一次性公开仪式，先确认（spec §三/§七）
+                                if !newValue, editingEntry != nil, !visibilityLocked,
+                                   visibility == .privateUntilRevealed {
+                                    confirmReveal = true
+                                } else {
+                                    visibility = newValue ? .privateUntilRevealed : .sharedImmediately
+                                }
+                            }))
                             .disabled(visibilityLocked)
                             .padding(.horizontal, 14).padding(.vertical, 8)
                     }
@@ -113,6 +122,12 @@ struct QuickLedgerSheet: View {
                     }
                     photoDatas = datas
                 }
+            }
+            .alert("公开给 TA？", isPresented: $confirmReveal) {
+                Button("公开") { visibility = .sharedImmediately }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("公开后 TA 会看到这条，且不可撤回。")
             }
             .onAppear(perform: loadIfNeeded)
         }
