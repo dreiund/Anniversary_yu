@@ -93,7 +93,7 @@ struct SettingsView: View {
                         GroupedRow(title: "经期归属", value: trackedPartnerName, valueColor: DS.actionBlue)
                     }
                     .buttonStyle(.plain)
-                    Toggle("足迹日历经期底色", isOn: $footprintsCycleTintOn)
+                    Toggle("足迹日历周期底色", isOn: $footprintsCycleTintOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
 

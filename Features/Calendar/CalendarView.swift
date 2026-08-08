@@ -125,6 +125,23 @@ struct CalendarView: View {
         return result
     }
 
+    /// 排卵窗（反馈⑥ T6）：ovulationWindows 展开天数/排卵日集合，经期优先在 cell 渲染层处理（同受 cycleTintOn 控制）
+    private var ovulationWindows: [OvulationWindow] {
+        let inputs = cyclesFetch.compactMap { c -> (start: Date, end: Date?)? in
+            c.startDate.map { ($0, c.endDate) }
+        }
+        let prediction = CyclePredictor.predict(cycles: inputs, calendar: cal)
+        return CyclePredictor.ovulationWindows(cycles: inputs, nextStarts: prediction.nextStarts, calendar: cal)
+    }
+
+    private var ovulationDaySet: Set<Date> {
+        Set(ovulationWindows.flatMap(\.days))
+    }
+
+    private var ovulationFlowerDaySet: Set<Date> {
+        Set(ovulationWindows.map(\.ovulationDay))
+    }
+
     private var calendarCard: some View {
         VStack(spacing: 6) {
             HStack {
@@ -135,10 +152,15 @@ struct CalendarView: View {
             }
             let cells = projectedCells
             let cycleDays = cycleDaySet
+            let ovulationDays = ovulationDaySet
+            let ovulationFlowerDays = ovulationFlowerDaySet
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7),
                       spacing: 4) {
                 ForEach(cells, id: \.day) { cell in
-                    CalendarDayCell(cell: cell, isCycleDay: cycleTintOn && cycleDays.contains(cell.day))
+                    CalendarDayCell(cell: cell,
+                                    isCycleDay: cycleTintOn && cycleDays.contains(cell.day),
+                                    isOvulationDay: cycleTintOn && ovulationDays.contains(cell.day),
+                                    isOvulationFlower: cycleTintOn && ovulationFlowerDays.contains(cell.day))
                         .contentShape(Rectangle())
                         .onTapGesture { if cell.inMonth { onDayTap(cell.day, mode) } }
                 }
@@ -196,6 +218,8 @@ struct CalendarView: View {
 struct CalendarDayCell: View {
     let cell: CalCell
     var isCycleDay: Bool = false
+    var isOvulationDay: Bool = false
+    var isOvulationFlower: Bool = false
 
     var body: some View {
         VStack(spacing: 1) {
@@ -218,6 +242,9 @@ struct CalendarDayCell: View {
             .frame(height: 11)
             Circle().fill(DS.ink).frame(width: 3.5, height: 3.5)
                 .opacity(cell.hasMoment ? 1 : 0)
+            if isOvulationFlower {
+                Text("🌸").font(.system(size: 6))
+            }
         }
         .frame(height: 44)
         .frame(maxWidth: .infinity)
@@ -226,6 +253,8 @@ struct CalendarDayCell: View {
             ZStack {
                 if isCycleDay {
                     RoundedRectangle(cornerRadius: 8).fill(DS.roseCell)
+                } else if isOvulationDay {
+                    RoundedRectangle(cornerRadius: 8).fill(DS.ovulationBg)
                 }
                 bandBackground
             }

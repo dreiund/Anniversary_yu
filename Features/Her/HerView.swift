@@ -156,7 +156,7 @@ struct HerView: View {
         let inputs = couples.first.map { repo.cyclesSorted(couple: $0) }?.compactMap {
             c -> (start: Date, end: Date?)? in c.startDate.map { ($0, c.endDate) }
         } ?? []
-        let base = "左右滑动换月 · 浅红=经期 · 虚线=预测 · 墨环=今天"
+        let base = "左右滑动换月 · 浅红=经期 · 虚线=预测 · 墨环=今天 · 紫=排卵期"
         return CyclePredictor.predict(cycles: inputs, calendar: cal).isDefault && !inputs.isEmpty
             ? base + " · 数据积累中" : base
     }
@@ -202,6 +202,17 @@ struct HerView: View {
                       interval.contains(day), day > today,
                       result[day]?.inPeriod != true else { continue }
                 result[day, default: CycleDayMarks()].predicted = true
+            }
+        }
+        for window in CyclePredictor.ovulationWindows(cycles: inputs, nextStarts: prediction.nextStarts,
+                                                       calendar: cal) {
+            for day in window.days where interval.contains(day) {
+                if result[day]?.inPeriod != true {
+                    result[day, default: CycleDayMarks()].ovulation = true
+                }
+            }
+            if interval.contains(window.ovulationDay), result[window.ovulationDay]?.inPeriod != true {
+                result[window.ovulationDay, default: CycleDayMarks()].isOvulationDay = true
             }
         }
         if let couple = couples.first {

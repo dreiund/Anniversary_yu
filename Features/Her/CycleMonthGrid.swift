@@ -5,6 +5,8 @@ enum CycleIntimacyMark { case none, protected, unprotected }
 struct CycleDayMarks {
     var inPeriod = false
     var predicted = false
+    var ovulation = false
+    var isOvulationDay = false
     var painRaw: Int16 = 0
     var flowRaw: Int16 = 0
     var colorRaw: Int16 = 0
@@ -47,7 +49,10 @@ struct CycleMonthGrid: View {
         return VStack(spacing: 2) {
             Text("\(cal.component(.day, from: day))")
                 .font(.system(size: 13, weight: m.inPeriod ? .semibold : .regular))
-                .foregroundStyle(m.inPeriod || m.predicted ? DS.roseCycle : DS.ink)
+                .foregroundStyle(m.inPeriod || m.predicted ? DS.roseCycle : (m.ovulation ? DS.ovulationInk : DS.ink))
+            if m.isOvulationDay {
+                Text("🌸").font(.system(size: 7))
+            }
             HStack(spacing: 2) {
                 dot(for: m.painRaw)
                 dot(for: m.flowRaw)
@@ -61,6 +66,8 @@ struct CycleMonthGrid: View {
         .background {
             if m.inPeriod {
                 RoundedRectangle(cornerRadius: 9).fill(DS.roseCell)
+            } else if m.ovulation {
+                RoundedRectangle(cornerRadius: 9).fill(DS.ovulationBg)
             } else if m.predicted {
                 RoundedRectangle(cornerRadius: 9)
                     .stroke(DS.roseCycle, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))

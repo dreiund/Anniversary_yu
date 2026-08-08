@@ -39,6 +39,8 @@ enum DS {
     static let bandBlue = Color(hex: 0xEDF4FC)   // 日历见面带淡蓝（P3 spec §3.1）
     static let rosePale = Color(hex: 0xFDF1EF)   // 她页横幅/粉卡底（P5）
     static let roseCell = Color(hex: 0xF8E3DF)   // 经期天格浅粉底（P5，实红改浅红保四点可辨）
+    static let ovulationBg = Color(hex: 0xF0E6FA)   // 排卵期淡紫底（反馈⑥）
+    static let ovulationInk = Color(hex: 0x8E44AD)  // 排卵期紫字（反馈⑥）
 
     enum Spacing {
         static let xxs: CGFloat = 4
