@@ -183,4 +183,16 @@ final class MeetingEditTests: XCTestCase {
         try repo.start(m, at: Date(timeIntervalSince1970: 100))
         XCTAssertThrowsError(try repo.deletePlanned(m))
     }
+
+    func testPlanItemRemindAtPersists() throws {
+        let (pc, couple) = try makeCouple()
+        let meetings = MeetingRepository(context: pc.viewContext)
+        let m = try meetings.createPlanned(couple: couple, title: nil, city: nil, plannedStart: nil, plannedEnd: nil)
+        let plans = PlanItemRepository(context: pc.viewContext)
+        let item = try plans.add(to: m, day: nil, time: nil, title: "买票", note: nil,
+                                 placeText: nil, authorID: nil, remindAt: Date(timeIntervalSince1970: 500))
+        XCTAssertEqual(item.remindAt, Date(timeIntervalSince1970: 500))
+        try plans.update(item, day: nil, time: nil, title: "买票", note: nil, placeText: nil, remindAt: nil)
+        XCTAssertNil(item.remindAt)
+    }
 }

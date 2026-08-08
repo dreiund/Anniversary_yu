@@ -94,7 +94,7 @@ struct PlanItemFormSheet: View {
         let placeValue = placeText.isEmpty ? nil : placeText
         if let item {
             try? repo.update(item, day: dayValue, time: timeValue, title: title,
-                             note: noteValue, placeText: placeValue)
+                             note: noteValue, placeText: placeValue, remindAt: item.remindAt)
         } else {
             let couples = CoupleRepository(context: context)
             let authorID = (try? couples.fetchCouple()).flatMap { couples.currentPartnerID(of: $0) }
