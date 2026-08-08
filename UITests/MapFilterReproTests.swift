@@ -181,6 +181,26 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "H3-统计页")
     }
 
+    /// 反馈⑥：今天卡 / 记得做段 / 她月历紫窗
+    @MainActor
+    func testRound6Look() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["📌 帮她带充电宝"].waitForExistence(timeout: 10), "今天卡未出现")
+        attach(app, name: "R1-今天卡")
+
+        app.buttons["小本本"].tap()
+        app.buttons["记得做"].tap()
+        XCTAssertTrue(app.staticTexts["📌 我做"].waitForExistence(timeout: 3), "记得做段未出现")
+        attach(app, name: "R2-记得做段")
+
+        app.buttons["她"].tap()
+        sleep(2)
+        attach(app, name: "R3-她月历紫窗")
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())

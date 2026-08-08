@@ -89,6 +89,19 @@ enum DebugSeeder {
                                        note: nil, now: Date(), calendar: cal)
         _ = try? cycleRepo.addIntimacy(couple: couple, day: day(-3), protected: false,
                                        note: nil, now: Date(), calendar: cal)
+
+        // 记得做种子：我做一条今天到期 + Ta做一条私密（今天卡/第四段/🔒 演示）
+        let todoRepo = TodoRepository(context: context)
+        let myID = coupleRepo.currentPartnerID(of: couple)
+        let herID = CoupleRepository(context: context).otherPartner(of: couple)?.id
+        _ = try? todoRepo.create(couple: couple, title: "帮她带充电宝", detail: nil,
+                                 dueAt: Date(), assigneeID: myID, authorID: herID,
+                                 visibility: .sharedImmediately, place: nil, remindAt: nil,
+                                 calendar: cal)
+        _ = try? todoRepo.create(couple: couple, title: "查演出票", detail: "周五开票",
+                                 dueAt: day(3), assigneeID: herID, authorID: myID,
+                                 visibility: .privateUntilRevealed, place: nil, remindAt: nil,
+                                 calendar: cal)
     }
 
     /// 清空整库：逐实体逐对象删除。CloudKit 店不支持 NSBatchDeleteRequest（绕过历史追踪会被拒），

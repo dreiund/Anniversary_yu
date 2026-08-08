@@ -16,6 +16,8 @@
 3. 取消勾选该参数。
 4. 浏览器打开 https://icloud.developer.apple.com → 容器 `iCloud.com.fkc.anniversary` → 左下 **Deploy Schema Changes…** → 从 Development 部署到 **Production**。看到 CD 开头的 15 个记录类型全被带上即确认。
 
+> 反馈⑥ 起新增 CDTodoItem 实体与 CDPlanItem.remindAt 字段：发布含此改动的构建前，重跑一次本节（-InitCloudKitSchema → Deploy to Production，增量、老数据不动）。
+
 ## 二、App Store Connect 建 App
 
 1. https://appstoreconnect.apple.com → 我的 App → ＋ → 新建 App。
