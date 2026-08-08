@@ -68,7 +68,7 @@ final class PersistenceController {
         container.viewContext.transactionAuthor = Self.localTransactionAuthor
 
         #if DEBUG
-        // 一次性动作：Xcode scheme 勾选 -InitCloudKitSchema 跑一次，把 15 个实体的
+        // 一次性动作：Xcode scheme 勾选 -InitCloudKitSchema 跑一次，把 16 个实体的
         // 记录类型全量推到 CloudKit Development 环境（含 P4/P5 未产生数据的实体），
         // 之后在 CloudKit Console 部署到 Production。见 docs/RELEASE.md。
         if ProcessInfo.processInfo.arguments.contains("-InitCloudKitSchema") {

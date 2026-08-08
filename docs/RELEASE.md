@@ -12,9 +12,9 @@
 ## 一、CloudKit schema：初始化（Development）→ 部署（Production）
 
 1. Xcode 打开工程 → 顶部 scheme「Anniversary」→ Edit Scheme… → Run → Arguments，勾选已预置的 `-InitCloudKitSchema`。
-2. 用**你的 iPhone**（已登录你的 iCloud）⌘R 跑一次，控制台见 `✅ CloudKit schema 初始化完成（Development 环境）`。它会把 15 个实体的记录类型一次性建全（含 P4/P5 还没数据的实体——一次部署，后面阶段不用再来）。
+2. 用**你的 iPhone**（已登录你的 iCloud）⌘R 跑一次，控制台见 `✅ CloudKit schema 初始化完成（Development 环境）`。它会把 16 个实体的记录类型一次性建全（含 P4/P5 还没数据的实体；反馈⑥ 起含 CDTodoItem）。
 3. 取消勾选该参数。
-4. 浏览器打开 https://icloud.developer.apple.com → 容器 `iCloud.com.fkc.anniversary` → 左下 **Deploy Schema Changes…** → 从 Development 部署到 **Production**。看到 CD 开头的 15 个记录类型全被带上即确认。
+4. 浏览器打开 https://icloud.developer.apple.com → 容器 `iCloud.com.fkc.anniversary` → 左下 **Deploy Schema Changes…** → 从 Development 部署到 **Production**。看到 CD 开头的 16 个记录类型全被带上即确认。
 
 > 反馈⑥ 起新增 CDTodoItem 实体与 CDPlanItem.remindAt 字段：发布含此改动的构建前，重跑一次本节（-InitCloudKitSchema → Deploy to Production，增量、老数据不动）。
 
