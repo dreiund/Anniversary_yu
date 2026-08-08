@@ -57,7 +57,9 @@ struct PlanView: View {
                                     SwipeDeleteRow(id: item.objectID, openID: $openSwipeID,
                                                    buttonWidth: 56, cornerRadius: 10,
                                                    buttonInset: 4, showsLabel: false) {
+                                        let id = item.id
                                         try? PlanItemRepository(context: context).delete(item)
+                                        if let id { ReminderScheduler.cancelPlans([id]) }
                                     } content: {
                                         planRow(item)
                                     }
@@ -127,7 +129,9 @@ struct PlanView: View {
                 let picked = selected.compactMap {
                     try? context.existingObject(with: $0) as? CDPlanItem
                 }
+                let ids = picked.compactMap(\.id)
                 try? PlanItemRepository(context: context).delete(picked)
+                ReminderScheduler.cancelPlans(ids)
                 selected = []
                 selecting = false
             }
@@ -236,7 +240,9 @@ struct PlanView: View {
         .contextMenu {
             Button("编辑") { editingItem = item }
             Button("删除", role: .destructive) {
+                let id = item.id
                 try? PlanItemRepository(context: context).delete(item)
+                if let id { ReminderScheduler.cancelPlans([id]) }
             }
         }
     }

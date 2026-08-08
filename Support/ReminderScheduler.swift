@@ -30,4 +30,10 @@ enum ReminderScheduler {
     static func cancel(id: String) {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
     }
+
+    /// 批量取消日程提醒（删除路径统一入口，spec §五「删除条目→取消」）：
+    /// 调用方须在删除保存前收集受影响 CDPlanItem 的 id，删除保存后再传入本函数。
+    static func cancelPlans(_ ids: [UUID]) {
+        ids.forEach { cancel(id: ReminderPlanner.planID($0)) }
+    }
 }

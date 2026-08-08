@@ -196,6 +196,18 @@ final class MapFilterReproTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["📌 我做"].waitForExistence(timeout: 3), "记得做段未出现")
         attach(app, name: "R2-记得做段")
 
+        // R4：记得做表单开关态。⊕ 弹层里的「记得做」格是图标+文字合成的无障碍标签，坐标/标签定位都不稳，
+        // 降级走更稳的路径：点自己写的条目（"查演出票"，种子里 authorID=我，可编辑）直接进编辑表单截同款。
+        let myTodo = app.staticTexts["查演出票"]
+        XCTAssertTrue(myTodo.waitForExistence(timeout: 3), "自建记得做条目未出现")
+        myTodo.tap()
+        XCTAssertTrue(app.navigationBars["编辑记得做"].waitForExistence(timeout: 3), "记得做编辑表单未弹出")
+        XCTAssertTrue(app.switches["私密"].waitForExistence(timeout: 2) || app.staticTexts["私密"].exists,
+                      "私密开关未出现")
+        attach(app, name: "R4-表单开关态")
+        app.buttons["取消"].tap()
+        sleep(1)
+
         app.buttons["她"].tap()
         sleep(2)
         attach(app, name: "R3-她月历紫窗")

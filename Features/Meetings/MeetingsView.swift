@@ -69,7 +69,9 @@ struct MeetingsView: View {
         .alert("删除所选 \(selected.count) 项？", isPresented: $confirmBatch) {
             Button("删除所选", role: .destructive) {
                 let picked = meetings.filter { selected.contains($0.objectID) }
+                let ids = picked.flatMap { (($0.planItems as? Set<CDPlanItem>) ?? []).compactMap(\.id) }
                 try? MeetingRepository(context: context).delete(Array(picked))
+                ReminderScheduler.cancelPlans(ids)
                 selected = []
                 selecting = false
             }
@@ -89,7 +91,9 @@ struct MeetingsView: View {
                                     set: { if !$0 { pendingDelete = nil } })) {
             Button(deleteIsPlanned ? "删除计划" : "删除见面", role: .destructive) {
                 if let meeting = pendingDelete {
+                    let ids = ((meeting.planItems as? Set<CDPlanItem>) ?? []).compactMap(\.id)
                     try? MeetingRepository(context: context).delete(meeting)
+                    ReminderScheduler.cancelPlans(ids)
                 }
                 pendingDelete = nil
             }

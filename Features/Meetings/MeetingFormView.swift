@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreData
 
 enum MeetingFormMode {
     case create(CDCouple)
@@ -87,7 +88,9 @@ struct MeetingFormView: View {
             .alert("删除这次计划？", isPresented: $confirmDelete) {
                 Button("删除计划", role: .destructive) {
                     if let m = editingMeeting {
+                        let ids = ((m.planItems as? Set<CDPlanItem>) ?? []).compactMap(\.id)
                         try? MeetingRepository(context: context).deletePlanned(m)
+                        ReminderScheduler.cancelPlans(ids)
                     }
                     dismiss()
                 }
