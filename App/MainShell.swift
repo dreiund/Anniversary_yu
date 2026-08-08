@@ -27,6 +27,7 @@ struct MainShell: View {
         case seal(CDMeeting)
         case ledgerForm
         case quickLedger
+        case todoForm
         case cycleDay(CycleSheetSegment)
         case trackedPicker
 
@@ -37,6 +38,7 @@ struct MainShell: View {
             case .seal: "seal"
             case .ledgerForm: "ledgerForm"
             case .quickLedger: "quickLedger"
+            case .todoForm: "todoForm"
             case .cycleDay: "cycleDay"
             case .trackedPicker: "trackedPicker"
             }
@@ -87,6 +89,10 @@ struct MainShell: View {
                 if let couple = try? CoupleRepository(context: context).fetchCouple() {
                     QuickLedgerSheet(mode: .create(couple))
                 }
+            case .todoForm:
+                if let couple = try? CoupleRepository(context: context).fetchCouple() {
+                    TodoFormView(mode: .create(couple))
+                }
             case .cycleDay(let segment):
                 if let couple = try? CoupleRepository(context: context).fetchCouple() {
                     CycleDaySheet(couple: couple,
@@ -122,11 +128,12 @@ struct MainShell: View {
             activeSheet = .ledgerForm
         case .quickEntry:
             activeSheet = .quickLedger
-        case .intimacy, .cycle:
-            let segment: CycleSheetSegment = action == .intimacy ? .intimacy : .period
+        case .todo:
+            activeSheet = .todoForm
+        case .cycle:
             if let couple = try? CoupleRepository(context: context).fetchCouple(),
                CycleRepository(context: context).trackedPartner(couple: couple) != nil {
-                activeSheet = .cycleDay(segment)
+                activeSheet = .cycleDay(.period)
             } else {
                 activeSheet = .trackedPicker
             }

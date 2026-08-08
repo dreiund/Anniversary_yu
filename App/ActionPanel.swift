@@ -6,7 +6,7 @@ enum PanelAction {
     case seal
     case ledgerEntry
     case quickEntry
-    case intimacy
+    case todo
     case cycle
 }
 
@@ -26,7 +26,7 @@ struct ActionPanel: View {
             Tile(symbol: "square.and.pencil", title: "互评", action: .ledgerEntry),
             Tile(symbol: "face.smiling", title: "心情", action: .mood),
             Tile(symbol: "heart", title: "喜怒", action: .quickEntry),
-            Tile(symbol: "sparkles", title: "亲密", action: .intimacy),
+            Tile(symbol: "checkmark.circle", title: "记得做", action: .todo),
             Tile(symbol: "drop", title: "经期", action: .cycle),
         ]
     }
