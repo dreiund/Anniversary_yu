@@ -235,9 +235,10 @@ struct TimelineListView: View {
     /// 非管理模式左滑删除,点卡片按三态分流(todo=编辑成回忆/missed=带坐标弹小地图/prepared=纯记录不可点)。
     @ViewBuilder
     private func planRow(_ item: CDPlanItem, state: PlanCardState) -> some View {
-        let card = PlanTodoCard(item: item, state: state) {
-            convert(item)
-        }
+        // 反馈⑧修(评审 Important):管理模式下计划卡纯展示——onToggle 冻结为 nil 且整卡 disabled,
+        // 待办圈不可误触转化(手滑点到圈不再静默创建回忆/删计划);非管理模式才接上真实转化回调
+        let card = PlanTodoCard(item: item, state: state, onToggle: selecting ? nil : { convert(item) })
+            .disabled(selecting)
         if selecting {
             card
         } else {
