@@ -135,16 +135,22 @@ struct MeetingDetailView: View {
         .sheet(isPresented: $showEditForm) { MeetingFormView(mode: .edit(meeting)) }
         // 反馈⑨T4:备忘侧签——挂在这一层(时间线 ScrollView 的容器外)才能常驻不随滚动消失；
         // 只在「时间线」分段且有备忘时露出，路线图/计划分段不出现
+        // 反馈⑨T4修(评审 Moderate,spec §一):侧签要竖排书签样式——汉字逐字竖排，数字压在最下面
         .overlay(alignment: .leading) {
             if segment == 0 && !memos.isEmpty {
                 Button { showMemos = true } label: {
-                    Text("备忘 \(memos.count)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.vertical, 10).padding(.horizontal, 5)
-                        .background(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
-                                                           bottomTrailingRadius: 8, topTrailingRadius: 8)
-                            .fill(DS.ink))
+                    VStack(spacing: 2) {
+                        ForEach(Array("备忘"), id: \.self) { ch in
+                            Text(String(ch))
+                        }
+                        Text("\(memos.count)")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 10).padding(.horizontal, 5)
+                    .background(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
+                                                       bottomTrailingRadius: 8, topTrailingRadius: 8)
+                        .fill(DS.ink))
                 }
                 .buttonStyle(DSPressEffect())
             }

@@ -56,6 +56,7 @@ struct TimelineListView: View {
         let allPlans = showPlans ? Array(plansFetch) : []
         // 反馈⑨T4:备忘(day == nil)从主时间线剥离——已备组/散插/tail/灰卡从此只含日程；
         // 备忘改在 MeetingDetailView 的左缘侧签弹窗里独立展示(纯划线,永不转化，见 MemoListSheet)
+        let memos = allPlans.filter { $0.day == nil }
         let prepared = allPlans.filter { $0.day != nil }.filter(\.isDone).sorted { $0.sortIndex < $1.sortIndex }
         let pendingPlans = allPlans.filter { $0.day != nil }.filter { !$0.isDone }
         // 散插:时刻落在某个已有天的自然日内 → 进那天;其余(未来/备忘)→ 尾组
@@ -77,7 +78,9 @@ struct TimelineListView: View {
             }
 
         LazyVStack(alignment: .leading, spacing: DS.Spacing.md) {
-            if grouped.isEmpty && prepared.isEmpty && pendingPlans.isEmpty {
+            // 反馈⑨T4修(评审 Low):空态判断纳入 memos——只有备忘时,侧签已经露出「备忘 N」,
+            // 主时间线不该再喊「还没有记录」制造矛盾
+            if grouped.isEmpty && prepared.isEmpty && pendingPlans.isEmpty && memos.isEmpty {
                 Text("还没有记录 · 点底栏 ⊕ 记下第一条")
                     .dsCaption()
                     .frame(maxWidth: .infinity)
@@ -327,41 +330,21 @@ struct TimelineListView: View {
 /// 这正是与待办卡的本质区别:待办卡点圈/点卡都是"补全表单→转成记忆"，备忘卡打勾只是划掉。
 /// 由 MeetingDetailView 持有 showMemos 状态并挂在 ScrollView 容器层展示(侧签始终可见不随时间线滚走)，
 /// memos 由调用方算好传入，这里只管渲染与增删改。
+/// 反馈⑨T4修(评审 Moderate):行样式与 PlanView.memoRow 对齐(标题 14pt/勾钮 DSPressEffect/备注单行)，
+/// 并补上长按 contextMenu「编辑」——此前只能删除重建,改个错字都做不到。
 struct MemoListSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     let meeting: CDMeeting
     let memos: [CDPlanItem]
     @State private var memoAddSheet = false
+    @State private var editingItem: CDPlanItem?
 
     var body: some View {
         NavigationStack {
             List {
                 ForEach(memos, id: \.objectID) { item in
-                    HStack(spacing: 10) {
-                        Button {
-                            try? PlanItemRepository(context: context).toggleDone(item)
-                            if item.isDone, let id = item.id {
-                                ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
-                            }
-                        } label: {
-                            Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 20))
-                                .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
-                        }
-                        .buttonStyle(.plain)
-                        Text(item.title ?? "")
-                            .strikethrough(item.isDone, color: DS.inkMuted)
-                            .foregroundStyle(item.isDone ? DS.inkMuted : DS.ink)
-                        if let note = item.note, !note.isEmpty { Text(note).dsFootnote() }
-                    }
-                    .swipeActions {
-                        Button("删除", role: .destructive) {
-                            let id = item.id
-                            try? PlanItemRepository(context: context).delete(item)
-                            if let id { ReminderScheduler.cancelPlans([id]) }
-                        }
-                    }
+                    memoRow(item)
                 }
             }
             .listStyle(.plain)
@@ -377,6 +360,44 @@ struct MemoListSheet: View {
         .presentationDetents([.medium, .large])
         .sheet(isPresented: $memoAddSheet) {
             PlanItemFormSheet(meeting: meeting, item: nil, initialMode: .memo)
+        }
+        // initialMode 留空:item.day == nil 已经让 PlanItemFormSheet 自动判成备忘模式(同 PlanView.editingItem 用法)
+        .sheet(item: $editingItem) { PlanItemFormSheet(meeting: meeting, item: $0) }
+    }
+
+    private func memoRow(_ item: CDPlanItem) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                try? PlanItemRepository(context: context).toggleDone(item)
+                if item.isDone, let id = item.id {
+                    ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+                }
+            } label: {
+                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
+            }
+            .buttonStyle(DSPressEffect())
+            Text(item.title ?? "")
+                .font(.system(size: 14))
+                .strikethrough(item.isDone, color: DS.inkMuted)
+                .foregroundStyle(item.isDone ? DS.inkMuted : DS.ink)
+            if let note = item.note, !note.isEmpty { Text(note).dsFootnote().lineLimit(1) }
+        }
+        .swipeActions {
+            Button("删除", role: .destructive) {
+                let id = item.id
+                try? PlanItemRepository(context: context).delete(item)
+                if let id { ReminderScheduler.cancelPlans([id]) }
+            }
+        }
+        .contextMenu {
+            Button("编辑") { editingItem = item }
+            Button("删除", role: .destructive) {
+                let id = item.id
+                try? PlanItemRepository(context: context).delete(item)
+                if let id { ReminderScheduler.cancelPlans([id]) }
+            }
         }
     }
 }
