@@ -159,6 +159,7 @@ enum ModelSchema {
             attr("startDate", .dateAttributeType),
             attr("endDate", .dateAttributeType),
             attr("predictedStartAtLogging", .dateAttributeType),
+            attr("authorPartnerID", .UUIDAttributeType),
         ])
 
         let cycleLog = entity("CDCycleDayLog", CDCycleDayLog.self, [

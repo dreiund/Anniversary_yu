@@ -18,6 +18,8 @@
 
 > 反馈⑥ 起新增 CDTodoItem 实体与 CDPlanItem.remindAt 字段：发布含此改动的构建前，重跑一次本节（-InitCloudKitSchema → Deploy to Production，增量、老数据不动）。
 
+> P6-T2 起 CDCycle 新增 `authorPartnerID` 字段（一字段增量，无新实体）：上传 1.0.0 构建前重跑一次本节（-InitCloudKitSchema → Deploy to Production，增量、老数据不动，旧 CDCycle 记录该字段留空按「响」处理不受影响）。
+
 ## 二、App Store Connect 建 App
 
 1. https://appstoreconnect.apple.com → 我的 App → ＋ → 新建 App。

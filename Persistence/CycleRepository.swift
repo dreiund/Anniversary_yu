@@ -39,6 +39,7 @@ struct CycleRepository {
         cycle.id = UUID()
         cycle.startDate = d
         cycle.predictedStartAtLogging = predictedStart
+        cycle.authorPartnerID = CoupleRepository(context: context).currentPartnerID(of: couple)
         cycle.couple = couple
         try context.save()
         return cycle
@@ -66,6 +67,7 @@ struct CycleRepository {
         cycle.id = UUID()
         cycle.startDate = s
         cycle.endDate = e
+        cycle.authorPartnerID = CoupleRepository(context: context).currentPartnerID(of: couple)
         cycle.couple = couple                                  // 无当时预测：predictedStartAtLogging 留空
         try context.save()
         return cycle

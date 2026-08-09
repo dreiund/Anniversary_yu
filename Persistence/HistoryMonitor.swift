@@ -114,9 +114,11 @@ final class HistoryMonitor {
                 }
 
                 if isCycleEnabled(), !cycleIDs.isEmpty {
+                    let me = myPartnerID(context)
                     let started = cycleIDs.contains { id in
                         guard let cycle = try? context.existingObject(with: id) as? CDCycle else { return false }
-                        return Self.cycleNotifiable(endDate: cycle.endDate)
+                        return Self.cycleNotifiable(endDate: cycle.endDate,
+                                                    authorPartnerID: cycle.authorPartnerID, myID: me)
                     }
                     if started { notifier.notifyCycleStart() }
                 }
@@ -141,6 +143,11 @@ final class HistoryMonitor {
         return visibilityRaw == EntryVisibility.sharedImmediately.rawValue || revealedAt != nil
     }
 
-    /// 只有「经期开始」（endDate 为空的插入）才提醒；补录起止俱全不惊动（spec §六）
-    nonisolated static func cycleNotifiable(endDate: Date?) -> Bool { endDate == nil }
+    /// 只有「经期开始」（endDate 为空的插入）才提醒；补录起止俱全不惊动（spec §六）。
+    /// P6-T2：作者是本机（含自己的第二台设备）不响；author 为 nil（旧数据）仍响，不静默。
+    nonisolated static func cycleNotifiable(endDate: Date?, authorPartnerID: UUID?, myID: UUID?) -> Bool {
+        guard endDate == nil else { return false }
+        if let author = authorPartnerID, let myID, author == myID { return false }
+        return true
+    }
 }

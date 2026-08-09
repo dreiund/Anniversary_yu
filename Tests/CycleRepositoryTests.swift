@@ -25,6 +25,8 @@ final class CycleRepositoryTests: XCTestCase {
         XCTAssertEqual(c.startDate, cal.startOfDay(for: d(10)))
         XCTAssertNil(c.endDate)
         XCTAssertEqual(c.predictedStartAtLogging, d(9))
+        // P6-T2：创建时写入当前 partnerID 作者
+        XCTAssertEqual(c.authorPartnerID, CoupleRepository(context: pc.viewContext).currentPartnerID(of: couple))
         XCTAssertNotNil(repo.ongoing(couple: couple))
         XCTAssertThrowsError(try repo.start(couple: couple, on: d(12), predictedStart: nil,
                                             today: d(12), calendar: cal)) {
@@ -69,6 +71,8 @@ final class CycleRepositoryTests: XCTestCase {
 
     func testContainingAndUpdateRangeAndDeleteCascadesLogs() throws {
         let c = try repo.backfill(couple: couple, start: d(10), end: d(15), today: d(50), calendar: cal)
+        // P6-T2：补录同样写入当前 partnerID 作者
+        XCTAssertEqual(c.authorPartnerID, CoupleRepository(context: pc.viewContext).currentPartnerID(of: couple))
         XCTAssertNotNil(repo.cycle(containing: d(12), couple: couple, calendar: cal))
         XCTAssertNil(repo.cycle(containing: d(16), couple: couple, calendar: cal))
         try repo.updateRange(c, start: d(11), end: d(16), calendar: cal)
