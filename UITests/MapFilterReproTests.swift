@@ -192,8 +192,9 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "R1-今天卡")
 
         app.buttons["小本本"].tap()
-        app.buttons["记得做"].tap()
-        XCTAssertTrue(app.staticTexts["📌 我做"].waitForExistence(timeout: 3), "记得做段未出现")
+        // 反馈⑨T6:小本本新壳段名「记得做」→「待办」，且不再分「📌 我做/Ta做」两组（平列表+筛选行）
+        app.buttons["待办"].tap()
+        XCTAssertTrue(app.staticTexts["帮她带充电宝"].waitForExistence(timeout: 3), "待办段条目未出现")
         attach(app, name: "R2-记得做段")
 
         // R4：记得做表单开关态。⊕ 弹层里的「记得做」格是图标+文字合成的无障碍标签，坐标/标签定位都不稳，
@@ -234,7 +235,9 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "S2-单钉抽屉")
     }
 
-    /// 反馈⑧:计划→回忆转化流水线(已备卡/待办卡/点圈转化/点卡编辑转化/结束后灰卡)
+    /// 反馈⑧:计划→回忆转化流水线(已备卡/待办卡/点圈开表单转化/结束后灰卡)
+    /// 反馈⑨T4改造:备忘(day==nil)已从主时间线剥离，只在左缘侧签弹窗展示，永不转化(§一)；
+    /// 待办圈不再秒转化，点圈打开「补全这段回忆」预填表单，存储才转化(§二 2A)。
     @MainActor
     func testRound8PlanFlow() throws {
         let app = XCUIApplication()
@@ -244,42 +247,91 @@ final class MapFilterReproTests: XCTestCase {
         let card = app.staticTexts["上海"]
         XCTAssertTrue(card.waitForExistence(timeout: 8), "进行中卡未出现")
         card.tap()
-        // 进行中:行前已备 + 待办卡 + 接下来组(两条备忘:给她妈带特产/买伴手礼)
+        // 进行中:行前已备 + 待办卡；备忘(给她妈带特产/买伴手礼)已被 T4 剥离出主时间线卡流，
+        // 不再有「接下来 · 还没做」组里的备忘卡
         XCTAssertTrue(app.staticTexts["行前已备 · 1"].waitForExistence(timeout: 5), "已备组未出现")
         XCTAssertTrue(app.staticTexts["买火车票"].exists, "已备划线卡未出现")
-        XCTAssertTrue(app.staticTexts["接下来 · 还没做"].exists, "接下来组未出现")
-        XCTAssertTrue(app.staticTexts["给她妈带特产"].exists, "备忘待办未出现")
-        XCTAssertTrue(app.staticTexts["买伴手礼"].exists, "第二条备忘待办未出现")
         // 「计划」chip 应已消失(进行中)
         XCTAssertFalse(app.buttons["计划"].exists, "进行中不应再有计划 chip")
+        // 反馈⑨T4:备忘剥离进左缘侧签——竖排书签是「备」「忘」「N」三个独立 Text 拼成一个按钮，
+        // 系统无障碍把子 Text 的 label 用「, 」拼接成整按钮的组合 label（实测导出视图树确认，
+        // 不是简单的「备忘 N」一句话）；种子 2 条备忘 = 给她妈带特产+买伴手礼
+        // （「买火车票」day != nil 走「行前已备」，不算备忘——见 DebugSeeder.swift 的 T7 注释）
+        let memoTab = app.buttons["备, 忘, 2"]
+        XCTAssertTrue(memoTab.waitForExistence(timeout: 5), "备忘侧签未出现")
         attach(app, name: "R8-1-进行中时间线")
-        // 点圈秒转化「去码头拍日落」(今天全天待办,散插在今天组)
+        // tap 侧签 → 半屏弹窗，备忘条目在里面，纯划线不转化
+        memoTab.tap()
+        XCTAssertTrue(app.navigationBars["备忘"].waitForExistence(timeout: 3), "备忘弹窗未弹出")
+        XCTAssertTrue(app.staticTexts["给她妈带特产"].exists, "备忘弹窗条目未出现")
+        attach(app, name: "R8-1b-备忘侧签弹窗")
+        app.buttons["关闭"].tap()
+        sleep(1)
+        // 点圈(反馈⑨T2A：不再秒转化)→ 打开「补全这段回忆」表单，预填标题，点「存储」才转化
         let toggle = app.buttons["划掉 去码头拍日落"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 3), "待办圈未出现")
         toggle.tap()
+        XCTAssertTrue(app.navigationBars["补全这段回忆"].waitForExistence(timeout: 3), "补全这段回忆表单未弹出")
+        let titleField = app.textFields["如 蟹家大院"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 2), "标题栏未出现")
+        XCTAssertEqual(titleField.value as? String, "去码头拍日落", "标题栏未预填")
+        app.buttons["存储"].tap()
         sleep(1)
         XCTAssertFalse(app.buttons["划掉 去码头拍日落"].exists, "转化后圈应消失")
         XCTAssertTrue(app.staticTexts["去码头拍日落"].exists, "转化后的记忆卡不见了")
         attach(app, name: "R8-2-转化后")
-        // 点「给她妈带特产」待办卡的卡片正文(不是圆圈)→ 编辑转化路径:预填「补全这段回忆」表单,存储即转化
-        app.staticTexts["给她妈带特产"].tap()
-        XCTAssertTrue(app.navigationBars["补全这段回忆"].waitForExistence(timeout: 3), "补全这段回忆表单未弹出")
-        let titleField = app.textFields["如 蟹家大院"]
-        XCTAssertTrue(titleField.waitForExistence(timeout: 2), "标题栏未出现")
-        XCTAssertEqual(titleField.value as? String, "给她妈带特产", "标题栏未预填")
-        app.buttons["存储"].tap()
-        sleep(1)
-        XCTAssertFalse(app.buttons["划掉 给她妈带特产"].exists, "编辑转化后圈应消失")
-        XCTAssertTrue(app.staticTexts["给她妈带特产"].exists, "编辑转化后的记忆卡不见了")
-        attach(app, name: "R8-2b-编辑转化")
-        // 结束见面 → 灰卡(买伴手礼没被转化,留到结束后)
+        // 结束见面 → 灰卡(江边看夜景是种子里唯一未转化的真日程，才会落"没做成的计划"；
+        // 备忘 day==nil 已被 T4 剥离，不再能充当灰卡)
         app.buttons["结束见面"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3))
         app.alerts.firstMatch.buttons["结束见面"].tap()
         sleep(1)
         XCTAssertTrue(app.staticTexts["没做成的计划"].waitForExistence(timeout: 5), "灰卡组未出现")
-        XCTAssertTrue(app.staticTexts["买伴手礼"].exists, "灰卡未出现")
+        XCTAssertTrue(app.staticTexts["江边看夜景"].exists, "灰卡未出现")
+        // 备忘(给她妈带特产/买伴手礼)结束后仍存档在侧签，不随结束见面消失
+        XCTAssertTrue(app.buttons["备, 忘, 2"].exists, "结束后备忘侧签应仍在")
         attach(app, name: "R8-3-结束后灰卡")
+    }
+
+    /// 反馈⑨:时间线左缘侧签+弹窗观感 / 小本本新壳四段+二级筛选观感截图
+    @MainActor
+    func testRound9Look() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+        app.buttons["足迹"].tap()
+        let card = app.staticTexts["上海"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), "进行中卡未出现")
+        card.tap()
+
+        // S1:时间线左缘侧签(墨底白字竖排「备/忘/N」)
+        let memoTab = app.buttons["备, 忘, 2"]
+        XCTAssertTrue(memoTab.waitForExistence(timeout: 5), "备忘侧签未出现")
+        attach(app, name: "R9-S1-时间线侧签")
+
+        // S2:侧签弹窗
+        memoTab.tap()
+        XCTAssertTrue(app.navigationBars["备忘"].waitForExistence(timeout: 3), "备忘弹窗未弹出")
+        attach(app, name: "R9-S2-侧签弹窗")
+        app.buttons["关闭"].tap()
+        sleep(1)
+
+        // 小本本新壳:四段 tab + 二级筛选（反馈⑨T6）
+        app.buttons["小本本"].tap()
+        XCTAssertTrue(app.staticTexts["陪我逛了一下午书店"].waitForExistence(timeout: 5), "好事段未出现")
+        XCTAssertTrue(app.buttons["好事"].exists, "「好事」tab 未出现")
+        XCTAssertTrue(app.buttons["生气"].exists, "「生气」tab 未出现")
+        XCTAssertTrue(app.buttons["喜好"].exists, "「喜好」tab 未出现")
+        XCTAssertTrue(app.buttons["待办"].exists, "「待办」tab 未出现")
+        XCTAssertTrue(app.buttons["私密箱"].exists, "好事段二级筛选「私密箱」未出现")
+        // S3:好事段(默认落段)
+        attach(app, name: "R9-S3-小本本好事段")
+
+        // S4:待办段——平列表(不再分「我做/Ta做」两组)，二级筛选同样生效
+        app.buttons["待办"].tap()
+        XCTAssertTrue(app.staticTexts["帮她带充电宝"].waitForExistence(timeout: 3), "待办段条目未出现")
+        XCTAssertTrue(app.buttons["全部"].exists, "待办段二级筛选「全部」未出现")
+        attach(app, name: "R9-S4-小本本待办段")
     }
 
     /// 反馈⑦：计划/记得做钉与按次筛选

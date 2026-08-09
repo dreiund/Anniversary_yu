@@ -102,9 +102,12 @@ enum DebugSeeder {
             to: meeting, day: Date(), time: nil, title: "去码头拍日落", note: nil,
             placeText: "演示码头", authorID: authorID, place: singleOnly ? nil : pier)
 
-        // 反馈⑧:行前已备划线卡 + 备忘待办(接下来组,两条——一条走点圈/编辑转化用,一条留到结束后当灰卡)
+        // 反馈⑧:行前已备划线卡。反馈⑨T4修(评审,carry-to-T7)：「行前已备」组改为只收 day != nil
+        // 的已完成日程(spec §一)，day=nil 的已完成项(即使勾了)只在侧签里划线，不再够格进这组——
+        // 「买火车票」原是 day=nil 的已完成项，T4 前用它顶「行前已备」，T4 后会导致这组整体消失
+        // (经本轮 T7 实测确认)，故这里给它一个 day，使其继续代表"行前已备"这张卡的回归样本。
         let ticket = try? PlanItemRepository(context: context).add(
-            to: meeting, day: nil, time: nil, title: "买火车票", note: nil,
+            to: meeting, day: Date(), time: nil, title: "买火车票", note: nil,
             placeText: nil, authorID: authorID)
         ticket?.isDone = true
         _ = try? PlanItemRepository(context: context).add(
@@ -112,6 +115,16 @@ enum DebugSeeder {
             placeText: nil, authorID: authorID)
         _ = try? PlanItemRepository(context: context).add(
             to: meeting, day: nil, time: nil, title: "买伴手礼", note: nil,
+            placeText: nil, authorID: authorID)
+        // 反馈⑨T7:江边看夜景——结束见面后要落"没做成的计划"灰卡组的真日程(day != nil;备忘已被 T4
+        // 剥离出主时间线,不再能充当灰卡)。day 特意设在这次见面已有的两天(昨天/今天)之外,否则会被
+        // TimelineListView.belongsToExistingDay 的"散插"规则并进当天分组而不是尾组(经实测验证：
+        // day=今天会散插进当天卡流，不会落 tail，见此轮 T7 报告)；用明天 20:00 表示"这次见面没走到
+        // 那天，没做成"，全流程不转化，只用于回归"没做成的计划"分组与项名断言。
+        let farDay = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))!
+        let farTime = cal.date(bySettingHour: 20, minute: 0, second: 0, of: farDay)!
+        _ = try? PlanItemRepository(context: context).add(
+            to: meeting, day: farDay, time: farTime, title: "江边看夜景", note: nil,
             placeText: nil, authorID: authorID)
         try? context.save()
 

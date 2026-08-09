@@ -64,4 +64,32 @@ final class PlanConversionTests: XCTestCase {
         }
     }
 
+    // 3. 反馈⑨T1 carry(spec §一评审①)：PlanItemFormSheet 备忘模式没有地点行，save() 对已有地点的
+    //    旧项目直传 item.place/item.placeText 原值(day/time/remindAt 写 nil)——表单层不可单测，
+    //    这里在 repo 层等价复现该调用契约：place 不能被静默清空。
+    func testMemoUpdatePreservesPlace() throws {
+        let place = CDPlace(context: pc.viewContext)
+        place.id = UUID()
+        place.name = "旧地点"
+        place.latitude = 31.0
+        place.longitude = 121.0
+        place.categoryRaw = PlaceCategory.other.rawValue
+        place.createdAt = Date()
+        place.couple = couple
+
+        let item = try plans.add(to: meeting, day: date(2026, 8, 12), time: nil,
+                                 title: "旧日程", note: nil, placeText: "旧地点",
+                                 authorID: nil, place: place)
+
+        // 模拟表单备忘分支的真实调用：day/time/remindAt 传 nil，placeText/place 原样透传 item 现值
+        try plans.update(item, day: nil, time: nil, title: "旧日程",
+                         note: nil, placeText: item.placeText, remindAt: nil, place: item.place)
+
+        XCTAssertNil(item.day, "备忘模式保存 day 应清空")
+        XCTAssertNil(item.time, "备忘模式保存 time 应清空")
+        XCTAssertNotNil(item.place, "备忘保存不应静默清空地点字段(评审①裁定)")
+        XCTAssertEqual(item.place?.name, "旧地点")
+        XCTAssertEqual(item.placeText, "旧地点")
+    }
+
 }
