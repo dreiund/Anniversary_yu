@@ -279,7 +279,9 @@ struct TodoFormView: View {
 
         if let id = savedTodo?.id {
             let key = ReminderPlanner.todoID(id)
-            if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindDate, now: Date()) {
+            // 完成的事项不该再响（P6-B3，堵「勾掉后编辑保存复活提醒」）
+            if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindDate,
+                                                        isDone: savedTodo?.isDone == true, now: Date()) {
                 ReminderScheduler.schedule(id: key, title: trimmedTitle,
                                            body: trimmedDetail.isEmpty ? "记得做" : trimmedDetail,
                                            at: remindAt)
