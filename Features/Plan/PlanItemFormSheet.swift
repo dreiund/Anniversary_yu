@@ -186,16 +186,22 @@ struct PlanItemFormSheet: View {
         let couples = CoupleRepository(context: context)
         let couple = try? couples.fetchCouple()
         // 反馈⑦ 1A：地点走选点归并（与记忆/小本本同管线）；placeText 同步写名字兼容旧展示
-        // 地点:备忘模式一律 nil(place/placeText 同);日程模式走现有 PlaceResolver 逻辑
+        // 反馈⑨T1修：备忘模式表单没有地点行，place/placeText 原样透传不改
+        // （编辑=保留 item 原有关系，新建=nil），避免旧「day=nil 但已填地点」计划项
+        // 一保存（哪怕只是改错别字）就被静默清空地点；日程模式仍走现有 PlaceResolver 逻辑
         var place: CDPlace?
+        var placeValue: String?
         let trimmedLocation = locationName.trimmingCharacters(in: .whitespaces)
-        if !isMemo, !trimmedLocation.isEmpty {
+        if isMemo {
+            place = item?.place
+            placeValue = item?.placeText
+        } else if !trimmedLocation.isEmpty {
             let picked = PickedPlace(name: trimmedLocation,
                                      latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
                                      categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
             place = PlaceResolver.resolve(picked, context: context, couple: couple)
+            placeValue = trimmedLocation
         }
-        let placeValue = (isMemo || trimmedLocation.isEmpty) ? nil : trimmedLocation
         var savedItem: CDPlanItem?
         if let item {
             try? repo.update(item, day: dayValue, time: timeValue, title: title,
@@ -208,6 +214,9 @@ struct PlanItemFormSheet: View {
                                       note: noteValue, placeText: placeValue, authorID: authorID,
                                       remindAt: remindValue, place: place)
         }
+        // 备忘模式 remindValue 恒为 nil → shouldSchedule(remindAt: nil, ...) 恒 false →
+        // 下面必然落到 else 分支 cancel(取消原提醒)。这里没有显式写 isMemo 分支，
+        // 是刻意依赖这条隐式链条；以后改这段逻辑时别把它改没了，否则备忘会漏取消提醒。
         if let id = savedItem?.id {
             let key = ReminderPlanner.planID(id)
             if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindValue, now: Date()) {
