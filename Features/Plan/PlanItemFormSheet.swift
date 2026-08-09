@@ -1,10 +1,13 @@
 import SwiftUI
 
+enum PlanFormMode { case schedule, memo }
+
 struct PlanItemFormSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     let meeting: CDMeeting
     let item: CDPlanItem?
+    let initialMode: PlanFormMode?
 
     @State private var title = ""
     @State private var note = ""
@@ -13,42 +16,53 @@ struct PlanItemFormSheet: View {
     @State private var locationCategoryRaw: Int16 = 0
     @State private var linkedPlaceID: UUID?
     @State private var showPlacePicker = false
-    @State private var hasDay = false
+    @State private var formMode: PlanFormMode = .schedule
     @State private var moment = Date()
     @State private var remindOn = false
     @State private var remindDate = Date()
+
+    init(meeting: CDMeeting, item: CDPlanItem?, initialMode: PlanFormMode? = nil) {
+        self.meeting = meeting
+        self.item = item
+        self.initialMode = initialMode
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: DS.Spacing.md) {
+                    Picker("", selection: $formMode.animation()) {
+                        Text("日程").tag(PlanFormMode.schedule)
+                        Text("备忘").tag(PlanFormMode.memo)
+                    }
+                    .pickerStyle(.segmented)
                     GroupedSection {
                         HStack {
                             Text("事项").dsBody()
-                            TextField("如 G102 高铁", text: $title).multilineTextAlignment(.trailing)
+                            TextField(formMode == .memo ? "如 带伞" : "如 G102 高铁", text: $title)
+                                .multilineTextAlignment(.trailing)
                         }
                         .padding(.horizontal, 14).padding(.vertical, 11)
-                        DS.hairline.frame(height: 1).padding(.leading, 14)
-                        Toggle("指定日期", isOn: $hasDay.animation())
-                            .padding(.horizontal, 14).padding(.vertical, 8)
-                        if hasDay {
+                        if formMode == .schedule {
+                            DS.hairline.frame(height: 1).padding(.leading, 14)
                             DatePicker("时刻", selection: $moment)
                                 .padding(.horizontal, 14).padding(.vertical, 6)
-                        }
-                        Toggle("提醒我", isOn: Binding(
-                            get: { remindOn },
-                            set: { newValue in
-                                withAnimation {
-                                    remindOn = newValue
-                                    if newValue { remindDate = defaultRemindDate() }
-                                }
-                            }))
-                            .padding(.horizontal, 14).padding(.vertical, 6)
-                        if remindOn {
-                            DatePicker("提醒时刻", selection: $remindDate)
+                            DS.hairline.frame(height: 1).padding(.leading, 14)
+                            Toggle("提醒我", isOn: Binding(
+                                get: { remindOn },
+                                set: { newValue in
+                                    withAnimation {
+                                        remindOn = newValue
+                                        if newValue { remindDate = defaultRemindDate() }
+                                    }
+                                }))
                                 .padding(.horizontal, 14).padding(.vertical, 6)
-                            Text("提醒只响在设置它的手机上").dsFootnote()
-                                .padding(.horizontal, 14).padding(.bottom, 6)
+                            if remindOn {
+                                DatePicker("提醒时刻", selection: $remindDate)
+                                    .padding(.horizontal, 14).padding(.vertical, 6)
+                                Text("提醒只响在设置它的手机上").dsFootnote()
+                                    .padding(.horizontal, 14).padding(.bottom, 6)
+                            }
                         }
                     }
                     GroupedSection {
@@ -57,28 +71,30 @@ struct PlanItemFormSheet: View {
                             TextField("可选", text: $note).multilineTextAlignment(.trailing)
                         }
                         .padding(.horizontal, 14).padding(.vertical, 11)
-                        DS.hairline.frame(height: 1).padding(.leading, 14)
-                        Button {
-                            showPlacePicker = true
-                        } label: {
-                            HStack {
-                                Text("地点").dsBody()
-                                Spacer()
-                                Text(locationName.isEmpty ? "可跳过 ›" : locationName)
-                                    .dsCaption().lineLimit(1)
-                                if !locationName.isEmpty {
-                                    Button {
-                                        locationName = ""; coords = nil
-                                        locationCategoryRaw = 0; linkedPlaceID = nil
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 13)).foregroundStyle(DS.chipBorder)
+                        if formMode == .schedule {
+                            DS.hairline.frame(height: 1).padding(.leading, 14)
+                            Button {
+                                showPlacePicker = true
+                            } label: {
+                                HStack {
+                                    Text("地点").dsBody()
+                                    Spacer()
+                                    Text(locationName.isEmpty ? "可跳过 ›" : locationName)
+                                        .dsCaption().lineLimit(1)
+                                    if !locationName.isEmpty {
+                                        Button {
+                                            locationName = ""; coords = nil
+                                            locationCategoryRaw = 0; linkedPlaceID = nil
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 13)).foregroundStyle(DS.chipBorder)
+                                        }
                                     }
                                 }
+                                .padding(.horizontal, 14).padding(.vertical, 11)
                             }
-                            .padding(.horizontal, 14).padding(.vertical, 11)
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                     if let item {
                         Button("删除此项") {
@@ -94,7 +110,7 @@ struct PlanItemFormSheet: View {
                 .padding(DS.Spacing.md)
             }
             .background(DS.parchment)
-            .navigationTitle(item == nil ? "添加日程" : "编辑日程")
+            .navigationTitle(item == nil ? (formMode == .memo ? "添加备忘" : "添加日程") : "编辑")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
@@ -103,7 +119,10 @@ struct PlanItemFormSheet: View {
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .onAppear { loadIfEditing() }
+            .onAppear {
+                formMode = initialMode ?? ((item?.day == nil && item != nil) ? .memo : .schedule)
+                loadIfEditing()
+            }
             .sheet(isPresented: $showPlacePicker) {
                 PlacePickerSheet(initial: coords.map {
                     PickedPlace(name: locationName, latitude: $0.0, longitude: $0.1,
@@ -136,7 +155,6 @@ struct PlanItemFormSheet: View {
             locationName = item.placeText ?? ""   // 旧数据的手输文字照常显示
         }
         if let d = item.day {
-            hasDay = true
             let cal = Calendar.current
             if let t = item.time {
                 // 旧有时间数据：合成 day 的年月日 + time 的时分
@@ -160,23 +178,24 @@ struct PlanItemFormSheet: View {
 
     private func save() {
         let repo = PlanItemRepository(context: context)
-        let momentValue = hasDay ? moment : nil
-        let dayValue = momentValue
-        let timeValue = momentValue
+        let isMemo = formMode == .memo
+        let dayValue: Date? = isMemo ? nil : moment
+        let timeValue: Date? = isMemo ? nil : moment
         let noteValue = note.isEmpty ? nil : note
-        let remindValue: Date? = remindOn ? remindDate : nil
+        let remindValue: Date? = (!isMemo && remindOn) ? remindDate : nil
         let couples = CoupleRepository(context: context)
         let couple = try? couples.fetchCouple()
         // 反馈⑦ 1A：地点走选点归并（与记忆/小本本同管线）；placeText 同步写名字兼容旧展示
+        // 地点:备忘模式一律 nil(place/placeText 同);日程模式走现有 PlaceResolver 逻辑
         var place: CDPlace?
         let trimmedLocation = locationName.trimmingCharacters(in: .whitespaces)
-        if !trimmedLocation.isEmpty {
+        if !isMemo, !trimmedLocation.isEmpty {
             let picked = PickedPlace(name: trimmedLocation,
                                      latitude: coords?.0 ?? 0, longitude: coords?.1 ?? 0,
                                      categoryRaw: locationCategoryRaw, existingPlaceID: linkedPlaceID)
             place = PlaceResolver.resolve(picked, context: context, couple: couple)
         }
-        let placeValue = trimmedLocation.isEmpty ? nil : trimmedLocation
+        let placeValue = (isMemo || trimmedLocation.isEmpty) ? nil : trimmedLocation
         var savedItem: CDPlanItem?
         if let item {
             try? repo.update(item, day: dayValue, time: timeValue, title: title,
