@@ -10,7 +10,9 @@ struct PlanView: View {
         predicate: NSPredicate(format: "statusRaw == %d", MeetingStatus.ongoing.rawValue)
     ) private var ongoingMeetings: FetchedResults<CDMeeting>
     @State private var editingItem: CDPlanItem?
+    @State private var viewingItem: CDPlanItem?
     @State private var showAdd = false
+    @State private var addMode: PlanFormMode = .schedule
     @State private var showEditForm = false
     @State private var goDetail = false
     @State private var selecting = false
@@ -75,9 +77,26 @@ struct PlanView: View {
 
                 if !sections.undated.isEmpty {
                     Text("备忘").dsSectionTitle()
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], alignment: .leading, spacing: 8) {
-                        ForEach(sections.undated, id: \.objectID) { item in
-                            memoChip(item)
+                    GroupedSection {
+                        ForEach(Array(sections.undated.enumerated()), id: \.element.objectID) { i, item in
+                            VStack(spacing: 0) {
+                                if selecting {
+                                    memoRow(item)
+                                } else {
+                                    SwipeDeleteRow(id: item.objectID, openID: $openSwipeID,
+                                                   buttonWidth: 56, cornerRadius: 10,
+                                                   buttonInset: 4, showsLabel: false) {
+                                        let id = item.id
+                                        try? PlanItemRepository(context: context).delete(item)
+                                        if let id { ReminderScheduler.cancelPlans([id]) }
+                                    } content: {
+                                        memoRow(item)
+                                    }
+                                }
+                                if i < sections.undated.count - 1 {
+                                    DS.hairline.frame(height: 1).padding(.leading, 14)
+                                }
+                            }
                         }
                     }
                 }
@@ -119,7 +138,9 @@ struct PlanView: View {
                     HStack {
                         Text("已安排 \(stats.planned) 项 · 完成 \(stats.done) 项").dsCaption()
                         Spacer()
-                        Button("添加日程") { showAdd = true }
+                        Button("添加备忘") { addMode = .memo; showAdd = true }
+                            .font(.system(size: 14)).foregroundStyle(DS.inkMuted)
+                        Button("添加日程") { addMode = .schedule; showAdd = true }
                             .buttonStyle(BluePillButtonStyle())
                     }
                 }
@@ -141,7 +162,8 @@ struct PlanView: View {
             Text("所选日程会删除。")
         }
         .sheet(item: $miniMapPlace) { PlaceMiniMapSheet(place: $0) }
-        .sheet(isPresented: $showAdd) { PlanItemFormSheet(meeting: meeting, item: nil) }
+        .sheet(item: $viewingItem) { PlanItemDetailSheet(item: $0) }
+        .sheet(isPresented: $showAdd) { PlanItemFormSheet(meeting: meeting, item: nil, initialMode: addMode) }
         .sheet(item: $editingItem) { PlanItemFormSheet(meeting: meeting, item: $0) }
         .sheet(isPresented: $showEditForm, onDismiss: {
             // 表单里删除计划后：等 sheet 完全收场再退出本页——body 守卫在转场中会竞速失效
@@ -229,35 +251,39 @@ struct PlanView: View {
         .padding(.horizontal, 14).padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture {
-            if selecting { toggleSelection(item.objectID) } else { editingItem = item }
+            if selecting { toggleSelection(item.objectID) } else { viewingItem = item }
         }
     }
 
-    private func memoChip(_ item: CDPlanItem) -> some View {
-        Button {
-            if selecting { toggleSelection(item.objectID) }
-            else {
-                try? PlanItemRepository(context: context).toggleDone(item)
-                // 反馈⑧终审:勾掉即取消提醒，对齐"记得做"；取消勾选不恢复
-                if item.isDone, let id = item.id {
-                    ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+    private func memoRow(_ item: CDPlanItem) -> some View {
+        HStack(spacing: 10) {
+            if selecting {
+                SelectionCircle(isOn: selected.contains(item.objectID), size: 20)
+            } else {
+                Button {
+                    try? PlanItemRepository(context: context).toggleDone(item)
+                    if item.isDone, let id = item.id {
+                        ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+                    }
+                } label: {
+                    Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
                 }
+                .buttonStyle(DSPressEffect())
             }
-        } label: {
-            HStack(spacing: 5) {
-                if selecting {
-                    SelectionCircle(isOn: selected.contains(item.objectID), size: 15)
-                }
-                Text(item.title ?? "")
-                    .font(.system(size: 13))
-                    .strikethrough(item.isDone, color: DS.inkMuted)
-                    .foregroundStyle(item.isDone ? DS.inkMuted : DS.ink)
+            Text(item.title ?? "")
+                .font(.system(size: 14))
+                .strikethrough(item.isDone, color: DS.inkMuted)
+                .foregroundStyle(item.isDone ? DS.inkMuted : DS.ink)
+            if let note = item.note, !note.isEmpty {
+                Text(note).dsFootnote().lineLimit(1)
             }
-            .padding(.vertical, 6).padding(.horizontal, 12)
-            .background(Capsule().fill(DS.canvas))
-            .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
+            Spacer()
         }
-        .buttonStyle(DSPressEffect())
+        .padding(.horizontal, 14).padding(.vertical, 9)
+        .contentShape(Rectangle())
+        .onTapGesture { if selecting { toggleSelection(item.objectID) } }
         .contextMenu {
             Button("编辑") { editingItem = item }
             Button("删除", role: .destructive) {
