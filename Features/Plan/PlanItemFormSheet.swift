@@ -140,11 +140,16 @@ struct PlanItemFormSheet: View {
         }
         if let d = item.day {
             hasDay = true
+            let cal = Calendar.current
             if let t = item.time {
-                moment = t
+                // 旧有时间数据：合成 day 的年月日 + time 的时分
+                var comps = cal.dateComponents([.year, .month, .day], from: d)
+                let tc = cal.dateComponents([.hour, .minute], from: t)
+                comps.hour = tc.hour
+                comps.minute = tc.minute
+                moment = cal.date(from: comps) ?? d
             } else {
                 // 旧全天编辑预填 9:00
-                let cal = Calendar.current
                 moment = cal.date(bySettingHour: 9, minute: 0, second: 0, of: d) ?? d
             }
         }
