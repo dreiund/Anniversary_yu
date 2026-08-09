@@ -1,21 +1,21 @@
 import SwiftUI
 import CoreData
 
-/// 小本本四段（spec §四 / 反馈⑥ §四）：积极 / 消极 / 喜怒（喜怒段内 ❤/⚡ 分组）/ 记得做
+/// 小本本四段（反馈⑨换壳）：好事(praise) / 生气(angry，内分「记一笔」complaint + 「⚡雷区」trigger 两组) / 喜好(likes) / 待办(todos)
 enum LedgerSegment: CaseIterable {
-    case praise, complaint, moods, todos
+    case praise, angry, likes, todos
 
     var label: String {
         switch self {
-        case .praise: return "积极"
-        case .complaint: return "消极"
-        case .moods: return "喜怒"
-        case .todos: return "记得做"
+        case .praise: return "好事"
+        case .angry: return "生气"
+        case .likes: return "喜好"
+        case .todos: return "待办"
         }
     }
 }
 
-/// 小本本列表（spec §四，小样选 A 双行 chips）
+/// 小本本列表（反馈⑨换壳：用户设计图布局，米色系——大标题+管理钮自绘头部、下划线二级筛选对四段都生效、统一白卡）
 struct LedgerListView: View {
     @Environment(\.managedObjectContext) private var context
     @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
@@ -34,7 +34,7 @@ struct LedgerListView: View {
     @State private var viewingTodo: CDTodoItem?
     @State private var pendingDeleteTodo: CDTodoItem?
 
-    /// 默认落「积极」段；今天卡等入口可传段直达（如「记得做」，反馈⑥ §四）
+    /// 默认落「好事」段；今天卡等入口可传段直达（如「待办」，反馈⑥ §四机制不变）
     init(initialSegment: LedgerSegment = .praise) {
         _segment = State(initialValue: initialSegment)
     }
@@ -58,29 +58,17 @@ struct LedgerListView: View {
             LazyVStack(alignment: .leading, spacing: DS.Spacing.xs) {
                 switch segment {
                 case .praise: entriesSection(category: .praise)
-                case .complaint: entriesSection(category: .complaint)
-                case .moods: moodsSection
+                case .angry: angrySection
+                case .likes: entriesSection(category: .like)
                 case .todos: todosSection
                 }
             }
             .padding(DS.Spacing.md)
         }
-        .background(DS.canvas)
-        .navigationTitle("小本本")
+        .background(DS.parchment)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) { header }
-        .toolbar {
-            if entries.contains(where: { LedgerRules.canEdit(authorID: $0.authorPartnerID, myID: myID) }) {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(selecting ? "完成" : "管理") {
-                        selecting.toggle()
-                        selected = []
-                        openSwipeID = nil
-                    }
-                    .font(.system(size: 14))
-                }
-            }
-        }
         .safeAreaInset(edge: .bottom) {
             if selecting {
                 FrostedBottomBar {
@@ -127,34 +115,57 @@ struct LedgerListView: View {
         .sheet(item: $viewingTodo) { TodoDetailSheet(todo: $0, myID: myID) }
     }
 
+    /// 大标题 + 管理钮自绘头部（原 toolbar 管理钮已删，navigationTitle 置空避免与此重复）；
+    /// 段 chips 下再是下划线二级筛选，四段都显示（反馈⑨换壳）
     private var header: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("小本本").dsPageTitle()
+                Spacer()
+                Button(selecting ? "完成" : "管理") {
+                    selecting.toggle(); selected = []; openSwipeID = nil
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(DS.ink)
+                .padding(.vertical, 6).padding(.horizontal, 14)
+                .background(Capsule().fill(.white))
+                .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
+            }
             HStack(spacing: 6) {
                 ForEach(LedgerSegment.allCases, id: \.label) { seg in
-                    SelectableChip(title: seg.label, isSelected: segment == seg) { segment = seg }
+                    Button { segment = seg } label: {
+                        Text(seg.label)
+                            .font(.system(size: 14, weight: segment == seg ? .semibold : .regular))
+                            .foregroundStyle(segment == seg ? DS.ink : DS.inkMuted)
+                            .padding(.vertical, 7).padding(.horizontal, 14)
+                            .background(RoundedRectangle(cornerRadius: 10)
+                                .fill(segment == seg ? .white : .clear))
+                            .overlay(RoundedRectangle(cornerRadius: 10)
+                                .stroke(segment == seg ? DS.hairline : .clear, lineWidth: 1))
+                    }
+                    .buttonStyle(DSPressEffect())
                 }
             }
-            if segment != .todos {
-                HStack(spacing: 5) {
-                    ForEach(LedgerFilter.allCases, id: \.label) { f in
-                        Button {
-                            filter = f
-                        } label: {
+            HStack(spacing: 16) {
+                ForEach(LedgerFilter.allCases, id: \.label) { f in
+                    Button { filter = f } label: {
+                        VStack(spacing: 3) {
                             Text(f.label)
-                                .font(.system(size: 11, weight: filter == f ? .semibold : .regular))
-                                .foregroundStyle(filter == f ? .white : DS.ink)
-                                .padding(.vertical, 4).padding(.horizontal, 10)
-                                .background(Capsule().fill(filter == f ? DS.actionBlue : DS.canvas))
-                                .overlay(Capsule().stroke(filter == f ? DS.actionBlue : DS.chipBorder, lineWidth: 1))
+                                .font(.system(size: 12, weight: filter == f ? .semibold : .regular))
+                                .foregroundStyle(filter == f ? DS.actionBlue : DS.inkMuted)
+                            Rectangle().fill(filter == f ? DS.actionBlue : .clear)
+                                .frame(height: 2).clipShape(Capsule())
                         }
-                        .buttonStyle(DSPressEffect())
+                        .fixedSize()
                     }
+                    .buttonStyle(.plain)
                 }
+                Spacer()
             }
         }
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
-        .background(DS.canvas)
+        .padding(.horizontal, DS.Spacing.md).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.parchment)
     }
 
     @ViewBuilder
@@ -164,34 +175,36 @@ struct LedgerListView: View {
             emptyHint
         } else {
             ForEach(list, id: \.objectID) { entry in
-                entryRow(entry) { entryCard(entry) }
+                entryRow(entry) { newCard(entry, icon: category == .praise ? "heart" : "star") }
             }
         }
     }
 
+    /// 生气段：「记一笔」complaint + 「⚡ 雷区」trigger 两组小标题（反馈⑨换壳，原喜怒段拆分）
     @ViewBuilder
-    private var moodsSection: some View {
-        let likes = filtered(categories: [.like])
+    private var angrySection: some View {
+        let complaints = filtered(categories: [.complaint])
         let triggers = filtered(categories: [.trigger])
-        if likes.isEmpty && triggers.isEmpty {
+        if complaints.isEmpty && triggers.isEmpty {
             emptyHint
         } else {
-            if !likes.isEmpty {
-                Text("❤ 喜欢").font(.system(size: 14, weight: .bold))
-                ForEach(likes, id: \.objectID) { entry in
-                    entryRow(entry) { moodCard(entry, accent: DS.dsGreen) }
+            if !complaints.isEmpty {
+                Text("记一笔").font(.system(size: 13, weight: .bold)).foregroundStyle(DS.inkMuted)
+                ForEach(complaints, id: \.objectID) { entry in
+                    entryRow(entry) { newCard(entry, icon: "cloud.drizzle") }
                 }
             }
             if !triggers.isEmpty {
-                Text("⚡ 雷区").font(.system(size: 14, weight: .bold)).padding(.top, 4)
+                Text("⚡ 雷区").font(.system(size: 13, weight: .bold)).foregroundStyle(DS.inkMuted).padding(.top, 4)
                 ForEach(triggers, id: \.objectID) { entry in
-                    entryRow(entry) { moodCard(entry, accent: DS.dsOrange) }
+                    entryRow(entry) { newCard(entry, icon: "bolt") }
                 }
             }
         }
     }
 
-    /// 记得做段：我做/Ta做两组，各自未完成按目标日升序、已完成沉底（TodoRules.sortKey）
+    /// 待办段：不再分「我做/Ta做」两组，按 TodoRules.sortKey 合成一列平铺，行内徽标区分我做/Ta做；
+    /// 二级筛选四档与小本本条目同口径生效（LedgerRules.matches，author 维度——不是 assignee 维度）
     @ViewBuilder
     private var todosSection: some View {
         let repo = TodoRepository(context: context)
@@ -200,23 +213,16 @@ struct LedgerListView: View {
             TodoRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
                                 visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
         }
-        let mine = visible.filter { $0.assigneePartnerID == myID }
-            .sorted { TodoRules.sortKey(isDone: $0.isDone, dueAt: $0.dueAt, doneAt: $0.doneAt)
-                    < TodoRules.sortKey(isDone: $1.isDone, dueAt: $1.dueAt, doneAt: $1.doneAt) }
-        let theirs = visible.filter { $0.assigneePartnerID != myID }
-            .sorted { TodoRules.sortKey(isDone: $0.isDone, dueAt: $0.dueAt, doneAt: $0.doneAt)
-                    < TodoRules.sortKey(isDone: $1.isDone, dueAt: $1.dueAt, doneAt: $1.doneAt) }
-        if mine.isEmpty && theirs.isEmpty {
+        let matched = visible.filter {
+            LedgerRules.matches(filter: filter, authorID: $0.authorPartnerID, myID: myID,
+                                visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }
+        let sorted = matched.sorted { TodoRules.sortKey(isDone: $0.isDone, dueAt: $0.dueAt, doneAt: $0.doneAt)
+                                     < TodoRules.sortKey(isDone: $1.isDone, dueAt: $1.dueAt, doneAt: $1.doneAt) }
+        if sorted.isEmpty {
             emptyHint
         } else {
-            if !mine.isEmpty {
-                Text("📌 我做").font(.system(size: 14, weight: .bold))
-                ForEach(mine, id: \.objectID) { todoRow($0) }
-            }
-            if !theirs.isEmpty {
-                Text("👉 Ta做").font(.system(size: 14, weight: .bold)).padding(.top, 4)
-                ForEach(theirs, id: \.objectID) { todoRow($0) }
-            }
+            ForEach(sorted, id: \.objectID) { todoRow($0) }
         }
     }
 
@@ -254,11 +260,12 @@ struct LedgerListView: View {
         }
     }
 
-    /// 记得做行：勾选圈（作者或 assignee 可点）+ 内容，左滑删仅作者，点行→作者编辑/非作者只读详情
+    /// 待办行：勾选圈占新卡图标位 + 内容，外观同 newCard（白卡+hairline 描边+圆角 14）；
+    /// 左滑删仅作者，点行→作者编辑/非作者只读详情（行为不变，反馈⑨只换壳）
     @ViewBuilder
     private func todoRow(_ todo: CDTodoItem) -> some View {
         let canEdit = TodoRules.canEdit(authorID: todo.authorPartnerID, myID: myID)
-        let row = HStack(spacing: 10) {
+        let row = HStack(alignment: .top, spacing: 10) {
             Button {
                 if TodoRules.canToggleDone(authorID: todo.authorPartnerID,
                                            assigneeID: todo.assigneePartnerID, myID: myID) {
@@ -268,23 +275,28 @@ struct LedgerListView: View {
                     }
                 }
             } label: {
-                Image(systemName: todo.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(todo.isDone ? DS.actionBlue : DS.chipBorder)
+                ZStack {
+                    Circle().fill(DS.parchment).frame(width: 34, height: 34)
+                    Image(systemName: todo.isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(todo.isDone ? DS.actionBlue : DS.chipBorder)
+                }
             }
             .buttonStyle(DSPressEffect())
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(todo.title ?? "")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(todo.isDone ? DS.inkMuted : DS.ink)
                     .strikethrough(todo.isDone, color: DS.inkMuted)
+                    .lineLimit(1)
                 Text(todoMeta(todo)).dsFootnote()
             }
             Spacer()
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
+        .background(RoundedRectangle(cornerRadius: 14).fill(.white))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(DS.hairline, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
             if canEdit { editingTodo = todo } else { viewingTodo = todo }
@@ -307,6 +319,7 @@ struct LedgerListView: View {
             parts.append("🔒")
         }
         if todo.isDone { parts.append("已完成") }
+        parts.append(todo.assigneePartnerID == myID ? "我做" : "Ta做")
         return parts.joined(separator: " · ")
     }
 
@@ -316,71 +329,42 @@ struct LedgerListView: View {
             .padding(.top, 48)
     }
 
-    /// 积极/消极卡：徽章 + 标题 + 摘要 + meta + 首证据缩略
-    private func entryCard(_ entry: CDLedgerEntry) -> some View {
-        let accent = entry.categoryRaw == LedgerCategory.praise.rawValue ? DS.dsGreen : DS.dsOrange
+    /// 反馈⑨新卡：白底+hairline 描边+圆角 14+左圆底图标+标题/详情/脚注（用户设计图版式，米色系）
+    private func newCard(_ entry: CDLedgerEntry, icon: String) -> some View {
         let thumb = LedgerRepository(context: context).evidencesSorted(entry).first?.thumbnailData
-        return VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Text((LedgerCategory(rawValue: entry.categoryRaw) ?? .praise).title)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(accent)
-                    .padding(.vertical, 1).padding(.horizontal, 7)
-                    .overlay(Capsule().stroke(accent, lineWidth: 1))
-                Text(entry.title ?? "").font(.system(size: 15, weight: .semibold)).foregroundStyle(DS.ink)
-                    .lineLimit(1)
-                Spacer()
-                if !LedgerRules.isRevealed(visibilityRaw: entry.visibilityRaw, revealedAt: entry.revealedAt) {
-                    Text("🔒").font(.system(size: 10))
+        return HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                Circle().fill(DS.parchment).frame(width: 34, height: 34)
+                Image(systemName: icon).font(.system(size: 14)).foregroundStyle(DS.ink)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(entry.title ?? "").font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(DS.ink).lineLimit(1)
+                    Spacer()
+                    if !LedgerRules.isRevealed(visibilityRaw: entry.visibilityRaw, revealedAt: entry.revealedAt) {
+                        Text("🔒").font(.system(size: 10))
+                    }
                 }
-            }
-            if let detail = entry.detail, !detail.isEmpty {
-                Text(detail).font(.system(size: 12)).foregroundStyle(DS.inkMuted).lineLimit(2)
-            }
-            HStack(spacing: 8) {
-                Text(metaLine(entry)).dsFootnote()
-                Spacer()
-                if let thumb, let ui = UIImage(data: thumb) {
-                    Image(uiImage: ui).resizable().scaledToFill()
-                        .frame(width: 26, height: 26)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .allowsHitTesting(false)
+                if let detail = entry.detail, !detail.isEmpty {
+                    Text(detail).font(.system(size: 12)).foregroundStyle(DS.inkMuted).lineLimit(2)
+                }
+                HStack(spacing: 8) {
+                    Text(metaLine(entry)).dsFootnote()
+                    Spacer()
+                    if let thumb, let ui = UIImage(data: thumb) {
+                        Image(uiImage: ui).resizable().scaledToFill()
+                            .frame(width: 26, height: 26)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .allowsHitTesting(false)
+                    }
                 }
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment))
-        .contentShape(Rectangle())
-    }
-
-    /// 喜怒卡：左描边 + 一句话 + meta（spec §四）
-    private func moodCard(_ entry: CDLedgerEntry, accent: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(entry.title ?? "").font(.system(size: 14, weight: .semibold)).foregroundStyle(DS.ink)
-                    .lineLimit(1)
-                Spacer()
-                if !LedgerRules.isRevealed(visibilityRaw: entry.visibilityRaw, revealedAt: entry.revealedAt) {
-                    Text("🔒").font(.system(size: 10))
-                }
-            }
-            if let detail = entry.detail, !detail.isEmpty {
-                Text(detail).font(.system(size: 11)).foregroundStyle(DS.inkMuted).lineLimit(1)
-            }
-            Text(metaLine(entry)).dsFootnote()
-        }
-        .padding(.vertical, 9).padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.card).fill(DS.parchment)
-        )
-        .overlay(alignment: .leading) {
-            UnevenRoundedRectangle(topLeadingRadius: DS.Radius.card, bottomLeadingRadius: DS.Radius.card,
-                                   bottomTrailingRadius: 0, topTrailingRadius: 0)
-                .fill(accent)
-                .frame(width: 3)
-        }
+        .background(RoundedRectangle(cornerRadius: 14).fill(.white))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(DS.hairline, lineWidth: 1))
         .contentShape(Rectangle())
     }
 
