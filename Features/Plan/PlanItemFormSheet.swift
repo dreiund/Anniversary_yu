@@ -32,10 +32,7 @@ struct PlanItemFormSheet: View {
                         Toggle("指定日期", isOn: $hasDay.animation())
                             .padding(.horizontal, 14).padding(.vertical, 8)
                         if hasDay {
-                            DatePicker("日期", selection: $moment, displayedComponents: .date)
-                                .padding(.horizontal, 14).padding(.vertical, 6)
-                            DS.hairline.frame(height: 1).padding(.leading, 14)
-                            DatePicker("时刻", selection: $moment, displayedComponents: .hourAndMinute)
+                            DatePicker("时刻", selection: $moment)
                                 .padding(.horizontal, 14).padding(.vertical, 6)
                         }
                         Toggle("提醒我", isOn: Binding(
