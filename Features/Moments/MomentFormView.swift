@@ -334,14 +334,14 @@ struct MomentFormView: View {
                             comment: comment.isEmpty ? nil : comment)
             : nil
 
-        _ = try? MomentRepository(context: context).create(
+        let created = try? MomentRepository(context: context).create(
             in: meeting, type: type, title: title,
             body: bodyText.isEmpty ? nil : bodyText,
             happenedAt: happenedAt, photoDatas: photoDatas,
             myEvaluation: evaluation, authorID: authorID, place: place,
             sealNewPastDayAt: sealNewPastDayAt)
-        if case let .fromPlan(item) = mode {
-            // 转化收尾:计划项退场(取消提醒后删除)——与秒转化同语义
+        if created != nil, case let .fromPlan(item) = mode {
+            // 转化收尾:回忆建成后计划项才退场(建不成则计划原样保留,与秒转化同等原子性)
             if let id = item.id { ReminderScheduler.cancelPlans([id]) }
             try? PlanItemRepository(context: context).delete(item)
         }
