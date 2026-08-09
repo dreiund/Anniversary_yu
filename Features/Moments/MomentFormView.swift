@@ -5,6 +5,7 @@ import CoreData
 enum MomentFormMode {
     case create(CDMeeting)
     case edit(CDMoment)
+    case fromPlan(CDPlanItem)   // 反馈⑧:待办卡点开编辑,保存=创建回忆+删计划(转化)
 }
 
 struct MomentFormView: View {
@@ -33,6 +34,20 @@ struct MomentFormView: View {
     @State private var loadedPlaceSignature = ""
 
     private var isEdit: Bool { if case .edit = mode { true } else { false } }
+    private var navigationTitleText: String {
+        switch mode {
+        case .edit: "编辑记忆"
+        case .fromPlan: "补全这段回忆"
+        case .create: "新的记忆"
+        }
+    }
+    private var createTargetMeeting: CDMeeting? {
+        switch mode {
+        case let .create(meeting): meeting
+        case let .fromPlan(item): item.meeting
+        case .edit: nil
+        }
+    }
     private var placeSignature: String {
         "\(locationName.trimmingCharacters(in: .whitespaces))|\(coords?.0 ?? 0)|\(coords?.1 ?? 0)"
     }
@@ -50,7 +65,7 @@ struct MomentFormView: View {
                 .padding(DS.Spacing.md)
             }
             .background(DS.parchment)
-            .navigationTitle(isEdit ? "编辑记忆" : "新的记忆")
+            .navigationTitle(navigationTitleText)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
@@ -73,7 +88,7 @@ struct MomentFormView: View {
             }
             .sheet(item: $staleDay) { day in
                 StaleSealSheet(day: day) { sealTime in
-                    if case let .create(meeting) = mode {
+                    if let meeting = createTargetMeeting {
                         try? MeetingRepository(context: context).sealOpenDay(in: meeting, at: sealTime)
                         doCreate(in: meeting)
                     }
@@ -82,7 +97,7 @@ struct MomentFormView: View {
             .sheet(item: $backfillSeal) { target in
                 BackfillSealSheet(day: target.id) { sealAt in
                     backfillSeal = nil
-                    if case let .create(meeting) = mode {
+                    if let meeting = createTargetMeeting {
                         doCreate(in: meeting, sealNewPastDayAt: sealAt)
                     }
                 }
@@ -231,6 +246,25 @@ struct MomentFormView: View {
     }
 
     private func loadIfEditing() {
+        if case let .fromPlan(item) = mode {
+            let repo = PlanItemRepository(context: context)
+            title = item.title ?? ""
+            bodyText = item.note ?? ""
+            happenedAt = min(repo.plannedMoment(of: item) ?? Date(), Date())
+            if let place = item.place {
+                locationName = place.name ?? ""
+                if place.latitude != 0 || place.longitude != 0 {
+                    coords = (place.latitude, place.longitude)
+                }
+                locationCategoryRaw = place.categoryRaw
+                linkedPlaceID = place.id
+                type = MomentType(placeCategory: PlaceCategory(rawValue: place.categoryRaw) ?? .other)
+            } else {
+                locationName = item.placeText ?? ""
+                type = .other
+            }
+            return
+        }
         guard case let .edit(moment) = mode else { return }
         type = MomentType(rawValue: moment.typeRaw) ?? .other
         title = moment.title ?? ""
@@ -269,6 +303,16 @@ struct MomentFormView: View {
                 return
             }
             doCreate(in: meeting)
+        case let .fromPlan(item):
+            guard let meeting = item.meeting else { dismiss(); return }
+            let meetingRepo = MeetingRepository(context: context)
+            let stale = (try? meetingRepo.staleOpenDay(in: meeting, now: Date(), recordAt: happenedAt)) ?? nil
+            if let stale { staleDay = stale; return }
+            if meetingRepo.wouldOpenNewPastDay(in: meeting, at: happenedAt) {
+                backfillSeal = BackfillSealTarget(id: happenedAt)
+                return
+            }
+            doCreate(in: meeting)
         }
     }
 
@@ -296,6 +340,11 @@ struct MomentFormView: View {
             happenedAt: happenedAt, photoDatas: photoDatas,
             myEvaluation: evaluation, authorID: authorID, place: place,
             sealNewPastDayAt: sealNewPastDayAt)
+        if case let .fromPlan(item) = mode {
+            // 转化收尾:计划项退场(取消提醒后删除)——与秒转化同语义
+            if let id = item.id { ReminderScheduler.cancelPlans([id]) }
+            try? PlanItemRepository(context: context).delete(item)
+        }
         SealReminder.refresh(context: context)
         dismiss()
     }
