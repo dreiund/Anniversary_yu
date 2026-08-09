@@ -99,6 +99,11 @@ struct SettingsView: View {
 
                 Text("配对与同步").dsSectionTitle()
                 GroupedSection {
+                    // P6-B1:双 couple 歧义防线的最后一道——理论上 pruneEmptyLocalCouple 该已经
+                    // 自愈掉多余空间，这行只在自愈没跑到/没赶上时兜底，提示用户找开发者别自己瞎点。
+                    if couples.count > 1 {
+                        GroupedRow(title: "检测到重复空间", value: "联系开发者处理", valueColor: DS.dsOrange)
+                    }
                     GroupedRow(title: "配对状态", value: pairingStatus.label,
                                valueColor: pairingStatus == .connected ? DS.dsGreen : DS.inkMuted)
                     if let couple = couples.first, !isParticipant {

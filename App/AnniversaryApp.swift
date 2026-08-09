@@ -25,6 +25,7 @@ enum AppServices {
 @main
 struct AnniversaryApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     private let persistence = PersistenceController.shared
 
     init() {
@@ -40,6 +41,13 @@ struct AnniversaryApp: App {
         WindowGroup {
             RootView()
                 .environment(\.managedObjectContext, persistence.viewContext)
+        }
+        // P6-B1:第二道保险——accept 成功回调是第一道，App 前台激活时再兜底扫一遍
+        // (冷启动首次变 active、每次从后台回前台都会触发；pruneEmptyLocalCouple 本身幂等，
+        // 反复调用无副作用)。
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            try? CoupleRepository(context: persistence.viewContext).pruneEmptyLocalCouple()
         }
     }
 }

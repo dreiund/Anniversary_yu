@@ -84,12 +84,20 @@ final class SharingManager: ObservableObject {
 
     /// 受邀方 delegate 入口（T7）。接受后镜像自动把共享 zone 导入共享库，
     /// RootView 的 couple FetchRequest 随之非空，界面自动进入主壳。
+    /// P6-B1:接受成功后顺带自愈——如果本机之前等不及邀请就自己建了空单人空间，
+    /// 私有 store 里那份空壳残留现在已是纯冗余，趁此刻清掉（App 前台激活是第二道保险）。
+    /// completion 不保证在主线程回调，Core Data 访问经 context.perform 切回 context 自己的队列。
     nonisolated static func accept(_ metadata: CKShare.Metadata) {
         let controller = PersistenceController.shared
         guard let sharedStore = controller.sharedStore else { return }
         controller.container.acceptShareInvitations(from: [metadata], into: sharedStore) { _, error in
             if let error {
                 print("接受邀请失败：\(error)")
+                return
+            }
+            let context = controller.viewContext
+            context.perform {
+                try? CoupleRepository(context: context).pruneEmptyLocalCouple()
             }
         }
     }
