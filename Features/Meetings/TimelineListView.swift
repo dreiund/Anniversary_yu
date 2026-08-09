@@ -54,8 +54,10 @@ struct TimelineListView: View {
         let isFinished = meeting.statusRaw == MeetingStatus.finished.rawValue
         let showPlans = isOngoing || isFinished
         let allPlans = showPlans ? Array(plansFetch) : []
-        let prepared = allPlans.filter(\.isDone).sorted { $0.sortIndex < $1.sortIndex }
-        let pendingPlans = allPlans.filter { !$0.isDone }
+        // 反馈⑨T4:备忘(day == nil)从主时间线剥离——已备组/散插/tail/灰卡从此只含日程；
+        // 备忘改在 MeetingDetailView 的左缘侧签弹窗里独立展示(纯划线,永不转化，见 MemoListSheet)
+        let prepared = allPlans.filter { $0.day != nil }.filter(\.isDone).sorted { $0.sortIndex < $1.sortIndex }
+        let pendingPlans = allPlans.filter { $0.day != nil }.filter { !$0.isDone }
         // 散插:时刻落在某个已有天的自然日内 → 进那天;其余(未来/备忘)→ 尾组
         // 注:body 受 @ViewBuilder 约束,块内不能出现 func/type 声明语句(仅 let 可以)——
         // 故用 let 绑定闭包而非嵌套 func(嵌套 func 会报 "closure containing a declaration
@@ -111,7 +113,8 @@ struct TimelineListView: View {
             }
         }
         .sheet(isPresented: $showSeal) { SealSheet(meeting: meeting) }
-        .sheet(isPresented: $showAddPlan) { PlanItemFormSheet(meeting: meeting, item: nil) }
+        // 反馈⑨T4:备忘入口挪到侧签弹窗的「＋ 加备忘」里，这里保持日程直达
+        .sheet(isPresented: $showAddPlan) { PlanItemFormSheet(meeting: meeting, item: nil, initialMode: .schedule) }
         .sheet(item: $editingPlan) { MomentFormView(mode: .fromPlan($0)) }
         .sheet(item: $miniMapPlace) { PlaceMiniMapSheet(place: $0) }
         .alert("删除这条记忆？", isPresented: Binding(get: { pendingDeleteMoment != nil },
@@ -236,8 +239,10 @@ struct TimelineListView: View {
     @ViewBuilder
     private func planRow(_ item: CDPlanItem, state: PlanCardState) -> some View {
         // 反馈⑧修(评审 Important):管理模式下计划卡纯展示——onToggle 冻结为 nil 且整卡 disabled,
-        // 待办圈不可误触转化(手滑点到圈不再静默创建回忆/删计划);非管理模式才接上真实转化回调
-        let card = PlanTodoCard(item: item, state: state, onToggle: selecting ? nil : { convert(item) })
+        // 待办圈不可误触(手滑点到圈不再静默创建回忆/删计划);非管理模式才接上真实回调。
+        // 反馈⑨T4:onToggle 不再秒转化——点圈与点卡统一打开 .fromPlan 补全表单(与下方 onTapGesture
+        // 的 .todo 分支同一目标),转化前先在表单里补全再由用户确认保存。
+        let card = PlanTodoCard(item: item, state: state, onToggle: selecting ? nil : { editingPlan = item })
             .disabled(selecting)
         if selecting {
             card
@@ -258,15 +263,6 @@ struct TimelineListView: View {
                     }
             }
         }
-    }
-
-    /// 秒转化(点圆圈):无弹窗,待办卡原位过渡成记忆卡;转化前取消本机提醒
-    private func convert(_ item: CDPlanItem) {
-        if let id = item.id { ReminderScheduler.cancelPlans([id]) }
-        withAnimation(.snappy) {
-            _ = try? PlanItemRepository(context: context).convertToMoment(item)
-        }
-        SealReminder.refresh(context: context)
     }
 
     private func momentCard(_ moment: CDMoment, repo: MomentRepository) -> some View {
@@ -324,5 +320,63 @@ struct TimelineListView: View {
         .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
         // 命中区限定在卡片矩形内：scaledToFill 照片的不可见溢出不再劫持相邻卡片的点击
         .contentShape(Rectangle())
+    }
+}
+
+/// 反馈⑨T4:备忘从时间线主流剥离后的独立弹窗——纯记录列表,勾选=划线(toggleDone)+勾掉取消提醒,永不转化成回忆；
+/// 这正是与待办卡的本质区别:待办卡点圈/点卡都是"补全表单→转成记忆"，备忘卡打勾只是划掉。
+/// 由 MeetingDetailView 持有 showMemos 状态并挂在 ScrollView 容器层展示(侧签始终可见不随时间线滚走)，
+/// memos 由调用方算好传入，这里只管渲染与增删改。
+struct MemoListSheet: View {
+    @Environment(\.managedObjectContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    let meeting: CDMeeting
+    let memos: [CDPlanItem]
+    @State private var memoAddSheet = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(memos, id: \.objectID) { item in
+                    HStack(spacing: 10) {
+                        Button {
+                            try? PlanItemRepository(context: context).toggleDone(item)
+                            if item.isDone, let id = item.id {
+                                ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+                            }
+                        } label: {
+                            Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 20))
+                                .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
+                        }
+                        .buttonStyle(.plain)
+                        Text(item.title ?? "")
+                            .strikethrough(item.isDone, color: DS.inkMuted)
+                            .foregroundStyle(item.isDone ? DS.inkMuted : DS.ink)
+                        if let note = item.note, !note.isEmpty { Text(note).dsFootnote() }
+                    }
+                    .swipeActions {
+                        Button("删除", role: .destructive) {
+                            let id = item.id
+                            try? PlanItemRepository(context: context).delete(item)
+                            if let id { ReminderScheduler.cancelPlans([id]) }
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("备忘")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("＋ 加备忘") { memoAddSheet = true }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .sheet(isPresented: $memoAddSheet) {
+            PlanItemFormSheet(meeting: meeting, item: nil, initialMode: .memo)
+        }
     }
 }

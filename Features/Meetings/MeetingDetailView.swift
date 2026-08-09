@@ -10,6 +10,24 @@ struct MeetingDetailView: View {
     @State private var selecting = false
     @State private var selected: Set<NSManagedObjectID> = []
     @State private var confirmBatch = false
+    // 反馈⑨T4:备忘侧签——独立 FetchRequest 挂在这一层(ScrollView 容器外)，
+    // 侧签才能贴着屏幕左缘常驻，不会像挂在 TimelineListView 的 LazyVStack 上那样随时间线滚走
+    @FetchRequest private var plansFetch: FetchedResults<CDPlanItem>
+    @State private var showMemos = false
+
+    init(meeting: CDMeeting) {
+        self.meeting = meeting
+        _plansFetch = FetchRequest(sortDescriptors: [],
+                                   predicate: NSPredicate(format: "meeting == %@", meeting))
+    }
+
+    // 备忘只在进行中/已结束展示(与 TimelineListView 的 showPlans 口径一致)；计划中态该走「计划」chip 里的 PlanView
+    private var showPlans: Bool {
+        meeting.statusRaw == MeetingStatus.ongoing.rawValue || meeting.statusRaw == MeetingStatus.finished.rawValue
+    }
+    private var memos: [CDPlanItem] {
+        showPlans ? plansFetch.filter { $0.day == nil } : []
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -115,5 +133,24 @@ struct MeetingDetailView: View {
             Text("未封盘的天会一并封盘。")
         }
         .sheet(isPresented: $showEditForm) { MeetingFormView(mode: .edit(meeting)) }
+        // 反馈⑨T4:备忘侧签——挂在这一层(时间线 ScrollView 的容器外)才能常驻不随滚动消失；
+        // 只在「时间线」分段且有备忘时露出，路线图/计划分段不出现
+        .overlay(alignment: .leading) {
+            if segment == 0 && !memos.isEmpty {
+                Button { showMemos = true } label: {
+                    Text("备忘 \(memos.count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.vertical, 10).padding(.horizontal, 5)
+                        .background(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
+                                                           bottomTrailingRadius: 8, topTrailingRadius: 8)
+                            .fill(DS.ink))
+                }
+                .buttonStyle(DSPressEffect())
+            }
+        }
+        .sheet(isPresented: $showMemos) {
+            MemoListSheet(meeting: meeting, memos: memos)
+        }
     }
 }
