@@ -25,8 +25,10 @@ struct MeetingDetailView: View {
     private var showPlans: Bool {
         meeting.statusRaw == MeetingStatus.ongoing.rawValue || meeting.statusRaw == MeetingStatus.finished.rawValue
     }
+    // 反馈⑨终审修(M-3):按 sortIndex 排序,与 PlanView 备忘区(PlanItemRepository.sections 的 undated)口径一致——
+    // FetchRequest 本身未设 sortDescriptors,不排序时行序跨启动不稳
     private var memos: [CDPlanItem] {
-        showPlans ? plansFetch.filter { $0.day == nil } : []
+        showPlans ? plansFetch.filter { $0.day == nil }.sorted { $0.sortIndex < $1.sortIndex } : []
     }
 
     var body: some View {

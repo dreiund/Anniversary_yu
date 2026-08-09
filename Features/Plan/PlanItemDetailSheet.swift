@@ -1,5 +1,4 @@
 import SwiftUI
-import MapKit
 import CoreData
 
 /// 反馈⑨:行前日程只读查看页——点行先看,右上「编辑」才进表单;带坐标地点可直接导航
@@ -109,10 +108,9 @@ private struct SmallBluePillButtonStyle: ButtonStyle {
     }
 }
 
-/// 反馈⑨:跳苹果地图对某地点开导航(小地图/日程查看页共用)
+/// 反馈⑨终审修:导航统一走 AmapNavigator(高德优先,未装退苹果地图;GCJ-02 国内坐标坑见该文件注释)——
+/// 原先这里直跳苹果地图,与地点档案页「导航到这里」形成同屏两套导航标准,现收敛为一套(小地图/日程查看页共用)
+@MainActor
 func openInMapsNavigation(place: CDPlace) {
-    let coord = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-    let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coord))
-    mapItem.name = place.name
-    mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDefault])
+    AmapNavigator.navigate(name: place.name ?? "目的地", latitude: place.latitude, longitude: place.longitude)
 }
