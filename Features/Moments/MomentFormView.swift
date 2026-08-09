@@ -250,7 +250,9 @@ struct MomentFormView: View {
             let repo = PlanItemRepository(context: context)
             title = item.title ?? ""
             bodyText = item.note ?? ""
-            happenedAt = min(repo.plannedMoment(of: item) ?? Date(), Date())
+            // spec §四:时刻在未来或无时刻(全天项无时刻，视同无时刻)时用当下
+            let planned = item.time != nil ? repo.plannedMoment(of: item) : nil
+            happenedAt = min(planned ?? Date(), Date())
             if let place = item.place {
                 locationName = place.name ?? ""
                 if place.latitude != 0 || place.longitude != 0 {

@@ -97,7 +97,8 @@ struct PlanItemRepository {
     }
 
     /// 反馈⑧:待办转化成回忆——创建 CDMoment 后删除计划项(源头消失,一条计划只生成一条回忆)。
-    /// 时刻在未来或缺失时钳到 now(避免 dayForRecord 为未来日期造出「未来已封盘天」)。
+    /// 时刻在未来或无时刻(spec §四:全天项没有时刻,等同无时刻)时钳到 now
+    /// (避免 dayForRecord 按全天项的 00:00 落到区间外,拆出同一自然日的重复天序号)。
     /// 只做数据:调用方负责在调用前用 item.id 取消本机提醒(ReminderScheduler.cancelPlans)。
     @discardableResult
     func convertToMoment(_ item: CDPlanItem, now: Date = Date()) throws -> CDMoment? {
@@ -114,7 +115,8 @@ struct PlanItemRepository {
                             latitude: 0, longitude: 0, categoryRaw: 0, existingPlaceID: nil),
                 context: context, couple: couple)
         }
-        let happenedAt = min(plannedMoment(of: item) ?? now, now)
+        let planned = item.time != nil ? plannedMoment(of: item) : nil
+        let happenedAt = min(planned ?? now, now)
         let category = place.flatMap { PlaceCategory(rawValue: $0.categoryRaw) } ?? .other
         let moment = try MomentRepository(context: context).create(
             in: meeting, type: MomentType(placeCategory: category),

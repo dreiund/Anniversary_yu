@@ -119,4 +119,25 @@ final class PlanConversionTests: XCTestCase {
                            "\(category) 应映射到 \(want)")
         }
     }
+
+    // 7. 修复回归（spec §四：无时刻用当下，全天项没有时刻应等同无时刻）：
+    //    全天项(time==nil)经 plannedMoment 会拿到当日 00:00，若把它当"有时刻"去 min(00:00, now)，
+    //    00:00 常落在已开放天的区间外，被 dayForRecord 拆成同一自然日的第二个天序号。
+    func testConvertAllDayUsesNow() throws {
+        let today = date(2026, 8, 30)
+        let meetings = MeetingRepository(context: pc.viewContext)
+        // 先让 meeting 有一个覆盖 now(14:00) 的开放天（上午 9 点开的这一天）
+        _ = try meetings.dayForRecord(in: meeting, at: date(2026, 8, 30, 9, 0))
+        let daysBefore = (meeting.dateDays as? Set<CDDateDay> ?? []).count
+
+        let item = try plans.add(to: meeting, day: today, time: nil,
+                                 title: "去码头拍日落", note: nil, placeText: nil, authorID: nil)
+
+        let now = date(2026, 8, 30, 14, 0)
+        let moment = try plans.convertToMoment(item, now: now)
+
+        XCTAssertEqual(moment?.happenedAt, now, "全天项没有时刻，应等同无时刻直接用 now，不落到当日 00:00")
+        let daysAfter = (meeting.dateDays as? Set<CDDateDay> ?? []).count
+        XCTAssertEqual(daysAfter, daysBefore, "不应拆出同一自然日的第二个天序号")
+    }
 }
