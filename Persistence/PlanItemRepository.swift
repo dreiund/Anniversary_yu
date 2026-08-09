@@ -84,4 +84,44 @@ struct PlanItemRepository {
         let all = ((meeting.planItems as? Set<CDPlanItem>) ?? [])
         return (all.count, all.filter(\.isDone).count)
     }
+
+    /// 计划时刻合成:有时间用日期的年月日+时间的时分;全天用当日 00:00;无日期(备忘)nil
+    func plannedMoment(of item: CDPlanItem, calendar: Calendar = .current) -> Date? {
+        guard let day = item.day else { return nil }
+        guard let time = item.time else { return calendar.startOfDay(for: day) }
+        var comps = calendar.dateComponents([.year, .month, .day], from: day)
+        let t = calendar.dateComponents([.hour, .minute], from: time)
+        comps.hour = t.hour
+        comps.minute = t.minute
+        return calendar.date(from: comps) ?? day
+    }
+
+    /// 反馈⑧:待办转化成回忆——创建 CDMoment 后删除计划项(源头消失,一条计划只生成一条回忆)。
+    /// 时刻在未来或缺失时钳到 now(避免 dayForRecord 为未来日期造出「未来已封盘天」)。
+    /// 只做数据:调用方负责在调用前用 item.id 取消本机提醒(ReminderScheduler.cancelPlans)。
+    @discardableResult
+    func convertToMoment(_ item: CDPlanItem, now: Date = Date()) throws -> CDMoment? {
+        guard let meeting = item.meeting else { return nil }
+        let couples = CoupleRepository(context: context)
+        let couple = try? couples.fetchCouple()
+        let authorID = couple.flatMap { couples.currentPartnerID(of: $0) }
+        var place = item.place
+        if place == nil, let text = item.placeText,
+           !text.trimmingCharacters(in: .whitespaces).isEmpty, let couple {
+            // 手输文字地点与记忆同管线归并(无坐标地点,档案页会提示补选点)
+            place = PlaceResolver.resolve(
+                PickedPlace(name: text.trimmingCharacters(in: .whitespaces),
+                            latitude: 0, longitude: 0, categoryRaw: 0, existingPlaceID: nil),
+                context: context, couple: couple)
+        }
+        let happenedAt = min(plannedMoment(of: item) ?? now, now)
+        let category = place.flatMap { PlaceCategory(rawValue: $0.categoryRaw) } ?? .other
+        let moment = try MomentRepository(context: context).create(
+            in: meeting, type: MomentType(placeCategory: category),
+            title: item.title ?? "", body: item.note, happenedAt: happenedAt,
+            photoDatas: [], myEvaluation: nil, authorID: authorID, place: place)
+        context.delete(item)
+        try context.save()
+        return moment
+    }
 }

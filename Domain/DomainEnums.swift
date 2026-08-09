@@ -77,3 +77,16 @@ enum CycleColor: Int16, CaseIterable {
         }
     }
 }
+
+extension MomentType {
+    /// 反馈⑧:计划转回忆时按地点类目推记忆类型
+    init(placeCategory: PlaceCategory) {
+        switch placeCategory {
+        case .food, .cafe: self = .restaurant
+        case .scenery: self = .sight
+        case .shopping, .show: self = .activity
+        case .stay: self = .stay
+        case .other: self = .other
+        }
+    }
+}
