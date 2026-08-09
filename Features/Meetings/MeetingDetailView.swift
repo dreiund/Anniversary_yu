@@ -103,11 +103,10 @@ struct MeetingDetailView: View {
         }
         .alert("结束这次见面？", isPresented: $confirmEnd) {
             Button("结束见面", role: .destructive) {
-                // 反馈⑧:见面结束,没做成的计划变灰卡,它们的提醒闹钟一并取消
-                let pendingIDs = ((meeting.planItems as? Set<CDPlanItem>) ?? [])
-                    .filter { !$0.isDone }
-                    .compactMap(\.id)
-                ReminderScheduler.cancelPlans(pendingIDs)
+                // 反馈⑧终审:见面结束,取消该见面全部计划项的提醒——不再按 isDone 过滤
+                // (已勾掉的项此前会漏取消,导致见面结束后野提醒仍照响；取消已取消的提醒是幂等操作,无害)
+                let planIDs = ((meeting.planItems as? Set<CDPlanItem>) ?? []).compactMap(\.id)
+                ReminderScheduler.cancelPlans(planIDs)
                 try? MeetingRepository(context: context).end(meeting, at: Date())
                 SealReminder.refresh(context: context)
             }

@@ -226,9 +226,14 @@ struct HomeView: View {
                     Text("今天 · \(Fmt.monthDayWeek.string(from: Date()))")
                         .font(.system(size: 12)).foregroundStyle(DS.onDarkMuted)
                     ForEach(Array(visiblePlanRows.enumerated()), id: \.offset) { _, pair in
-                        todayRow(icon: "🕐",
-                                 text: "\(pair.1.time.map { Fmt.hm.string(from: $0) } ?? "全天") \(pair.1.title ?? "")",
-                                 link: "行前 ›") { PlanView(meeting: pair.0) }
+                        let rowText = "\(pair.1.time.map { Fmt.hm.string(from: $0) } ?? "全天") \(pair.1.title ?? "")"
+                        // 反馈⑧终审:ongoing 见面的行前计划已并入时间线，PlanView 只在 planned 状态可达——
+                        // 今天卡不能再放行进 PlanView（会绕过转化流水线：不建回忆、不取消提醒）
+                        if pair.0.statusRaw == MeetingStatus.ongoing.rawValue {
+                            todayRow(icon: "🕐", text: rowText, link: "时间线 ›") { MeetingDetailView(meeting: pair.0) }
+                        } else {
+                            todayRow(icon: "🕐", text: rowText, link: "行前 ›") { PlanView(meeting: pair.0) }
+                        }
                     }
                     if planRows.count > 3 {
                         Text("还有 \(planRows.count - 3) 条")

@@ -187,6 +187,11 @@ struct PlanView: View {
             } else {
                 Button {
                     try? PlanItemRepository(context: context).toggleDone(item)
+                    // 反馈⑧终审:勾掉即取消提醒，对齐"记得做"(LedgerListView)的 toggle 处理；
+                    // 取消勾选不恢复提醒——同构，不做重新排程
+                    if item.isDone, let id = item.id {
+                        ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+                    }
                 } label: {
                     Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20))
@@ -231,7 +236,13 @@ struct PlanView: View {
     private func memoChip(_ item: CDPlanItem) -> some View {
         Button {
             if selecting { toggleSelection(item.objectID) }
-            else { try? PlanItemRepository(context: context).toggleDone(item) }
+            else {
+                try? PlanItemRepository(context: context).toggleDone(item)
+                // 反馈⑧终审:勾掉即取消提醒，对齐"记得做"；取消勾选不恢复
+                if item.isDone, let id = item.id {
+                    ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+                }
+            }
         } label: {
             HStack(spacing: 5) {
                 if selecting {
