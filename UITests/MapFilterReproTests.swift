@@ -234,6 +234,54 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "S2-单钉抽屉")
     }
 
+    /// 反馈⑧:计划→回忆转化流水线(已备卡/待办卡/点圈转化/点卡编辑转化/结束后灰卡)
+    @MainActor
+    func testRound8PlanFlow() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+        app.buttons["足迹"].tap()
+        let card = app.staticTexts["上海"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), "进行中卡未出现")
+        card.tap()
+        // 进行中:行前已备 + 待办卡 + 接下来组(两条备忘:给她妈带特产/买伴手礼)
+        XCTAssertTrue(app.staticTexts["行前已备 · 1"].waitForExistence(timeout: 5), "已备组未出现")
+        XCTAssertTrue(app.staticTexts["买火车票"].exists, "已备划线卡未出现")
+        XCTAssertTrue(app.staticTexts["接下来 · 还没做"].exists, "接下来组未出现")
+        XCTAssertTrue(app.staticTexts["给她妈带特产"].exists, "备忘待办未出现")
+        XCTAssertTrue(app.staticTexts["买伴手礼"].exists, "第二条备忘待办未出现")
+        // 「计划」chip 应已消失(进行中)
+        XCTAssertFalse(app.buttons["计划"].exists, "进行中不应再有计划 chip")
+        attach(app, name: "R8-1-进行中时间线")
+        // 点圈秒转化「去码头拍日落」(今天全天待办,散插在今天组)
+        let toggle = app.buttons["划掉 去码头拍日落"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 3), "待办圈未出现")
+        toggle.tap()
+        sleep(1)
+        XCTAssertFalse(app.buttons["划掉 去码头拍日落"].exists, "转化后圈应消失")
+        XCTAssertTrue(app.staticTexts["去码头拍日落"].exists, "转化后的记忆卡不见了")
+        attach(app, name: "R8-2-转化后")
+        // 点「给她妈带特产」待办卡的卡片正文(不是圆圈)→ 编辑转化路径:预填「补全这段回忆」表单,存储即转化
+        app.staticTexts["给她妈带特产"].tap()
+        XCTAssertTrue(app.navigationBars["补全这段回忆"].waitForExistence(timeout: 3), "补全这段回忆表单未弹出")
+        let titleField = app.textFields["如 蟹家大院"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 2), "标题栏未出现")
+        XCTAssertEqual(titleField.value as? String, "给她妈带特产", "标题栏未预填")
+        app.buttons["存储"].tap()
+        sleep(1)
+        XCTAssertFalse(app.buttons["划掉 给她妈带特产"].exists, "编辑转化后圈应消失")
+        XCTAssertTrue(app.staticTexts["给她妈带特产"].exists, "编辑转化后的记忆卡不见了")
+        attach(app, name: "R8-2b-编辑转化")
+        // 结束见面 → 灰卡(买伴手礼没被转化,留到结束后)
+        app.buttons["结束见面"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3))
+        app.alerts.firstMatch.buttons["结束见面"].tap()
+        sleep(1)
+        XCTAssertTrue(app.staticTexts["没做成的计划"].waitForExistence(timeout: 5), "灰卡组未出现")
+        XCTAssertTrue(app.staticTexts["买伴手礼"].exists, "灰卡未出现")
+        attach(app, name: "R8-3-结束后灰卡")
+    }
+
     /// 反馈⑦：计划/记得做钉与按次筛选
     @MainActor
     func testRound7MapLook() throws {

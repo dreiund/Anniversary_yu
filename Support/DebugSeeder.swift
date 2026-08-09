@@ -101,6 +101,20 @@ enum DebugSeeder {
         _ = try? PlanItemRepository(context: context).add(
             to: meeting, day: Date(), time: nil, title: "去码头拍日落", note: nil,
             placeText: "演示码头", authorID: authorID, place: singleOnly ? nil : pier)
+
+        // 反馈⑧:行前已备划线卡 + 备忘待办(接下来组,两条——一条走点圈/编辑转化用,一条留到结束后当灰卡)
+        let ticket = try? PlanItemRepository(context: context).add(
+            to: meeting, day: nil, time: nil, title: "买火车票", note: nil,
+            placeText: nil, authorID: authorID)
+        ticket?.isDone = true
+        _ = try? PlanItemRepository(context: context).add(
+            to: meeting, day: nil, time: nil, title: "给她妈带特产", note: nil,
+            placeText: nil, authorID: authorID)
+        _ = try? PlanItemRepository(context: context).add(
+            to: meeting, day: nil, time: nil, title: "买伴手礼", note: nil,
+            placeText: nil, authorID: authorID)
+        try? context.save()
+
         let florist = CDPlace(context: context)
         florist.id = UUID(); florist.name = "演示花店"
         florist.latitude = 31.2254; florist.longitude = 121.4637
