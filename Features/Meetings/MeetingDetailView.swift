@@ -147,18 +147,21 @@ struct MeetingDetailView: View {
                         }
                         Text("\(memos.count)")
                     }
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.vertical, 10).padding(.horizontal, 5)
+                    // 反馈⑩bug2:加大字号与内边距,热区补足到 44pt 触控标准(原来太小不好点)
+                    .padding(.vertical, 14).padding(.horizontal, 9)
                     .background(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
-                                                       bottomTrailingRadius: 8, topTrailingRadius: 8)
+                                                       bottomTrailingRadius: 10, topTrailingRadius: 10)
                         .fill(DS.ink))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(DSPressEffect())
             }
         }
         .sheet(isPresented: $showMemos) {
-            MemoListSheet(meeting: meeting, memos: memos)
+            MemoListSheet(meeting: meeting)
         }
     }
 }

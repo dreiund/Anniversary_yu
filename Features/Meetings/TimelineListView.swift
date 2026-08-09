@@ -336,14 +336,22 @@ struct MemoListSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     let meeting: CDMeeting
-    let memos: [CDPlanItem]
+    // 反馈⑩bug2:自持 FetchRequest——之前接收父层传入的数组快照,行内勾选写库后无任何观察者,
+    // 界面不重画(重进才见划线)。FetchRequest 对属性变化(isDone)也响应,勾选即时上屏
+    @FetchRequest private var memosFetch: FetchedResults<CDPlanItem>
     @State private var memoAddSheet = false
     @State private var editingItem: CDPlanItem?
+
+    init(meeting: CDMeeting) {
+        self.meeting = meeting
+        _memosFetch = FetchRequest(sortDescriptors: [SortDescriptor(\.sortIndex)],
+                                   predicate: NSPredicate(format: "meeting == %@ AND day == nil", meeting))
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(memos, id: \.objectID) { item in
+                ForEach(memosFetch, id: \.objectID) { item in
                     memoRow(item)
                 }
             }

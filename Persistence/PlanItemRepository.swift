@@ -72,7 +72,14 @@ struct PlanItemRepository {
                 case (nil, nil): return a.sortIndex < b.sortIndex
                 case (nil, _): return true
                 case (_, nil): return false
-                case let (ta?, tb?): return ta != tb ? ta < tb : a.sortIndex < b.sortIndex
+                case let (ta?, tb?):
+                    // 反馈⑩bug1:只比时分——旧数据(反馈⑧前的独立时间选择器)time 的年月日是「保存当天」,
+                    // 跨天保存的两条直接比完整 Date 会乱序;新数据 day=time 同值不受影响
+                    let ca = calendar.dateComponents([.hour, .minute], from: ta)
+                    let cb = calendar.dateComponents([.hour, .minute], from: tb)
+                    let ma = (ca.hour ?? 0) * 60 + (ca.minute ?? 0)
+                    let mb = (cb.hour ?? 0) * 60 + (cb.minute ?? 0)
+                    return ma != mb ? ma < mb : a.sortIndex < b.sortIndex
                 }
             }
             return (key, items)

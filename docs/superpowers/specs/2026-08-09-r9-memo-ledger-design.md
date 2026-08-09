@@ -8,8 +8,9 @@
 - `PlanItemFormSheet` 顶部加 segmented Picker「日程 | 备忘」:
   - **日程**:事项 / 时刻(**必填**,单行 DatePicker,彻底删掉「指定日期」Toggle)/ 地点 / 提醒 / 备注;
   - **备忘**:只有 事项 + 备注 两行。
-  - 编辑时初始模式按 `item.day == nil` 判;可切换。**备忘模式保存**:day/time/place/placeText/remindAt
-    全写 nil,原提醒同步取消(cancelPlans)。日程模式保存:day 与 time 写同一时刻值(R8 规则);
+  - 编辑时初始模式按 `item.day == nil` 判;可切换。**备忘模式保存**:day/time/remindAt 写 nil,
+    原提醒同步取消;**place/placeText 保持原值不动**(表单无地点行=不触碰该字段——遗留
+    「无日期+有地点」的旧数据不被静默清空,评审①裁定)。日程模式保存:day 与 time 写同一时刻值(R8 规则);
     旧全天数据(day 有 time 无)编辑时预填当日 09:00(R8 规则沿用)。数据零迁移:day==nil 即备忘。
 - `PlanView` 备忘区:废弃 LazyVGrid 胶囊(adaptive 列把 chip 拉开=用户圈的间距问题),
   改 `GroupedSection` 紧凑列表行:圈(勾=toggleDone+勾掉取消提醒,现逻辑)+ 划线文字;

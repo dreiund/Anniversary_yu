@@ -92,4 +92,16 @@ final class PlanItemRepositoryTests: XCTestCase {
         // 验证第4层：全天条目按 sortIndex 排序
         XCTAssertEqual(s.dated[1].items.map(\.title), ["A全天", "B全天"])
     }
+
+    func testSectionsSortIgnoresTimeCalendarDate() throws {
+        // 反馈⑩bug1 回归:旧数据(反馈⑧前)time 的年月日是「保存当天」——
+        // 8/1 保存的 15:50(Date=8/1 15:50)与 8/5 保存的 09:00(Date=8/5 09:00)同排 8/20 的日程,
+        // 直接比完整 Date 会把 09:00 排到 15:50 后面;修复后只比时分
+        _ = try repo.add(to: meeting, day: date(2026, 8, 20), time: date(2026, 8, 1, 15, 50),
+                         title: "起飞", note: nil, placeText: nil, authorID: nil)
+        _ = try repo.add(to: meeting, day: date(2026, 8, 20), time: date(2026, 8, 5, 9, 0),
+                         title: "早餐", note: nil, placeText: nil, authorID: nil)
+        let s = repo.sections(for: meeting, calendar: cal)
+        XCTAssertEqual(s.dated[0].items.map(\.title), ["早餐", "起飞"])
+    }
 }
