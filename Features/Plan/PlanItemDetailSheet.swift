@@ -60,6 +60,10 @@ struct PlanItemDetailSheet: View {
                             .padding(.horizontal, 14).padding(.vertical, 10)
                         }
                     }
+                    HStack(spacing: 6) {
+                        AvatarInitial(name: authorName(item.authorPartnerID), size: 20)
+                        Text("\(authorName(item.authorPartnerID)) 安排的").dsFootnote()
+                    }
                 }
                 .padding(DS.Spacing.md)
             }
@@ -80,6 +84,13 @@ struct PlanItemDetailSheet: View {
                 if let place = item.place { PlaceMiniMapSheet(place: place) }
             }
         }
+    }
+
+    /// spec §三「作者小签」——与 PlanView.authorName(_:) 同款实现
+    private func authorName(_ id: UUID?) -> String {
+        let repo = CoupleRepository(context: context)
+        guard let id, let couple = try? repo.fetchCouple() else { return "" }
+        return repo.partners(of: couple).first { $0.id == id }?.name ?? ""
     }
 }
 
