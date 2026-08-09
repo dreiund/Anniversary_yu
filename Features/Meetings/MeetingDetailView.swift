@@ -22,7 +22,10 @@ struct MeetingDetailView: View {
                 HStack(spacing: 4) {
                     SelectableChip(title: "时间线", isSelected: segment == 0) { segment = 0 }
                     SelectableChip(title: "路线图", isSelected: segment == 1) { segment = 1 }
-                    SelectableChip(title: "计划", isSelected: segment == 2) { segment = 2 }
+                    // 反馈⑧:见面开始后行前计划整体并入时间线,「计划」入口只在计划中状态存在
+                    if meeting.statusRaw == MeetingStatus.planned.rawValue {
+                        SelectableChip(title: "计划", isSelected: segment == 2) { segment = 2 }
+                    }
                 }
             }
             .padding(DS.Spacing.md)
@@ -35,8 +38,14 @@ struct MeetingDetailView: View {
                 }
             } else if segment == 1 {
                 RouteMapView(meeting: meeting)
-            } else {
+            } else if meeting.statusRaw == MeetingStatus.planned.rawValue {
                 PlanView(meeting: meeting)
+            } else {
+                ScrollView {
+                    TimelineListView(meeting: meeting, selecting: selecting, selected: $selected)
+                        .padding(.horizontal, DS.Spacing.md)
+                        .padding(.bottom, DS.Spacing.md)
+                }
             }
         }
         .background(DS.parchment)
@@ -45,6 +54,9 @@ struct MeetingDetailView: View {
         .onChange(of: segment) { _, _ in
             selecting = false
             selected = []
+        }
+        .onChange(of: meeting.statusRaw) { _, newValue in
+            if segment == 2, newValue != MeetingStatus.planned.rawValue { segment = 0 }
         }
         .toolbar {
             if segment == 0 {
@@ -91,6 +103,11 @@ struct MeetingDetailView: View {
         }
         .alert("结束这次见面？", isPresented: $confirmEnd) {
             Button("结束见面", role: .destructive) {
+                // 反馈⑧:见面结束,没做成的计划变灰卡,它们的提醒闹钟一并取消
+                let pendingIDs = ((meeting.planItems as? Set<CDPlanItem>) ?? [])
+                    .filter { !$0.isDone }
+                    .compactMap(\.id)
+                ReminderScheduler.cancelPlans(pendingIDs)
                 try? MeetingRepository(context: context).end(meeting, at: Date())
                 SealReminder.refresh(context: context)
             }
