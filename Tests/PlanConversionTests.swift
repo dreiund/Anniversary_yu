@@ -1,6 +1,9 @@
 import XCTest
 @testable import Anniversary
 
+/// 反馈⑨T5: 待办转化逻辑单元测试。
+/// 转化唯一入口收敛为 MomentFormView.fromPlan 表单（反馈⑨ 2A），端到端由 UI 用例锁。
+/// 本文件保留 plannedMoment 时刻合成与 MomentType 类目映射的单测。
 final class PlanConversionTests: XCTestCase {
     private var pc: PersistenceController!
     private var couple: CDCouple!
@@ -15,7 +18,6 @@ final class PlanConversionTests: XCTestCase {
         let meetings = MeetingRepository(context: pc.viewContext)
         meeting = try meetings.createPlanned(couple: couple, title: nil, city: "上海",
                                              plannedStart: nil, plannedEnd: nil)
-        // 先 start 进 ongoing：convertToMoment 内部走 MomentRepository.create → dayForRecord 才有天可归
         try meetings.start(meeting, at: date(2026, 8, 29))
         plans = PlanItemRepository(context: pc.viewContext)
     }
@@ -24,65 +26,7 @@ final class PlanConversionTests: XCTestCase {
         cal.date(from: DateComponents(year: y, month: mo, day: d, hour: h, minute: mi))!
     }
 
-    // 1. 字段映射：标题/正文/过去时刻用计划时刻/类目→类型/地点原样带过去；源计划项被删（防重）
-    func testConvertMapsFields() throws {
-        let place = CDPlace(context: pc.viewContext)
-        place.id = UUID()
-        place.name = "蟹家大院"
-        place.categoryRaw = PlaceCategory.food.rawValue
-        place.createdAt = Date()
-        place.couple = couple
-
-        let item = try plans.add(to: meeting, day: date(2026, 8, 30), time: date(2026, 8, 30, 10, 0),
-                                 title: "吃蟹家大院", note: "人多要排队", placeText: nil,
-                                 authorID: nil, place: place)
-
-        let moment = try plans.convertToMoment(item, now: date(2026, 8, 30, 14, 0))
-
-        let m = try XCTUnwrap(moment)
-        XCTAssertEqual(m.title, "吃蟹家大院")
-        XCTAssertEqual(m.body, "人多要排队")
-        XCTAssertEqual(m.happenedAt, date(2026, 8, 30, 10, 0), "过去时刻应使用计划时刻，而非 now")
-        XCTAssertEqual(m.typeRaw, MomentType.restaurant.rawValue, "food 类目应映射成 restaurant")
-        XCTAssertEqual(m.place?.objectID, place.objectID, "原 place 应原样带过去")
-        XCTAssertEqual(plans.stats(for: meeting).planned, 0, "源计划项应被删除，防止重复转化")
-    }
-
-    // 2. 未来计划时刻钳到 now，避免 dayForRecord 造出「未来已封盘天」
-    func testConvertClampsFutureToNow() throws {
-        let item = try plans.add(to: meeting, day: date(2026, 9, 2), time: date(2026, 9, 2, 18, 0),
-                                 title: "音乐节", note: nil, placeText: nil, authorID: nil)
-
-        let now = date(2026, 9, 1, 12, 0)
-        let moment = try plans.convertToMoment(item, now: now)
-
-        XCTAssertEqual(moment?.happenedAt, now, "未来的计划时刻必须钳到 now")
-    }
-
-    // 3. 无日期备忘：happenedAt 落到 now，类目缺失映射到 other
-    func testConvertMemoWithoutDate() throws {
-        let item = try plans.add(to: meeting, day: nil, time: nil,
-                                 title: "带充电宝", note: nil, placeText: nil, authorID: nil)
-
-        let now = date(2026, 8, 30, 9, 0)
-        let moment = try plans.convertToMoment(item, now: now)
-
-        XCTAssertEqual(moment?.happenedAt, now, "无日期备忘应落到 now")
-        XCTAssertEqual(moment?.typeRaw, MomentType.other.rawValue, "无地点应映射到 other")
-    }
-
-    // 4. 手输文字地点走 PlaceResolver 同管线归并出无坐标地点
-    func testConvertResolvesPlaceText() throws {
-        let item = try plans.add(to: meeting, day: date(2026, 8, 30), time: nil,
-                                 title: "面馆", note: nil, placeText: "老巷面馆", authorID: nil)
-
-        let moment = try plans.convertToMoment(item, now: date(2026, 8, 30, 20, 0))
-
-        let place = try XCTUnwrap(moment?.place, "placeText 应归并出一个 CDPlace")
-        XCTAssertEqual(place.name, "老巷面馆")
-    }
-
-    // 5. plannedMoment 合成：day 只取年月日，time 只取时分；全天用 00:00；无日期 nil
+    // 1. plannedMoment 合成：day 只取年月日，time 只取时分；全天用 00:00；无日期 nil
     func testPlannedMomentComposition() throws {
         let day = date(2026, 8, 12, 23, 0)      // 年月日之外的时分不该被采用
         let time = date(2026, 9, 5, 18, 30)     // 另一天——只取其时分
@@ -100,8 +44,8 @@ final class PlanConversionTests: XCTestCase {
         XCTAssertNil(plans.plannedMoment(of: memo, calendar: cal))
     }
 
-    // 6. 评审补测：MomentType(placeCategory:) 直接遍历全部 7 个 PlaceCategory case 逐一断言，
-    //    防止 scenery/shopping/show/stay 三支（仅经 convertToMoment 间接覆盖 food/无地点两支）被误改而无测试报警
+    // 2. 评审补测：MomentType(placeCategory:) 直接遍历全部 7 个 PlaceCategory case 逐一断言，
+    //    防止遗漏或误改任何分支
     func testMomentTypeMappingCoversAllCategories() throws {
         let expectations: [(PlaceCategory, MomentType)] = [
             (.other, .other),
@@ -120,24 +64,4 @@ final class PlanConversionTests: XCTestCase {
         }
     }
 
-    // 7. 修复回归（spec §四：无时刻用当下，全天项没有时刻应等同无时刻）：
-    //    全天项(time==nil)经 plannedMoment 会拿到当日 00:00，若把它当"有时刻"去 min(00:00, now)，
-    //    00:00 常落在已开放天的区间外，被 dayForRecord 拆成同一自然日的第二个天序号。
-    func testConvertAllDayUsesNow() throws {
-        let today = date(2026, 8, 30)
-        let meetings = MeetingRepository(context: pc.viewContext)
-        // 先让 meeting 有一个覆盖 now(14:00) 的开放天（上午 9 点开的这一天）
-        _ = try meetings.dayForRecord(in: meeting, at: date(2026, 8, 30, 9, 0))
-        let daysBefore = (meeting.dateDays as? Set<CDDateDay> ?? []).count
-
-        let item = try plans.add(to: meeting, day: today, time: nil,
-                                 title: "去码头拍日落", note: nil, placeText: nil, authorID: nil)
-
-        let now = date(2026, 8, 30, 14, 0)
-        let moment = try plans.convertToMoment(item, now: now)
-
-        XCTAssertEqual(moment?.happenedAt, now, "全天项没有时刻，应等同无时刻直接用 now，不落到当日 00:00")
-        let daysAfter = (meeting.dateDays as? Set<CDDateDay> ?? []).count
-        XCTAssertEqual(daysAfter, daysBefore, "不应拆出同一自然日的第二个天序号")
-    }
 }
