@@ -352,7 +352,7 @@ struct MemoListSheet: View {
         NavigationStack {
             List {
                 ForEach(memosFetch, id: \.objectID) { item in
-                    memoRow(item)
+                    MemoRow(item: item) { editingItem = item }
                 }
             }
             .listStyle(.plain)
@@ -373,7 +373,18 @@ struct MemoListSheet: View {
         .sheet(item: $editingItem) { PlanItemFormSheet(meeting: meeting, item: $0) }
     }
 
-    private func memoRow(_ item: CDPlanItem) -> some View {
+}
+
+/// 反馈⑫:备忘行独立成 struct 并 @ObservedObject 订阅——List 对同 id 行有值缓存,
+/// 只靠 FetchRequest 整体失效时第 2+n 次勾选不重绘(数据已变、界面不动);
+/// NSManagedObject 自带 ObservableObject,行级订阅让每次 toggle 必驱动本行重绘
+/// (同款方案:MomentDetailView 的 @ObservedObject,P1 反馈轮已验证)
+private struct MemoRow: View {
+    @Environment(\.managedObjectContext) private var context
+    @ObservedObject var item: CDPlanItem
+    let onEdit: () -> Void
+
+    var body: some View {
         HStack(spacing: 10) {
             Button {
                 try? PlanItemRepository(context: context).toggleDone(item)
@@ -386,6 +397,8 @@ struct MemoListSheet: View {
                     .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
             }
             .buttonStyle(DSPressEffect())
+            // 动态无障碍标签:也让「第 n 次点按重绘」可被 UI 测试断言(反馈⑫回归锁)
+            .accessibilityLabel(item.isDone ? "恢复 \(item.title ?? "")" : "划掉 \(item.title ?? "")")
             Text(item.title ?? "")
                 .font(.system(size: 14))
                 .strikethrough(item.isDone, color: DS.inkMuted)
@@ -400,7 +413,7 @@ struct MemoListSheet: View {
             }
         }
         .contextMenu {
-            Button("编辑") { editingItem = item }
+            Button("编辑") { onEdit() }
             Button("删除", role: .destructive) {
                 let id = item.id
                 try? PlanItemRepository(context: context).delete(item)
