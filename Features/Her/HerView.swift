@@ -4,7 +4,7 @@ import CoreData
 /// 「记录·她」主页（spec §一）：横幅 + 粉卡双态 + 整月滑动月历，到日历为止
 struct HerView: View {
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: []) private var cycles: FetchedResults<CDCycle>
     @FetchRequest(sortDescriptors: []) private var dayLogs: FetchedResults<CDCycleDayLog>
     @FetchRequest(sortDescriptors: []) private var intimacyAll: FetchedResults<CDIntimacyRecord>

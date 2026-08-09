@@ -90,7 +90,7 @@ struct OnboardingView: View {
 /// 本页只负责讲清步骤并陪伴等待；共享数据一到、RootView 自动切主界面。
 private struct AcceptInviteGuideSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
 
     var body: some View {
         VStack(spacing: DS.Spacing.lg) {

@@ -6,7 +6,7 @@ struct PlaceDrawer: View {
     @ObservedObject var place: CDPlace
     let onOpenProfile: () -> Void
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
 
     private var placeMoments: [CDMoment] {
         ((place.moments as? Set<CDMoment>) ?? [])

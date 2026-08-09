@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @AppStorage("nameConfirmedCoupleID") private var confirmedCoupleID = ""
 
     var body: some View {

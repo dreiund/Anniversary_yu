@@ -7,7 +7,7 @@ struct PlaceProfileView: View {
     @ObservedObject var place: CDPlace
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @State private var showCategoryPicker = false
     @State private var showMiniMap = false
 

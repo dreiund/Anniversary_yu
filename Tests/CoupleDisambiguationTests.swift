@@ -4,18 +4,27 @@ import CoreData
 
 /// P6-B1:双 couple 歧义防线——P2 真实事故是「女友没等邀请自建了单人空间，接受邀请后
 /// 两个 CDCouple 并存，fetchCouple 无排序取首个导致身份随机串台」。这里覆盖两条防线：
-/// fetchCouple() 的确定性排序、pruneEmptyLocalCouple() 的空壳自愈（绝不误删有数据的 couple）。
+/// fetchCouple() 的确定性排序、pruneEmptyLocalCouple() 的空壳自愈。
+///
+/// pruneEmptyLocalCouple 的判据经过评审裁决改为「本机创建标记」而非直接判空——私有 store
+/// 同样挂 CloudKit 同步，换机/重装后一个正在同步、子数据还没落地的真实 couple 会在窗口期里
+/// 「看起来是空的」，纯判空会把它跟真的空壳混为一谈而误删（且删除会同步回云端）。标记只在
+/// bootstrapIfNeeded 本机就地新建 couple 那一刻写入，结构上不可能落到远端同步来的 couple 上，
+/// 所以下面大量用例都先显式调 `mark(_:)` 模拟这枚标记，而不是单纯造一个「空」couple。
 ///
 /// 内存双 store 并非不可行——参照 CurrentPartnerTests 已验证的做法，用独立
 /// NSPersistentContainer + 两个本地 sqlite 文件（文件名对齐 PersistenceController 的
 /// privateStoreFileName/sharedStoreFileName）即可拿到真实的私有/共享 store 区分，
 /// 比 brief 建议的单 store 降级方案覆盖更强，故优先用它；文件末尾另附一个单 store
-/// 降级测试，直接对齐 brief 原始方案。
+/// 降级测试，直接对齐 brief 原始方案，并按真实时序复现 P2 事故（先本机 bootstrap 出一个
+/// 空壳并打标记，再让「真实」couple 后到）。
 final class CoupleDisambiguationTests: XCTestCase {
     private var tmpDir: URL!
     private var container: NSPersistentContainer!
     private var privateStore: NSPersistentStore!
     private var sharedStore: NSPersistentStore!
+    private var defaults: UserDefaults!
+    private let suite = "CoupleDisambiguationTests"
 
     override func setUpWithError() throws {
         tmpDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
@@ -30,11 +39,24 @@ final class CoupleDisambiguationTests: XCTestCase {
         let stores = container.persistentStoreCoordinator.persistentStores
         privateStore = stores.first { $0.url?.lastPathComponent == PersistenceController.privateStoreFileName }
         sharedStore = stores.first { $0.url?.lastPathComponent == PersistenceController.sharedStoreFileName }
+        defaults = UserDefaults(suiteName: suite)
+        defaults.removePersistentDomain(forName: suite)
     }
 
     override func tearDownWithError() throws {
+        defaults.removePersistentDomain(forName: suite)
         container = nil
         try? FileManager.default.removeItem(at: tmpDir)
+    }
+
+    private func repo() -> CoupleRepository {
+        CoupleRepository(context: container.viewContext, defaults: defaults)
+    }
+
+    /// 模拟 bootstrapIfNeeded 落下的「本机创建标记」——真实生产里这一步由 bootstrapIfNeeded
+    /// 自动完成，这里为了精确控场（哪个 couple 该被判定为本机自建）显式调用。
+    private func mark(_ couple: CDCouple) {
+        defaults.set(couple.id!.uuidString, forKey: CoupleRepository.locallyBootstrappedCoupleIDKey)
     }
 
     @discardableResult
@@ -59,6 +81,8 @@ final class CoupleDisambiguationTests: XCTestCase {
         try context.save()
     }
 
+    /// 附带完整 meeting→dateDay→moment 三级链——同时覆盖「有 moment 就必然有 meeting」这条
+    /// 结构性事实(hasAnyData 只查 meetings，不单独查 moments，见 CoupleRepository 注释)。
     private func addMoment(to couple: CDCouple, in store: NSPersistentStore) throws {
         let context = container.viewContext
         let meeting = CDMeeting(context: context)
@@ -76,142 +100,151 @@ final class CoupleDisambiguationTests: XCTestCase {
     func testFetchCouplePrefersSharedStoreEvenIfCreatedLater() throws {
         try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1000))
         let laterShared = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2000))
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.fetchCouple()?.objectID, laterShared.objectID)
+        XCTAssertEqual(try repo().fetchCouple()?.objectID, laterShared.objectID)
     }
 
     func testFetchCoupleTiebreaksByEarliestCreatedAtWithinSameStore() throws {
         let earlier = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1000))
         try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 2000))
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.fetchCouple()?.objectID, earlier.objectID)
+        XCTAssertEqual(try repo().fetchCouple()?.objectID, earlier.objectID)
     }
 
     func testFetchCoupleIsStableAcrossRepeatedCalls() throws {
         try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 500))
         try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 999))
-        let repo = CoupleRepository(context: container.viewContext)
-        let first = try repo.fetchCouple()
+        let r = repo()
+        let first = try r.fetchCouple()
         XCTAssertNotNil(first)
         for _ in 0..<5 {
-            XCTAssertEqual(try repo.fetchCouple()?.objectID, first?.objectID)
+            XCTAssertEqual(try r.fetchCouple()?.objectID, first?.objectID)
         }
     }
 
     /// 单 couple 是全仓最常见场景，确定性化前后行为必须完全不变。
     func testFetchCoupleSingleCoupleUnaffectedRegressionGuard() throws {
         let solo = try makeCouple(in: privateStore, createdAt: Date())
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.fetchCouple()?.objectID, solo.objectID)
+        XCTAssertEqual(try repo().fetchCouple()?.objectID, solo.objectID)
     }
 
     func testFetchCoupleReturnsNilWhenNoCouple() throws {
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertNil(try repo.fetchCouple())
+        XCTAssertNil(try repo().fetchCouple())
     }
 
-    // MARK: - pruneEmptyLocalCouple：核心自愈场景（P2 事故复现）
+    // MARK: - pruneEmptyLocalCouple：核心自愈场景（P2 事故复现，标记版）
 
-    func testPruneDeletesEmptyPrivateCoupleKeepsSharedWithData() throws {
-        try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 100))
+    func testPruneDeletesMarkedEmptyCoupleKeepsSharedWithData() throws {
+        let empty = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 100))
+        mark(empty)
         let realShared = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 50))
         try addMeeting(to: realShared, in: sharedStore)
 
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 1)
+        XCTAssertEqual(try repo().pruneEmptyLocalCouple(), 1)
 
         let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
         XCTAssertEqual(remaining.map(\.objectID), [realShared.objectID])
+        XCTAssertNil(defaults.string(forKey: CoupleRepository.locallyBootstrappedCoupleIDKey))
+    }
+
+    /// 评审裁决要修的高危场景：私有 store 里一个「看起来空」的 couple——如果它没有本机创建
+    /// 标记（意味着它不是本机 bootstrap 出来的，而可能是换机/重装后正在从 CloudKit 同步、
+    /// 子数据还没落地的真实 couple），绝不能被删。这是本轮修复要防的核心事故。
+    func testPruneKeepsUnmarkedEmptyPrivateCouple() throws {
+        let unmarkedEmpty = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        let sibling = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2))
+        try addMeeting(to: sibling, in: sharedStore)
+
+        XCTAssertEqual(try repo().pruneEmptyLocalCouple(), 0)
+
+        let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
+        XCTAssertEqual(Set(remaining.map(\.objectID)), Set([unmarkedEmpty.objectID, sibling.objectID]))
     }
 
     func testPruneCascadeDeletesPlaceholderPartnersOfPrunedCouple() throws {
-        try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        let empty = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        mark(empty)
         let realShared = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2))
         try addMeeting(to: realShared, in: sharedStore)
 
-        let repo = CoupleRepository(context: container.viewContext)
-        try repo.pruneEmptyLocalCouple()
+        try repo().pruneEmptyLocalCouple()
 
         let partners = try container.viewContext.fetch(CDPartner.fetchRequest()) as! [CDPartner]
         XCTAssertEqual(partners.count, 2)
         XCTAssertTrue(partners.allSatisfy { $0.couple?.objectID == realShared.objectID })
     }
 
-    func testPruneDeletesEmptyOneWhenBothCouplesArePrivate() throws {
-        let empty = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
-        let withData = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 2))
-        try addMeeting(to: withData, in: privateStore)
-
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 1)
-
-        let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
-        XCTAssertEqual(remaining.map(\.objectID), [withData.objectID])
-        _ = empty
-    }
-
-    /// 唯一、尚未配对的正常新用户场景：绝不能因为「空」就被清掉。
+    /// 唯一、尚未配对的正常新用户场景：即便它带着标记，只要总数只有 1 个也绝不能被清掉。
     func testPruneNoOpWhenOnlyOneCoupleExists() throws {
         let solo = try makeCouple(in: privateStore, createdAt: Date())
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 0)
+        mark(solo)
+        XCTAssertEqual(try repo().pruneEmptyLocalCouple(), 0)
         let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
         XCTAssertEqual(remaining.map(\.objectID), [solo.objectID])
     }
 
     func testPruneIsIdempotent() throws {
-        try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        let empty = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        mark(empty)
         let realShared = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2))
         try addMeeting(to: realShared, in: sharedStore)
 
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 1)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 0)
+        let r = repo()
+        XCTAssertEqual(try r.pruneEmptyLocalCouple(), 1)
+        XCTAssertEqual(try r.pruneEmptyLocalCouple(), 0) // 标记已清，第二次天然 no-op
         let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
         XCTAssertEqual(remaining.count, 1)
     }
 
-    func testPruneNeverTouchesSharedStoreCoupleEvenIfEmpty() throws {
+    /// 防御性用例：标记理论上只可能指向私有 store 的 couple（bootstrapIfNeeded 的产物），
+    /// 但即便未来某个 bug 让它指向了共享 store 的 couple，isParticipantDevice 双保险也必须拦住。
+    func testPruneNeverTouchesSharedStoreCoupleEvenIfMarked() throws {
         let withData = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
         try addMeeting(to: withData, in: privateStore)
         let emptyShared = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2))
+        mark(emptyShared)
 
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 0)
+        XCTAssertEqual(try repo().pruneEmptyLocalCouple(), 0)
         let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
         XCTAssertEqual(Set(remaining.map(\.objectID)), Set([withData.objectID, emptyShared.objectID]))
     }
 
-    // MARK: - pruneEmptyLocalCouple：绝不误删有数据的 couple（逐类核对）
+    func testPruneNoOpWhenMarkerPointsToNonexistentCouple() throws {
+        defaults.set(UUID().uuidString, forKey: CoupleRepository.locallyBootstrappedCoupleIDKey)
+        try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2))
 
-    /// 私有 store 里一个「附带某类数据」的 couple + 共享 store 里另一个空 couple（制造
-    /// count > 1 的清理触发条件），断言 pruneEmptyLocalCouple 一个都不删。
-    private func assertNotPruned(
+        XCTAssertEqual(try repo().pruneEmptyLocalCouple(), 0)
+        let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
+        XCTAssertEqual(remaining.count, 2)
+    }
+
+    // MARK: - pruneEmptyLocalCouple：即便带标记，也绝不误删有数据的 couple（逐类核对）
+
+    /// 私有 store 里一枚带标记的 couple + 共享 store 里另一个 couple（制造 count>1 的清理
+    /// 触发条件），断言只要标记指向的 couple 有任意一类数据，pruneEmptyLocalCouple 就不删。
+    private func assertMarkedCoupleSurvives(
         attach: (CDCouple, NSPersistentStore) throws -> Void,
         file: StaticString = #filePath, line: UInt = #line
     ) throws {
         let dataBearing = try makeCouple(in: privateStore, createdAt: Date(timeIntervalSince1970: 1))
+        mark(dataBearing)
         try attach(dataBearing, privateStore)
         let sibling = try makeCouple(in: sharedStore, createdAt: Date(timeIntervalSince1970: 2))
 
-        let repo = CoupleRepository(context: container.viewContext)
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 0, file: file, line: line)
+        XCTAssertEqual(try repo().pruneEmptyLocalCouple(), 0, file: file, line: line)
 
         let remaining = try container.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
         XCTAssertEqual(Set(remaining.map(\.objectID)), Set([dataBearing.objectID, sibling.objectID]),
                         file: file, line: line)
     }
 
-    func testPruneKeepsCoupleWithMeetingData() throws {
-        try assertNotPruned { couple, store in try self.addMeeting(to: couple, in: store) }
+    /// meeting 与 moment 二合一：moment 结构上必须挂在某个 meeting 下，加 moment 必然同时
+    /// 让 couple.meetings 非空，两者在 hasAnyData 里走的是同一条判断，不必分成两个用例。
+    func testPruneKeepsMarkedCoupleWithMeetingOrMomentData() throws {
+        try assertMarkedCoupleSurvives { couple, store in try self.addMoment(to: couple, in: store) }
     }
 
-    func testPruneKeepsCoupleWithMomentData() throws {
-        try assertNotPruned { couple, store in try self.addMoment(to: couple, in: store) }
-    }
-
-    func testPruneKeepsCoupleWithLedgerEntryData() throws {
-        try assertNotPruned { couple, store in
+    func testPruneKeepsMarkedCoupleWithLedgerEntryData() throws {
+        try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let entry = CDLedgerEntry(context: context)
             entry.id = UUID(); entry.title = "花销"; entry.couple = couple
@@ -220,8 +253,8 @@ final class CoupleDisambiguationTests: XCTestCase {
         }
     }
 
-    func testPruneKeepsCoupleWithTodoData() throws {
-        try assertNotPruned { couple, store in
+    func testPruneKeepsMarkedCoupleWithTodoData() throws {
+        try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let todo = CDTodoItem(context: context)
             todo.id = UUID(); todo.title = "记得做"; todo.couple = couple
@@ -230,8 +263,8 @@ final class CoupleDisambiguationTests: XCTestCase {
         }
     }
 
-    func testPruneKeepsCoupleWithCycleData() throws {
-        try assertNotPruned { couple, store in
+    func testPruneKeepsMarkedCoupleWithCycleData() throws {
+        try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let cycle = CDCycle(context: context)
             cycle.id = UUID(); cycle.startDate = Date(); cycle.couple = couple
@@ -240,8 +273,8 @@ final class CoupleDisambiguationTests: XCTestCase {
         }
     }
 
-    func testPruneKeepsCoupleWithPlaceData() throws {
-        try assertNotPruned { couple, store in
+    func testPruneKeepsMarkedCoupleWithPlaceData() throws {
+        try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let place = CDPlace(context: context)
             place.id = UUID(); place.name = "家"; place.couple = couple
@@ -250,8 +283,8 @@ final class CoupleDisambiguationTests: XCTestCase {
         }
     }
 
-    func testPruneKeepsCoupleWithDailyMoodData() throws {
-        try assertNotPruned { couple, store in
+    func testPruneKeepsMarkedCoupleWithDailyMoodData() throws {
+        try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let mood = CDDailyMood(context: context)
             mood.id = UUID(); mood.day = Date(); mood.couple = couple
@@ -260,8 +293,8 @@ final class CoupleDisambiguationTests: XCTestCase {
         }
     }
 
-    func testPruneKeepsCoupleWithIntimacyRecordData() throws {
-        try assertNotPruned { couple, store in
+    func testPruneKeepsMarkedCoupleWithIntimacyRecordData() throws {
+        try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let record = CDIntimacyRecord(context: context)
             record.id = UUID(); record.happenedAt = Date(); record.couple = couple
@@ -270,36 +303,45 @@ final class CoupleDisambiguationTests: XCTestCase {
         }
     }
 
-    // MARK: - 单 store 降级方案（对齐 brief 原始测试计划）
+    // MARK: - 单 store 降级方案（对齐 brief 原始测试计划，按真实时序复现 P2 事故）
 
     /// brief 原计划：内存双 store 不可行时用单 store 模拟。实测下用独立 NSPersistentContainer
     /// 可以拿到真双 store（上面全部用例），但 PersistenceController(inMemory: true) 本身
     /// （生产代码实际会用到的单 store 场景，见 PersistenceControllerTests）确实只给单 store，
-    /// 这里直接对着它跑一遍，确认两条防线在这个降级形态下同样成立。
+    /// 这里直接对着它跑一遍，并按 P2 真实时序构造：先用 bootstrapIfNeeded 在本机就地建一个
+    /// 空壳（自动打标记，此刻库里只有它一个，prune 不动它）；再模拟「真实」couple 后到
+    /// （单 store 下没法真放进另一个 sqlite 文件，直接插入模拟同步落地）；最后一次 prune
+    /// 才应该把本机那个空壳标记着的 couple 收敛掉。
     func testFetchAndPruneUsingSingleInMemoryStoreDegradedSetup() throws {
         let pc = PersistenceController(inMemory: true)
-        let repo = CoupleRepository(context: pc.viewContext)
+        let r = CoupleRepository(context: pc.viewContext, defaults: defaults)
 
-        let hasData = try repo.bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
-        hasData.createdAt = Date(timeIntervalSince1970: 1)
-        let meeting = CDMeeting(context: pc.viewContext)
-        meeting.id = UUID(); meeting.title = "见面"; meeting.couple = hasData
+        let selfCreatedEmpty = try r.bootstrapIfNeeded(myName: "阿铖", partnerName: "小于", anniversary: nil)
+        selfCreatedEmpty.createdAt = Date(timeIntervalSince1970: 2)
 
-        let empty = CDCouple(context: pc.viewContext)
-        empty.id = UUID(); empty.createdAt = Date(timeIntervalSince1970: 2)
+        // 此刻库里只有本机自建的这一个（哪怕带标记），count==1，prune 绝不动它。
+        XCTAssertEqual(try r.pruneEmptyLocalCouple(), 0)
+
+        // 「真实」couple 后到（模拟接受邀请后镜像导入落地，且已有数据）——不经 bootstrapIfNeeded，
+        // 天然不带标记。
+        let real = CDCouple(context: pc.viewContext)
+        real.id = UUID(); real.createdAt = Date(timeIntervalSince1970: 1)
         let me = CDPartner(context: pc.viewContext)
-        me.id = UUID(); me.roleIndex = 0; me.couple = empty
+        me.id = UUID(); me.roleIndex = 0; me.couple = real
         let her = CDPartner(context: pc.viewContext)
-        her.id = UUID(); her.roleIndex = 1; her.couple = empty
+        her.id = UUID(); her.roleIndex = 1; her.couple = real
+        let meeting = CDMeeting(context: pc.viewContext)
+        meeting.id = UUID(); meeting.title = "见面"; meeting.couple = real
         try pc.viewContext.save()
 
-        // 单 store 无私有/共享区分，退化为 createdAt 最早——多次调用一致，且恰好是有数据那个。
-        let first = try repo.fetchCouple()
-        XCTAssertEqual(first?.objectID, hasData.objectID)
-        XCTAssertEqual(try repo.fetchCouple()?.objectID, first?.objectID)
+        // 单 store 无私有/共享区分，fetchCouple 退化为 createdAt 最早——多次调用一致。
+        let first = try r.fetchCouple()
+        XCTAssertEqual(first?.objectID, real.objectID)
+        XCTAssertEqual(try r.fetchCouple()?.objectID, first?.objectID)
 
-        XCTAssertEqual(try repo.pruneEmptyLocalCouple(), 1)
+        // 现在 count==2，标记指向的 selfCreatedEmpty 仍然空——这一次 prune 才会收敛它。
+        XCTAssertEqual(try r.pruneEmptyLocalCouple(), 1)
         let remaining = try pc.viewContext.fetch(CDCouple.fetchRequest()) as! [CDCouple]
-        XCTAssertEqual(remaining.map(\.objectID), [hasData.objectID])
+        XCTAssertEqual(remaining.map(\.objectID), [real.objectID])
     }
 }

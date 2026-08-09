@@ -9,7 +9,7 @@ struct SettingsView: View {
     @AppStorage("newLedgerAlertOn") private var newLedgerAlertOn = true
     @AppStorage("cycleStartAlertOn") private var cycleStartAlertOn = true
     @AppStorage("footprintsCycleTintOn") private var footprintsCycleTintOn = true
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var partnerName = ""
     @State private var anniversary = Date()

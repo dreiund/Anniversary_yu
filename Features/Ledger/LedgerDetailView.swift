@@ -6,7 +6,7 @@ struct LedgerDetailView: View {
     @ObservedObject var entry: CDLedgerEntry
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
 
     @State private var confirmReveal = false
     @State private var confirmDelete = false

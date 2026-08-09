@@ -18,7 +18,7 @@ enum LedgerSegment: CaseIterable {
 /// 小本本列表（反馈⑨换壳：用户设计图布局，米色系——大标题+管理钮自绘头部、下划线二级筛选对四段都生效、统一白卡）
 struct LedgerListView: View {
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDLedgerEntry.createdAt, order: .reverse)])
     private var entries: FetchedResults<CDLedgerEntry>
     @FetchRequest(sortDescriptors: []) private var todoItems: FetchedResults<CDTodoItem>

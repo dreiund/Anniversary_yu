@@ -16,7 +16,7 @@ struct PlacesMapView: View {
     @Environment(\.managedObjectContext) private var context
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDPlace.createdAt)])
     private var places: FetchedResults<CDPlace>
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
     private var meetings: FetchedResults<CDMeeting>
 

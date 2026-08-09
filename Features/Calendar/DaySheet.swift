@@ -11,7 +11,7 @@ struct DaySheet: View {
     let day: Date
     let mode: CalendarMode
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMoment.happenedAt)])
     private var allMoments: FetchedResults<CDMoment>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index)])
