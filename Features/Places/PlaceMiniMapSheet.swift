@@ -27,6 +27,11 @@ struct PlaceMiniMapSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") { dismiss() }
                 }
+                ToolbarItem(placement: .confirmationAction) {
+                    if place.latitude != 0 || place.longitude != 0 {
+                        Button("导航") { openInMapsNavigation(place: place) }
+                    }
+                }
             }
         }
     }
