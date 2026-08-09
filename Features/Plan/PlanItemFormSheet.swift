@@ -14,9 +14,7 @@ struct PlanItemFormSheet: View {
     @State private var linkedPlaceID: UUID?
     @State private var showPlacePicker = false
     @State private var hasDay = false
-    @State private var day = Date()
-    @State private var hasTime = false
-    @State private var time = Date()
+    @State private var moment = Date()
     @State private var remindOn = false
     @State private var remindDate = Date()
 
@@ -34,15 +32,11 @@ struct PlanItemFormSheet: View {
                         Toggle("指定日期", isOn: $hasDay.animation())
                             .padding(.horizontal, 14).padding(.vertical, 8)
                         if hasDay {
-                            DatePicker("日期", selection: $day, displayedComponents: .date)
+                            DatePicker("日期", selection: $moment, displayedComponents: .date)
                                 .padding(.horizontal, 14).padding(.vertical, 6)
                             DS.hairline.frame(height: 1).padding(.leading, 14)
-                            Toggle("指定时间", isOn: $hasTime.animation())
-                                .padding(.horizontal, 14).padding(.vertical, 8)
-                            if hasTime {
-                                DatePicker("时间", selection: $time, displayedComponents: .hourAndMinute)
-                                    .padding(.horizontal, 14).padding(.vertical, 6)
-                            }
+                            DatePicker("时刻", selection: $moment, displayedComponents: .hourAndMinute)
+                                .padding(.horizontal, 14).padding(.vertical, 6)
                         }
                         Toggle("提醒我", isOn: Binding(
                             get: { remindOn },
@@ -144,20 +138,29 @@ struct PlanItemFormSheet: View {
         } else {
             locationName = item.placeText ?? ""   // 旧数据的手输文字照常显示
         }
-        if let d = item.day { hasDay = true; day = d }
-        if let t = item.time { hasTime = true; time = t }
+        if let d = item.day {
+            hasDay = true
+            if let t = item.time {
+                moment = t
+            } else {
+                // 旧全天编辑预填 9:00
+                let cal = Calendar.current
+                moment = cal.date(bySettingHour: 9, minute: 0, second: 0, of: d) ?? d
+            }
+        }
         if let r = item.remindAt { remindOn = true; remindDate = r }
     }
 
     private func defaultRemindDate() -> Date {
         let cal = Calendar.current
-        return cal.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? Date()
+        return cal.date(bySettingHour: 9, minute: 0, second: 0, of: moment) ?? Date()
     }
 
     private func save() {
         let repo = PlanItemRepository(context: context)
-        let dayValue = hasDay ? day : nil
-        let timeValue = (hasDay && hasTime) ? time : nil
+        let momentValue = hasDay ? moment : nil
+        let dayValue = momentValue
+        let timeValue = momentValue
         let noteValue = note.isEmpty ? nil : note
         let remindValue: Date? = remindOn ? remindDate : nil
         let couples = CoupleRepository(context: context)
