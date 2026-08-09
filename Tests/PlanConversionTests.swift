@@ -99,4 +99,24 @@ final class PlanConversionTests: XCTestCase {
         let memo = CDPlanItem(context: pc.viewContext)
         XCTAssertNil(plans.plannedMoment(of: memo, calendar: cal))
     }
+
+    // 6. 评审补测：MomentType(placeCategory:) 直接遍历全部 7 个 PlaceCategory case 逐一断言，
+    //    防止 scenery/shopping/show/stay 三支（仅经 convertToMoment 间接覆盖 food/无地点两支）被误改而无测试报警
+    func testMomentTypeMappingCoversAllCategories() throws {
+        let expectations: [(PlaceCategory, MomentType)] = [
+            (.other, .other),
+            (.food, .restaurant),
+            (.cafe, .restaurant),
+            (.scenery, .sight),
+            (.shopping, .activity),
+            (.show, .activity),
+            (.stay, .stay),
+        ]
+        XCTAssertEqual(PlaceCategory.allCases.count, expectations.count,
+                       "PlaceCategory 增删 case 时本测试要同步更新，别漏分支")
+        for (category, want) in expectations {
+            XCTAssertEqual(MomentType(placeCategory: category).rawValue, want.rawValue,
+                           "\(category) 应映射到 \(want)")
+        }
+    }
 }
