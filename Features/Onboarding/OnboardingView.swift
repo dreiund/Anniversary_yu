@@ -7,6 +7,7 @@ struct OnboardingView: View {
     @State private var anniversary = Date()
     @State private var createError: String?
     @State private var showAcceptGuide = false
+    @State private var showAcceptFailed = false
 
     private var canCreate: Bool {
         !myName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -83,6 +84,16 @@ struct OnboardingView: View {
         }
         .background(DS.canvas)
         .sheet(isPresented: $showAcceptGuide) { AcceptInviteGuideSheet() }
+        // P6-T4:本页正是"配对等待态"——couple 还没落地时 MainShell 不在场，
+        // accept 失败的广播只有这里接得住，同样弹提示不静默吞错。
+        .alert("接受邀请失败", isPresented: $showAcceptFailed) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("检查网络后重试，或让对方重新发一次邀请。")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .shareAcceptFailed)) { _ in
+            showAcceptFailed = true
+        }
     }
 }
 

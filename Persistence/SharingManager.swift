@@ -1,6 +1,11 @@
 import CloudKit
 import CoreData
 
+/// P6-T4:accept 失败不再只 print——广播出去，由在场的容器（MainShell／引导页）接住弹提示。
+extension Notification.Name {
+    static let shareAcceptFailed = Notification.Name("shareAcceptFailed")
+}
+
 /// 情侣空间唯一一次配对的全部 CKShare 操作。
 /// 策略：链接即可加入（publicPermission .readWrite），链接只经微信私发；
 /// 对方加入后由「锁定邀请」把 publicPermission 关为 .none——门先开、人进来、再锁门。
@@ -93,6 +98,10 @@ final class SharingManager: ObservableObject {
         controller.container.acceptShareInvitations(from: [metadata], into: sharedStore) { _, error in
             if let error {
                 print("接受邀请失败：\(error)")
+                // completion 不保证在主线程回调，NotificationCenter 的 UI 订阅方需要主线程投递。
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .shareAcceptFailed, object: nil)
+                }
                 return
             }
             let context = controller.viewContext

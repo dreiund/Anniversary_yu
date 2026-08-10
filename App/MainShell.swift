@@ -15,6 +15,7 @@ struct MainShell: View {
     @State private var activeSheet: ShellSheet?
     @State private var pendingAction: PanelAction?
     @State private var showNoMeetingAlert = false
+    @State private var showAcceptFailed = false
 
     @FetchRequest(
         sortDescriptors: [],
@@ -109,6 +110,14 @@ struct MainShell: View {
             Button("知道了", role: .cancel) {}
         } message: {
             Text("去足迹页开始一次见面，再来记录。")
+        }
+        .alert("接受邀请失败", isPresented: $showAcceptFailed) {
+            Button("知道了", role: .cancel) {}
+        } message: {
+            Text("检查网络后重试，或让对方重新发一次邀请。")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .shareAcceptFailed)) { _ in
+            showAcceptFailed = true
         }
         .onAppear {
             SealReminder.refresh(context: context)
