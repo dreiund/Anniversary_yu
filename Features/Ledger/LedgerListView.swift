@@ -99,7 +99,7 @@ struct LedgerListView: View {
             }
             Button("取消", role: .cancel) { pendingDelete = nil }
         }
-        .alert("删除这条记得做？", isPresented: Binding(get: { pendingDeleteTodo != nil },
+        .alert("删除这条待办？", isPresented: Binding(get: { pendingDeleteTodo != nil },
                                               set: { if !$0 { pendingDeleteTodo = nil } })) {
             Button("删除", role: .destructive) {
                 if let todo = pendingDeleteTodo {
@@ -439,7 +439,7 @@ private struct TodoDetailSheet: View {
                 .padding(DS.Spacing.md)
             }
             .background(DS.canvas)
-            .navigationTitle("记得做")
+            .navigationTitle("待办")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }

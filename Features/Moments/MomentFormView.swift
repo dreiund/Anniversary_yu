@@ -70,7 +70,7 @@ struct MomentFormView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("存储") { save() }
+                    Button("保存") { save() }
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }

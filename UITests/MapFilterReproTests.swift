@@ -195,14 +195,14 @@ final class MapFilterReproTests: XCTestCase {
         // 反馈⑨T6:小本本新壳段名「记得做」→「待办」，且不再分「📌 我做/Ta做」两组（平列表+筛选行）
         app.buttons["待办"].tap()
         XCTAssertTrue(app.staticTexts["帮她带充电宝"].waitForExistence(timeout: 3), "待办段条目未出现")
-        attach(app, name: "R2-记得做段")
+        attach(app, name: "R2-待办段")
 
         // R4：记得做表单开关态。⊕ 弹层里的「记得做」格是图标+文字合成的无障碍标签，坐标/标签定位都不稳，
         // 降级走更稳的路径：点自己写的条目（"查演出票"，种子里 authorID=我，可编辑）直接进编辑表单截同款。
         let myTodo = app.staticTexts["查演出票"]
-        XCTAssertTrue(myTodo.waitForExistence(timeout: 3), "自建记得做条目未出现")
+        XCTAssertTrue(myTodo.waitForExistence(timeout: 3), "自建待办条目未出现")
         myTodo.tap()
-        XCTAssertTrue(app.navigationBars["编辑记得做"].waitForExistence(timeout: 3), "记得做编辑表单未弹出")
+        XCTAssertTrue(app.navigationBars["编辑待办"].waitForExistence(timeout: 3), "待办编辑表单未弹出")
         XCTAssertTrue(app.switches["私密"].waitForExistence(timeout: 2) || app.staticTexts["私密"].exists,
                       "私密开关未出现")
         attach(app, name: "R4-表单开关态")
@@ -275,7 +275,7 @@ final class MapFilterReproTests: XCTestCase {
         let titleField = app.textFields["如 蟹家大院"]
         XCTAssertTrue(titleField.waitForExistence(timeout: 2), "标题栏未出现")
         XCTAssertEqual(titleField.value as? String, "去码头拍日落", "标题栏未预填")
-        app.buttons["存储"].tap()
+        app.buttons["保存"].tap()
         sleep(1)
         XCTAssertFalse(app.buttons["划掉 去码头拍日落"].exists, "转化后圈应消失")
         XCTAssertTrue(app.staticTexts["去码头拍日落"].exists, "转化后的记忆卡不见了")
@@ -356,10 +356,10 @@ final class MapFilterReproTests: XCTestCase {
         sleep(2)
         XCTAssertFalse(app.staticTexts["还没有带地点的记忆"].exists, "计划筛选下应有码头钉")
         attach(app, name: "P1-计划筛选")
-        app.buttons["记得做"].tap()
+        app.buttons["待办"].tap()
         sleep(2)
-        XCTAssertFalse(app.staticTexts["还没有带地点的记忆"].exists, "记得做筛选下应有花店钉")
-        attach(app, name: "P2-记得做筛选")
+        XCTAssertFalse(app.staticTexts["还没有带地点的记忆"].exists, "待办筛选下应有花店钉")
+        attach(app, name: "P2-待办筛选")
         // 滑回行首再开见面菜单
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: chipsY))
             .press(forDuration: 0.05,

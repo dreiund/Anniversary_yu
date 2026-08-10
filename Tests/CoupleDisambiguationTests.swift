@@ -257,7 +257,7 @@ final class CoupleDisambiguationTests: XCTestCase {
         try assertMarkedCoupleSurvives { couple, store in
             let context = self.container.viewContext
             let todo = CDTodoItem(context: context)
-            todo.id = UUID(); todo.title = "记得做"; todo.couple = couple
+            todo.id = UUID(); todo.title = "待办"; todo.couple = couple
             context.assign(todo, to: store)
             try context.save()
         }

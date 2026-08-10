@@ -162,7 +162,7 @@ struct PlacesMapView: View {
                 chip(title: "计划", selected: filter == .plans) {
                     filter = filter == .plans ? .all : .plans
                 }
-                chip(title: "记得做", selected: filter == .todos) {
+                chip(title: "待办", selected: filter == .todos) {
                     filter = filter == .todos ? .all : .todos
                 }
             }

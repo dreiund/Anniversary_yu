@@ -104,7 +104,7 @@ struct QuickLedgerSheet: View {
                 .padding(DS.Spacing.md)
             }
             .background(DS.parchment)
-            .navigationTitle(editingEntry == nil ? "记一条喜怒" : "编辑喜怒")
+            .navigationTitle(editingEntry == nil ? "记一笔" : "编辑")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }

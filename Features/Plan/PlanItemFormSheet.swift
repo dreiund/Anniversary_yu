@@ -223,7 +223,7 @@ struct PlanItemFormSheet: View {
             if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindValue,
                                                         isDone: savedItem?.isDone == true, now: Date()) {
                 ReminderScheduler.schedule(id: key, title: title,
-                                           body: "行前日程", at: remindDate)
+                                           body: "日程", at: remindDate)
             } else {
                 ReminderScheduler.cancel(id: key)
             }

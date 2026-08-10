@@ -147,7 +147,7 @@ struct TodoFormView: View {
                 .padding(DS.Spacing.md)
             }
             .background(DS.parchment)
-            .navigationTitle(editingTodo == nil ? "记得做" : "编辑记得做")
+            .navigationTitle(editingTodo == nil ? "待办" : "编辑待办")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
@@ -174,7 +174,7 @@ struct TodoFormView: View {
             } message: {
                 Text("公开后 TA 会看到这条，且不可撤回。")
             }
-            .alert("删除这条记得做？", isPresented: $confirmDelete) {
+            .alert("删除这条待办？", isPresented: $confirmDelete) {
                 Button("删除", role: .destructive) { delete() }
                 Button("取消", role: .cancel) {}
             }
@@ -283,7 +283,7 @@ struct TodoFormView: View {
             if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindDate,
                                                         isDone: savedTodo?.isDone == true, now: Date()) {
                 ReminderScheduler.schedule(id: key, title: trimmedTitle,
-                                           body: trimmedDetail.isEmpty ? "记得做" : trimmedDetail,
+                                           body: trimmedDetail.isEmpty ? "待办" : trimmedDetail,
                                            at: remindAt)
             } else {
                 ReminderScheduler.cancel(id: key)

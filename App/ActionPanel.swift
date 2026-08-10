@@ -25,8 +25,8 @@ struct ActionPanel: View {
             Tile(symbol: "photo.on.rectangle", title: "记忆", action: .newMoment),
             Tile(symbol: "square.and.pencil", title: "互评", action: .ledgerEntry),
             Tile(symbol: "face.smiling", title: "心情", action: .mood),
-            Tile(symbol: "heart", title: "喜怒", action: .quickEntry),
-            Tile(symbol: "checkmark.circle", title: "记得做", action: .todo),
+            Tile(symbol: "heart", title: "喜好 · 生气", action: .quickEntry),
+            Tile(symbol: "checkmark.circle", title: "待办", action: .todo),
             Tile(symbol: "drop", title: "经期", action: .cycle),
         ]
     }

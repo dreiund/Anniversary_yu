@@ -247,7 +247,7 @@ struct HomeView: View {
                     }
                     ForEach(dueTodos, id: \.objectID) { todo in
                         todayRow(icon: todo.assigneePartnerID == myID ? "📌" : "👉",
-                                 text: todo.title ?? "", link: "记得做 ›") {
+                                 text: todo.title ?? "", link: "待办 ›") {
                             LedgerListView(initialSegment: .todos)
                         }
                     }
