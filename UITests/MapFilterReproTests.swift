@@ -237,7 +237,7 @@ final class MapFilterReproTests: XCTestCase {
 
     /// 反馈⑧:计划→回忆转化流水线(已备卡/待办卡/点圈开表单转化/结束后灰卡)
     /// 反馈⑨T4改造:备忘(day==nil)已从主时间线剥离，只在左缘侧签弹窗展示，永不转化(§一)；
-    /// 待办圈不再秒转化，点圈打开「补全这段回忆」预填表单，存储才转化(§二 2A)。
+    /// 待办圈不再秒转化，点圈打开「补全这段回忆」预填表单，保存才转化(§二 2A)。
     @MainActor
     func testRound8PlanFlow() throws {
         let app = XCUIApplication()
@@ -267,7 +267,7 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "R8-1b-备忘侧签弹窗")
         app.buttons["关闭"].tap()
         sleep(1)
-        // 点圈(反馈⑨T2A：不再秒转化)→ 打开「补全这段回忆」表单，预填标题，点「存储」才转化
+        // 点圈(反馈⑨T2A：不再秒转化)→ 打开「补全这段回忆」表单，预填标题，点「保存」才转化
         let toggle = app.buttons["划掉 去码头拍日落"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 3), "待办圈未出现")
         toggle.tap()

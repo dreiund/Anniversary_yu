@@ -3,7 +3,10 @@ import CoreData
 
 struct MeetingDetailView: View {
     @Environment(\.managedObjectContext) private var context
-    let meeting: CDMeeting
+    // 反馈⑧终审(M-4):@ObservedObject 订阅——原 let 不接 Core Data 的 objectWillChange,
+    // 对方远端结束见面(statusRaw 变化)时本机 chips/工具栏要靠别的 FetchRequest 碰巧触发才刷新,
+    // 不够即时；订阅后 meeting 自身变化即可驱动本视图重绘(同款方案见 MemoRow/MomentDetailView)
+    @ObservedObject var meeting: CDMeeting
     @State private var segment = 0
     @State private var confirmEnd = false
     @State private var showEditForm = false

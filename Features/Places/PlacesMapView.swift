@@ -42,9 +42,11 @@ struct PlacesMapView: View {
     }
 
     /// 计划钉（反馈⑦ 1A）：挂着未结束见面日程的地点——见面结束即从地图消失（数据保留）
+    /// 反馈⑨终审(M-1):备忘(day == nil)已独立出计划流水线(时间线左缘侧签,永不转化为日程)，
+    /// 不算「计」的口径内，排除在外——否则备忘会在地图上误出「计」钉
     private func hasActivePlan(_ place: CDPlace) -> Bool {
         ((place.planItems as? Set<CDPlanItem>) ?? []).contains {
-            guard let meeting = $0.meeting else { return false }
+            guard $0.day != nil, let meeting = $0.meeting else { return false }
             return meeting.statusRaw != MeetingStatus.finished.rawValue
         }
     }
@@ -79,6 +81,8 @@ struct PlacesMapView: View {
                 }
             }
             let hasLedger = hasVisibleLedger(p)
+            // 「计划」筛选 chip(.plans)与角标钉同复用 hasActivePlan，已含 day != nil 排除备忘，
+            // 口径天然一致，无需在此再叠加过滤（反馈⑨终审 M-1）
             let hasPlan = hasActivePlan(p)
             let hasTodo = hasVisibleTodo(p)
             guard hasMoments || hasLedger || hasPlan || hasTodo else { return false }
