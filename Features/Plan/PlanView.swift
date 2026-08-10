@@ -261,10 +261,7 @@ struct PlanView: View {
                 SelectionCircle(isOn: selected.contains(item.objectID), size: 20)
             } else {
                 Button {
-                    try? PlanItemRepository(context: context).toggleDone(item)
-                    if item.isDone, let id = item.id {
-                        ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
-                    }
+                    toggleMemo(item)
                 } label: {
                     Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20))
@@ -283,7 +280,11 @@ struct PlanView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 9)
         .contentShape(Rectangle())
-        .onTapGesture { if selecting { toggleSelection(item.objectID) } }
+        // P6-T6:备忘正文点击=勾选——非管理态点整行(不止圆圈)即 toggle,同圈逻辑含勾掉取消提醒；
+        // 圆圈本身是独立 Button 会吃掉自己的点击，不会与本行 onTapGesture 重复触发
+        .onTapGesture {
+            if selecting { toggleSelection(item.objectID) } else { toggleMemo(item) }
+        }
         .contextMenu {
             Button("编辑") { editingItem = item }
             Button("删除", role: .destructive) {
@@ -291,6 +292,14 @@ struct PlanView: View {
                 try? PlanItemRepository(context: context).delete(item)
                 if let id { ReminderScheduler.cancelPlans([id]) }
             }
+        }
+    }
+
+    /// 备忘勾选:划掉即取消提醒(取消勾选不恢复提醒，同 planRow 口径)
+    private func toggleMemo(_ item: CDPlanItem) {
+        try? PlanItemRepository(context: context).toggleDone(item)
+        if item.isDone, let id = item.id {
+            ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
         }
     }
 

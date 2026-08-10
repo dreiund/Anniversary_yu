@@ -6,7 +6,7 @@ enum CycleStatsSegment: Hashable { case month, year }
 /// 统计页（spec §四）：月|年三数字卡 + 历史周期列表（改起止/左滑删/补录）
 struct CycleStatsView: View {
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: []) private var cycles: FetchedResults<CDCycle>
     @FetchRequest(sortDescriptors: []) private var dayLogs: FetchedResults<CDCycleDayLog>
     @FetchRequest(sortDescriptors: []) private var intimacyAll: FetchedResults<CDIntimacyRecord>

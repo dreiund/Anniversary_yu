@@ -387,10 +387,7 @@ private struct MemoRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Button {
-                try? PlanItemRepository(context: context).toggleDone(item)
-                if item.isDone, let id = item.id {
-                    ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
-                }
+                toggle()
             } label: {
                 Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
@@ -404,7 +401,13 @@ private struct MemoRow: View {
                 .strikethrough(item.isDone, color: DS.inkMuted)
                 .foregroundStyle(item.isDone ? DS.inkMuted : DS.ink)
             if let note = item.note, !note.isEmpty { Text(note).dsFootnote().lineLimit(1) }
+            Spacer()
         }
+        .contentShape(Rectangle())
+        // P6-T6:备忘正文点击=勾选——整行(不止圆圈)可 tap 触发 toggle,与 PlanView.memoRow 同构；
+        // 圆圈自身是 Button 会吃掉点击，不会与本行 onTapGesture 重复触发；tap 与 swipeActions/
+        // contextMenu(长按)手势互不冲突，无需额外处理
+        .onTapGesture { toggle() }
         .swipeActions {
             Button("删除", role: .destructive) {
                 let id = item.id
@@ -419,6 +422,14 @@ private struct MemoRow: View {
                 try? PlanItemRepository(context: context).delete(item)
                 if let id { ReminderScheduler.cancelPlans([id]) }
             }
+        }
+    }
+
+    /// 备忘勾选:划掉即取消提醒(取消勾选不恢复提醒，同 PlanView.memoRow 口径)
+    private func toggle() {
+        try? PlanItemRepository(context: context).toggleDone(item)
+        if item.isDone, let id = item.id {
+            ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
         }
     }
 }

@@ -219,9 +219,11 @@ struct PlanItemFormSheet: View {
         // 是刻意依赖这条隐式链条；以后改这段逻辑时别把它改没了，否则备忘会漏取消提醒。
         if let id = savedItem?.id {
             let key = ReminderPlanner.planID(id)
-            if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindValue, now: Date()) {
+            // 完成的事项不该再响（P6-B3，堵「勾掉后编辑保存复活提醒」）
+            if remindOn, ReminderPlanner.shouldSchedule(remindAt: remindValue,
+                                                        isDone: savedItem?.isDone == true, now: Date()) {
                 ReminderScheduler.schedule(id: key, title: title,
-                                           body: "行前日程", at: remindDate)
+                                           body: "日程", at: remindDate)
             } else {
                 ReminderScheduler.cancel(id: key)
             }

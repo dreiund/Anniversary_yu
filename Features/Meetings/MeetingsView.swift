@@ -3,7 +3,7 @@ import CoreData
 
 struct MeetingsView: View {
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
     private var meetings: FetchedResults<CDMeeting>
     @State private var showForm = false

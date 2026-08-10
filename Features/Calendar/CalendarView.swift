@@ -5,7 +5,7 @@ import CoreData
 struct CalendarView: View {
     let onDayTap: (Date, CalendarMode) -> Void
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMoment.happenedAt)])
     private var moments: FetchedResults<CDMoment>
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>

@@ -150,6 +150,7 @@ final class CDCycle: NSManagedObject {
     @NSManaged var startDate: Date?
     @NSManaged var endDate: Date?
     @NSManaged var predictedStartAtLogging: Date?
+    @NSManaged var authorPartnerID: UUID?
     @NSManaged var couple: CDCouple?
     @NSManaged var dayLogs: NSSet?
 }

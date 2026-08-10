@@ -4,8 +4,11 @@ import UserNotifications
 enum ReminderPlanner {
     static func todoID(_ id: UUID) -> String { "todo-\(id.uuidString.lowercased())" }
     static func planID(_ id: UUID) -> String { "plan-\(id.uuidString.lowercased())" }
-    static func shouldSchedule(remindAt: Date?, now: Date) -> Bool {
-        guard let remindAt else { return false }
+    /// isDone：完成的事项不该再响（P6-B3，堵「勾掉后编辑保存复活提醒」）——
+    /// 勾掉只取消了当次已排程的通知，item/todo 的 remindAt 字段本身没清，
+    /// 编辑表单随手保存时若不挡在这里，会让已完成事项的提醒被重新排程。
+    static func shouldSchedule(remindAt: Date?, isDone: Bool, now: Date) -> Bool {
+        guard let remindAt, !isDone else { return false }
         return remindAt > now
     }
 }

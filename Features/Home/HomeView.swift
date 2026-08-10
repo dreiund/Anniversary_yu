@@ -5,7 +5,7 @@ import CloudKit
 struct HomeView: View {
     @Environment(\.managedObjectContext) private var context
     @AppStorage("showCountdown") private var showCountdown = true
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDMeeting.index, order: .reverse)])
     private var meetings: FetchedResults<CDMeeting>
     @FetchRequest(sortDescriptors: []) private var moods: FetchedResults<CDDailyMood>
@@ -247,7 +247,7 @@ struct HomeView: View {
                     }
                     ForEach(dueTodos, id: \.objectID) { todo in
                         todayRow(icon: todo.assigneePartnerID == myID ? "📌" : "👉",
-                                 text: todo.title ?? "", link: "记得做 ›") {
+                                 text: todo.title ?? "", link: "待办 ›") {
                             LedgerListView(initialSegment: .todos)
                         }
                     }

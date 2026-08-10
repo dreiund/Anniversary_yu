@@ -1,6 +1,11 @@
 import CloudKit
 import CoreData
 
+/// P6-T4:accept 失败不再只 print——广播出去，由在场的容器（MainShell／引导页）接住弹提示。
+extension Notification.Name {
+    static let shareAcceptFailed = Notification.Name("shareAcceptFailed")
+}
+
 /// 情侣空间唯一一次配对的全部 CKShare 操作。
 /// 策略：链接即可加入（publicPermission .readWrite），链接只经微信私发；
 /// 对方加入后由「锁定邀请」把 publicPermission 关为 .none——门先开、人进来、再锁门。
@@ -84,12 +89,24 @@ final class SharingManager: ObservableObject {
 
     /// 受邀方 delegate 入口（T7）。接受后镜像自动把共享 zone 导入共享库，
     /// RootView 的 couple FetchRequest 随之非空，界面自动进入主壳。
+    /// P6-B1:接受成功后顺带自愈——如果本机之前等不及邀请就自己建了空单人空间，
+    /// 私有 store 里那份空壳残留现在已是纯冗余，趁此刻清掉（App 前台激活是第二道保险）。
+    /// completion 不保证在主线程回调，Core Data 访问经 context.perform 切回 context 自己的队列。
     nonisolated static func accept(_ metadata: CKShare.Metadata) {
         let controller = PersistenceController.shared
         guard let sharedStore = controller.sharedStore else { return }
         controller.container.acceptShareInvitations(from: [metadata], into: sharedStore) { _, error in
             if let error {
                 print("接受邀请失败：\(error)")
+                // completion 不保证在主线程回调，NotificationCenter 的 UI 订阅方需要主线程投递。
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .shareAcceptFailed, object: nil)
+                }
+                return
+            }
+            let context = controller.viewContext
+            context.perform {
+                try? CoupleRepository(context: context).pruneEmptyLocalCouple()
             }
         }
     }

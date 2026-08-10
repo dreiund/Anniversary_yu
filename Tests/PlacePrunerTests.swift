@@ -79,7 +79,7 @@ final class PlacePrunerTests: XCTestCase {
 
     // 反馈⑥：记得做引用的地点不清（PlacePruner 计入 todoItems）
     func testPlaceReferencedOnlyByTodoSurvives() throws {
-        let place = makePlace("只有记得做引用")
+        let place = makePlace("只有待办引用")
         let todo = CDTodoItem(context: pc.viewContext)
         todo.id = UUID(); todo.title = "买花"; todo.couple = couple; todo.place = place
         try pc.viewContext.save()

@@ -18,7 +18,7 @@ enum LedgerSegment: CaseIterable {
 /// 小本本列表（反馈⑨换壳：用户设计图布局，米色系——大标题+管理钮自绘头部、下划线二级筛选对四段都生效、统一白卡）
 struct LedgerListView: View {
     @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: []) private var couples: FetchedResults<CDCouple>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDLedgerEntry.createdAt, order: .reverse)])
     private var entries: FetchedResults<CDLedgerEntry>
     @FetchRequest(sortDescriptors: []) private var todoItems: FetchedResults<CDTodoItem>
@@ -99,7 +99,7 @@ struct LedgerListView: View {
             }
             Button("取消", role: .cancel) { pendingDelete = nil }
         }
-        .alert("删除这条记得做？", isPresented: Binding(get: { pendingDeleteTodo != nil },
+        .alert("删除这条待办？", isPresented: Binding(get: { pendingDeleteTodo != nil },
                                               set: { if !$0 { pendingDeleteTodo = nil } })) {
             Button("删除", role: .destructive) {
                 if let todo = pendingDeleteTodo {
@@ -174,6 +174,8 @@ struct LedgerListView: View {
         if list.isEmpty {
             emptyHint
         } else {
+            // 调用方只传 .praise("好事")或 .like("喜好")两段(生气段走 angrySection、待办段走
+            // todosSection，均不经此处)——三目 else 分支等价于 .like，不会误配其它分类的图标
             ForEach(list, id: \.objectID) { entry in
                 entryRow(entry) { newCard(entry, icon: category == .praise ? "heart" : "star") }
             }
@@ -295,8 +297,8 @@ struct LedgerListView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.white))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(DS.hairline, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(.white))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
             if canEdit { editingTodo = todo } else { viewingTodo = todo }
@@ -363,8 +365,8 @@ struct LedgerListView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.white))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(DS.hairline, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(.white))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
         .contentShape(Rectangle())
     }
 
@@ -439,7 +441,7 @@ private struct TodoDetailSheet: View {
                 .padding(DS.Spacing.md)
             }
             .background(DS.canvas)
-            .navigationTitle("记得做")
+            .navigationTitle("待办")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
