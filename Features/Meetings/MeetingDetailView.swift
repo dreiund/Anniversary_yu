@@ -7,6 +7,9 @@ struct MeetingDetailView: View {
     // 对方远端结束见面(statusRaw 变化)时本机 chips/工具栏要靠别的 FetchRequest 碰巧触发才刷新,
     // 不够即时；订阅后 meeting 自身变化即可驱动本视图重绘(同款方案见 MemoRow/MomentDetailView)
     @ObservedObject var meeting: CDMeeting
+    // 终审 F-2:配合上面的 @ObservedObject 订阅——对方远端删除该见面时，本机若仍停留在
+    // 详情页会被主动触发重绘，此刻 meeting 已是失效对象，直接渲染会因读 fault 崩溃。
+    @Environment(\.dismiss) private var dismiss
     @State private var segment = 0
     @State private var confirmEnd = false
     @State private var showEditForm = false
@@ -35,6 +38,17 @@ struct MeetingDetailView: View {
     }
 
     var body: some View {
+        // 终审 F-2:远端删除后本页对象失效——立即退出，避免渲染已删 CDMeeting 触发 fault 崩溃
+        // (同款守卫见 PlanView)
+        if meeting.managedObjectContext == nil || meeting.isDeleted {
+            Color.clear.onAppear { dismiss() }
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
