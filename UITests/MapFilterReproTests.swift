@@ -313,6 +313,26 @@ final class MapFilterReproTests: XCTestCase {
         memoTab.tap()
         XCTAssertTrue(app.navigationBars["备忘"].waitForExistence(timeout: 3), "备忘弹窗未弹出")
         attach(app, name: "R9-S2-侧签弹窗")
+
+        // 反馈⑫回归锁(T6 评审 carry-to-T7):圆圈双点。修复前 List 对同 id 行有值缓存,
+        // FetchRequest 整体失效才重绘,第 2+n 次勾选数据已变但界面不动;行级 @ObservedObject
+        // 订阅(TimelineListView.MemoRow)后每次 toggle 都驱动本行重绘,无障碍标签随 isDone
+        // 动态显「划掉/恢复 标题」。种子「给她妈带特产」isDone 初始 false → 初始态「划掉」。
+        let memoToggle = app.buttons["划掉 给她妈带特产"]
+        XCTAssertTrue(memoToggle.waitForExistence(timeout: 3), "备忘勾选圆圈未出现")
+        memoToggle.tap()
+        XCTAssertTrue(app.buttons["恢复 给她妈带特产"].waitForExistence(timeout: 2),
+                      "第 1 次点击未翻转为「恢复」")
+        app.buttons["恢复 给她妈带特产"].tap()
+        XCTAssertTrue(app.buttons["划掉 给她妈带特产"].waitForExistence(timeout: 2),
+                      "第 2 次点击未翻回「划掉」(反馈⑫行级订阅重绘回归)")
+
+        // P6-T6 回归锁(评审 carry-to-T7):点行正文同样触发勾选,不止圆圈本身——「整行可勾」。
+        // 上面两次点击已把状态还原到「划掉」,点行是第 3 次翻转,应变「恢复」。
+        app.staticTexts["给她妈带特产"].tap()
+        XCTAssertTrue(app.buttons["恢复 给她妈带特产"].waitForExistence(timeout: 2),
+                      "点行正文未触发勾选(整行可勾回归)")
+
         app.buttons["关闭"].tap()
         sleep(1)
 
