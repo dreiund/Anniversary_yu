@@ -91,7 +91,7 @@ struct OnboardingView: View {
         } message: {
             Text("检查网络后重试，或让对方重新发一次邀请。")
         }
-        .onReceive(NotificationCenter.default.publisher(for: .shareAcceptFailed)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .shareAcceptFailed).receive(on: DispatchQueue.main)) { _ in
             showAcceptFailed = true
         }
     }
