@@ -32,7 +32,8 @@ struct HomeView: View {
             let _ = (moods.count, dateDays.count, planItems.count, todoItems.count, momentsAll.count, cyclesAll.count)  // 注册观察：心情/约会日/计划项/记得做/记忆/经期（含对方同步进来的）变更均刷新首页
             if let couple {
                 VStack(alignment: .leading, spacing: DS.Spacing.md) {
-                    if !accountAvailable {
+                    // 种子演示模式(UI 测试/商店截图)下模拟器无 iCloud,横幅只会干扰画面——抑制
+                    if !accountAvailable && !ProcessInfo.processInfo.arguments.contains("--seed-map-demo") {
                         ParchmentCard {
                             HStack(spacing: 8) {
                                 Circle().fill(DS.dsRed).frame(width: 6, height: 6)
