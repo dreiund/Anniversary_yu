@@ -170,7 +170,7 @@ struct MeetingDetailView: View {
                     .padding(.vertical, 14).padding(.horizontal, 9)
                     .background(UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0,
                                                        bottomTrailingRadius: 10, topTrailingRadius: 10)
-                        .fill(DS.ink))
+                        .fill(DS.darkCard))   // 反馈⑬①:ink 深色下翻亮,侧签底须恒深
                     // 反馈⑪:热区框要 alignment .leading——默认居中会把签块推离屏幕左缘留缝;
                     // 透明热区只向右侧延伸,签块本体紧贴屏幕边
                     .frame(minWidth: 48, minHeight: 48, alignment: .leading)

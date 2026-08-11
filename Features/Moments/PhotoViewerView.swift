@@ -30,7 +30,7 @@ struct PhotoViewerView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(DS.ink)
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color(hex: 0xD2D2D7).opacity(0.64)))
+                    .background(Circle().fill(DS.chipBorder.opacity(0.64)))
             }
             .padding(DS.Spacing.md)
         }

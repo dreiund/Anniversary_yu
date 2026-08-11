@@ -128,7 +128,7 @@ struct LedgerListView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(DS.ink)
                 .padding(.vertical, 6).padding(.horizontal, 14)
-                .background(Capsule().fill(.white))
+                .background(Capsule().fill(DS.canvas))
                 .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
             }
             HStack(spacing: 6) {
@@ -139,7 +139,7 @@ struct LedgerListView: View {
                             .foregroundStyle(segment == seg ? DS.ink : DS.inkMuted)
                             .padding(.vertical, 7).padding(.horizontal, 14)
                             .background(RoundedRectangle(cornerRadius: 10)
-                                .fill(segment == seg ? .white : .clear))
+                                .fill(segment == seg ? DS.canvas : .clear))
                             .overlay(RoundedRectangle(cornerRadius: 10)
                                 .stroke(segment == seg ? DS.hairline : .clear, lineWidth: 1))
                     }
@@ -297,7 +297,7 @@ struct LedgerListView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(.white))
+        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
         .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
@@ -365,7 +365,7 @@ struct LedgerListView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(.white))
+        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
         .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
         .contentShape(Rectangle())
     }

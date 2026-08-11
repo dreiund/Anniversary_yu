@@ -1,6 +1,7 @@
 import XCTest
 
-/// 地图筛选切空类目的复现脚本：种子数据只有 美食/景点公园 两类，切「咖啡甜品」应清空钉位。
+/// 地图筛选切空类目的复现脚本：种子数据只有 美食/景点公园 两类，切「出行」应清空钉位。
+/// (反馈⑬③:咖啡甜品并入美食不再单列,空类目改用新增的「出行」)
 /// 三张截图（全部 → 刚切空类目 → 稍后）供对比钉位是否残留。
 final class MapFilterReproTests: XCTestCase {
     @MainActor
@@ -56,7 +57,7 @@ final class MapFilterReproTests: XCTestCase {
         sleep(4)   // 等地图与钉渲染
         attach(app, name: "1-全部")
 
-        let emptyCat = app.buttons["咖啡甜品"]
+        let emptyCat = app.buttons["出行"]
         XCTAssertTrue(emptyCat.waitForExistence(timeout: 5), "筛选 chips 未出现")
         emptyCat.tap()
         sleep(2)

@@ -48,7 +48,7 @@ struct DarkUtilityButtonStyle: ButtonStyle {
             .foregroundStyle(.white)
             .padding(.vertical, 8)
             .padding(.horizontal, 15)
-            .background(RoundedRectangle(cornerRadius: 8).fill(DS.ink))
+            .background(RoundedRectangle(cornerRadius: 8).fill(DS.darkCard))   // 反馈⑬①:同侧签,墨底钮恒深
             .scaleEffect(configuration.isPressed ? 0.95 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
