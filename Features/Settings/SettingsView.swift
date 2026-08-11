@@ -12,6 +12,8 @@ struct SettingsView: View {
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var showDiagnostics = false
+    @State private var confirmPrunePlaces = false
+    @State private var orphanPlaces = 0
     @State private var partnerName = ""
     @State private var anniversary = Date()
     @State private var loadedAnniversary: Date?
@@ -108,6 +110,14 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    // 反馈:选点地图冒旧钉=孤儿地点(引用删光地点残留;启动自动清扫因云同步竞态已撤,
+                    // 手动入口在数据完整时由用户主动触发,无竞态风险)
+                    if orphanPlaces > 0 {
+                        Button { confirmPrunePlaces = true } label: {
+                            GroupedRow(title: "无引用的旧地点", value: "清理 \(orphanPlaces) 个 ›", valueColor: DS.dsOrange)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     GroupedRow(title: "配对状态", value: pairingStatus.label,
                                valueColor: pairingStatus == .connected ? DS.dsGreen : DS.inkMuted)
                     if let couple = couples.first, !isParticipant {
@@ -192,6 +202,16 @@ struct SettingsView: View {
             accountAvailable = status == .available
         }
         .sheet(isPresented: $showDiagnostics) { CoupleDiagnosticsView() }
+        .onAppear { orphanPlaces = PlacePruner.orphanCount(context: context) }
+        .alert("清理 \(orphanPlaces) 个无引用地点?", isPresented: $confirmPrunePlaces) {
+            Button("清理", role: .destructive) {
+                PlacePruner.pruneOrphans(context: context)
+                orphanPlaces = PlacePruner.orphanCount(context: context)
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这些地点没有任何记忆、小本本、日程或待办引用,只在选点地图里残留旧钉。清理后即从选点中消失,不影响任何现有数据。")
+        }
         .sheet(isPresented: $showTrackedPicker) {
             if let couple = couples.first {
                 TrackedPickerView(couple: couple, requireChoice: false)

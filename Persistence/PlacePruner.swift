@@ -5,6 +5,18 @@ import CoreData
 /// 只在本机删除类操作保存后调用（本地库此刻自洽）；**不做启动清扫**——CloudKit 首启导入
 /// 顺序不保证，地点先到、引用后到的窗口会误删并把删除同步回云端。记忆/小本本/日程/记得做计入引用。
 enum PlacePruner {
+    /// 孤儿计数(与 pruneOrphans 同判定,只数不删)——设置页手动清理入口展示用
+    static func orphanCount(context: NSManagedObjectContext) -> Int {
+        guard let places = try? context.fetch(NSFetchRequest<CDPlace>(entityName: "CDPlace")) else { return 0 }
+        return places.filter { place in
+            let moments = ((place.moments as? Set<CDMoment>) ?? []).filter { !$0.isDeleted }
+            let ledger = ((place.ledgerEntries as? Set<CDLedgerEntry>) ?? []).filter { !$0.isDeleted }
+            let plans = ((place.planItems as? Set<CDPlanItem>) ?? []).filter { !$0.isDeleted }
+            let todos = ((place.todoItems as? Set<CDTodoItem>) ?? []).filter { !$0.isDeleted }
+            return moments.isEmpty && ledger.isEmpty && plans.isEmpty && todos.isEmpty
+        }.count
+    }
+
     static func pruneOrphans(context: NSManagedObjectContext) {
         guard let places = try? context.fetch(NSFetchRequest<CDPlace>(entityName: "CDPlace")) else { return }
         var pruned = false
