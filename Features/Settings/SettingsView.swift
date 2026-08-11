@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var showDiagnostics = false
     @State private var showInviteShare = false
     @State private var inviteCopied = false
+    @State private var orphanAuthors = 0
+    @State private var confirmRepairAuthors = false
     @State private var confirmPrunePlaces = false
     @State private var orphanPlaces = 0
     @State private var partnerName = ""
@@ -120,6 +122,12 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    if orphanAuthors > 0 {
+                        Button { confirmRepairAuthors = true } label: {
+                            GroupedRow(title: "作者显示异常的记录", value: "修复 \(orphanAuthors) 条 ›", valueColor: DS.dsOrange)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     GroupedRow(title: "配对状态", value: pairingStatus.label,
                                valueColor: pairingStatus == .connected ? DS.dsGreen : DS.inkMuted)
                     if let couple = couples.first, !isParticipant {
@@ -155,20 +163,9 @@ struct SettingsView: View {
                                 .buttonStyle(.plain)
                             }
                         case .connected:
-                            if sharing.share?.publicPermission != CKShare.ParticipantPermission.none {
-                                if let url = sharing.share?.url {
-                                    ShareLink(item: SharingManager.inviteMessage(url: url)) {
-                                        GroupedRow(title: "邀请链接", value: "发出邀请 ›", valueColor: DS.actionBlue)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                Button {
-                                    Task { await sharing.lockInvites(for: couple) }
-                                } label: {
-                                    GroupedRow(title: "对方已加入", value: "锁定邀请 ›", valueColor: DS.actionBlue)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                            // 反馈⑯bug3:「锁定邀请」移除——经公开链接加入的参与者会随公开权限
+                            // 一起被关在门外(锁门=踢人=配对解除,实测事故)。安全模型改为链接保密。
+                            GroupedRow(title: "对方已加入", value: "链接勿外传", valueColor: DS.inkMuted)
                         }
                     }
                     GroupedRow(title: "iCloud 账号", value: accountAvailable ? "正常" : "未登录",
@@ -224,7 +221,23 @@ struct SettingsView: View {
                     .presentationDetents([.medium, .large])
             }
         }
-        .onAppear { orphanPlaces = PlacePruner.orphanCount(context: context) }
+        .onAppear {
+            orphanPlaces = PlacePruner.orphanCount(context: context)
+            if let couple = couples.first {
+                orphanAuthors = CoupleRepository(context: context).orphanAuthorCount(of: couple)
+            }
+        }
+        .alert("把 \(orphanAuthors) 条记录归为你记的?", isPresented: $confirmRepairAuthors) {
+            Button("归为我记的", role: .destructive) {
+                if let couple = couples.first {
+                    _ = try? CoupleRepository(context: context).repairOrphanAuthors(of: couple)
+                    orphanAuthors = CoupleRepository(context: context).orphanAuthorCount(of: couple)
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这些记录的作者信息指向早前被删除的空间成员,目前显示成「TA 记的」。只在确认这些是你本人在这台设备上写的时执行;TA 写的同类记录请在 TA 的手机上执行同样修复。")
+        }
         .alert("清理 \(orphanPlaces) 个无引用地点?", isPresented: $confirmPrunePlaces) {
             Button("清理", role: .destructive) {
                 PlacePruner.pruneOrphans(context: context)

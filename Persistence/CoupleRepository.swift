@@ -113,6 +113,39 @@ struct CoupleRepository {
     }
 
     /// [0]=创建者/我（roleIndex 0），[1]=对方（roleIndex 1）。保序硬约束，禁止更改排序键。
+    /// 反馈⑯bug1:无主作者条目计数——authorPartnerID 不属于当前 couple 任何成员的记录
+    /// (双空间窗口期写入的条目带着已删空间的成员 id,渲染时匹配不上一律显示成「TA」)。
+    func orphanAuthorCount(of couple: CDCouple) -> Int {
+        let valid = Set(partners(of: couple).compactMap(\.id))
+        return orphanAuthorObjects(validIDs: valid).count
+    }
+
+    /// 反馈⑯bug1:把无主作者条目批量归为「我」——只应在确认这些是本机写的时执行(设置页有确认文案)。
+    @discardableResult
+    func repairOrphanAuthors(of couple: CDCouple) throws -> Int {
+        guard let myID = currentPartnerID(of: couple) else { return 0 }
+        let valid = Set(partners(of: couple).compactMap(\.id))
+        let objects = orphanAuthorObjects(validIDs: valid)
+        for o in objects { o.setValue(myID, forKey: "authorPartnerID") }
+        if !objects.isEmpty { try context.save() }
+        return objects.count
+    }
+
+    private func orphanAuthorObjects(validIDs: Set<UUID>) -> [NSManagedObject] {
+        let entities = ["CDMoment", "CDEvaluation", "CDLedgerEntry", "CDTodoItem",
+                        "CDPlanItem", "CDDailyMood", "CDCycle"]
+        var found: [NSManagedObject] = []
+        for name in entities {
+            let request = NSFetchRequest<NSManagedObject>(entityName: name)
+            guard let rows = try? context.fetch(request) else { continue }
+            for row in rows {
+                guard let author = row.value(forKey: "authorPartnerID") as? UUID else { continue }
+                if !validIDs.contains(author) { found.append(row) }
+            }
+        }
+        return found
+    }
+
     func partners(of couple: CDCouple) -> [CDPartner] {
         let set = (couple.partners as? Set<CDPartner>) ?? []
         return set.sorted { $0.roleIndex < $1.roleIndex }
