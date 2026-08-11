@@ -25,6 +25,9 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Anniversary
+        # 反馈⑭:声明中文为开发语言——否则默认 en,系统日期选择器/系统按钮显示英文
+        CFBundleDevelopmentRegion: zh_Hans
+        CFBundleLocalizations: [zh_Hans]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}

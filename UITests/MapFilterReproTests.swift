@@ -258,7 +258,7 @@ final class MapFilterReproTests: XCTestCase {
         // 系统无障碍把子 Text 的 label 用「, 」拼接成整按钮的组合 label（实测导出视图树确认，
         // 不是简单的「备忘 N」一句话）；种子 2 条备忘 = 给她妈带特产+买伴手礼
         // （「买火车票」day != nil 走「行前已备」，不算备忘——见 DebugSeeder.swift 的 T7 注释）
-        let memoTab = app.buttons["备, 忘, 2"]
+        let memoTab = app.buttons["备忘 2"]
         XCTAssertTrue(memoTab.waitForExistence(timeout: 5), "备忘侧签未出现")
         attach(app, name: "R8-1-进行中时间线")
         // tap 侧签 → 半屏弹窗，备忘条目在里面，纯划线不转化
@@ -290,7 +290,7 @@ final class MapFilterReproTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["没做成的计划"].waitForExistence(timeout: 5), "灰卡组未出现")
         XCTAssertTrue(app.staticTexts["江边看夜景"].exists, "灰卡未出现")
         // 备忘(给她妈带特产/买伴手礼)结束后仍存档在侧签，不随结束见面消失
-        XCTAssertTrue(app.buttons["备, 忘, 2"].exists, "结束后备忘侧签应仍在")
+        XCTAssertTrue(app.buttons["备忘 2"].exists, "结束后备忘侧签应仍在")
         attach(app, name: "R8-3-结束后灰卡")
     }
 
@@ -306,7 +306,7 @@ final class MapFilterReproTests: XCTestCase {
         card.tap()
 
         // S1:时间线左缘侧签(墨底白字竖排「备/忘/N」)
-        let memoTab = app.buttons["备, 忘, 2"]
+        let memoTab = app.buttons["备忘 2"]
         XCTAssertTrue(memoTab.waitForExistence(timeout: 5), "备忘侧签未出现")
         attach(app, name: "R9-S1-时间线侧签")
 

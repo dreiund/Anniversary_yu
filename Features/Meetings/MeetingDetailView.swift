@@ -177,6 +177,9 @@ struct MeetingDetailView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(DSPressEffect())
+                // 反馈⑭:显式标签取代系统对多 Text 的自动拼接——拼接分隔符随本地化变
+                // (en「备, 忘, 2」/zh_Hans「备、忘、2」),UI 测试与 VoiceOver 都要稳定锚点
+                .accessibilityLabel("备忘 \(memos.count)")
             }
         }
         .sheet(isPresented: $showMemos) {

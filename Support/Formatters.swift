@@ -8,7 +8,7 @@ enum Fmt {
         return f
     }
 
-    static let ymd = make("yyyy.MM.dd")
+    static let ymd = make("yyyy年M月d日")   // 反馈⑭:全 App 日期中文化(原 yyyy.MM.dd 西式点分)
     static let monthDay = make("M月d日")
     static let monthDayWeek = make("M月d日 EEE")
     static let hm = make("HH:mm")
