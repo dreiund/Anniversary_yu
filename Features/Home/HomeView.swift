@@ -3,6 +3,8 @@ import CoreData
 import CloudKit
 
 struct HomeView: View {
+    /// 反馈⑬②:提醒区「去足迹翻翻回忆」要能真的切到足迹 tab——MainShell 把 tab 绑定传下来
+    var shellTab: Binding<AppTab>? = nil
     @Environment(\.managedObjectContext) private var context
     @AppStorage("showCountdown") private var showCountdown = true
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
@@ -281,7 +283,10 @@ struct HomeView: View {
         Text("提醒").dsSectionTitle()
         GroupedSection {
             if stale == nil && pendingEvals.isEmpty {
-                GroupedRow(title: "一切都好", value: "去足迹翻翻回忆 ›", showsDivider: false)
+                Button { shellTab?.wrappedValue = .footprints } label: {
+                    GroupedRow(title: "一切都好", value: "去足迹翻翻回忆 ›", showsDivider: false)
+                }
+                .buttonStyle(.plain)
             } else {
                 if let ongoing, stale != nil {
                     NavigationLink {

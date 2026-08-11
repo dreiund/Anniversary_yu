@@ -151,7 +151,8 @@ struct PlacePickerSheet: View {
             if linkedPlaceID == nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 5) {
-                        ForEach(PlaceCategory.allCases, id: \.rawValue) { cat in
+                        // 反馈⑬③:类别选择用展示类目(咖啡甜品/影展演出不再新写,旧数据归并展示)
+                        ForEach(PlaceCategory.displayCases, id: \.rawValue) { cat in
                             Button {
                                 categoryRaw = cat.rawValue
                             } label: {

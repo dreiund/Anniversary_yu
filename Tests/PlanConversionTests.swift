@@ -55,6 +55,7 @@ final class PlanConversionTests: XCTestCase {
             (.shopping, .activity),
             (.show, .activity),
             (.stay, .stay),
+            (.travel, .activity),
         ]
         XCTAssertEqual(PlaceCategory.allCases.count, expectations.count,
                        "PlaceCategory 增删 case 时本测试要同步更新，别漏分支")

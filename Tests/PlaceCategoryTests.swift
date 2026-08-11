@@ -11,7 +11,14 @@ final class PlaceCategoryTests: XCTestCase {
         XCTAssertEqual(PlaceCategory.shopping.rawValue, 4)
         XCTAssertEqual(PlaceCategory.show.rawValue, 5)
         XCTAssertEqual(PlaceCategory.stay.rawValue, 6)
-        XCTAssertEqual(PlaceCategory.allCases.count, 7)
+        XCTAssertEqual(PlaceCategory.travel.rawValue, 7)   // 反馈⑬③追加(尾部新增,旧值不动)
+        XCTAssertEqual(PlaceCategory.allCases.count, 8)
+    }
+
+    func testDisplayMergeCoversAllRaws() {
+        // 反馈⑬③:展示类目的 mergedRaws 并集必须覆盖全部 raw——任何历史数据都能落进某个筛选
+        let covered = Set(PlaceCategory.displayCases.flatMap(\.mergedRaws))
+        XCTAssertEqual(covered, Set(PlaceCategory.allCases.map(\.rawValue)))
     }
 
     func testLabels() {

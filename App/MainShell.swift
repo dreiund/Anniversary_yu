@@ -50,7 +50,7 @@ struct MainShell: View {
         VStack(spacing: 0) {
             ZStack {
                 switch tab {
-                case .us: NavigationStack { HomeView() }
+                case .us: NavigationStack { HomeView(shellTab: $tab) }
                 case .footprints: NavigationStack { MeetingsView() }
                 case .ledger: NavigationStack { LedgerListView() }
                 case .her: NavigationStack { HerView() }

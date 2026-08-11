@@ -76,7 +76,7 @@ struct PlacesMapView: View {
                 guard hasMoments, matchesMeeting(p, index: index) else { return false }
                 switch filter {
                 case .all: return true
-                case .category(let cat): return p.categoryRaw == cat.rawValue
+                case .category(let cat): return cat.mergedRaws.contains(p.categoryRaw)
                 case .ledger, .plans, .todos: return false
                 }
             }
@@ -88,7 +88,7 @@ struct PlacesMapView: View {
             guard hasMoments || hasLedger || hasPlan || hasTodo else { return false }
             switch filter {
             case .all: return true
-            case .category(let cat): return p.categoryRaw == cat.rawValue
+            case .category(let cat): return cat.mergedRaws.contains(p.categoryRaw)
             case .ledger: return hasLedger
             case .plans: return hasPlan
             case .todos: return hasTodo
@@ -130,7 +130,8 @@ struct PlacesMapView: View {
     private var meetingMenu: some View {
         Menu {
             Button("全部见面") { selectMeeting(nil) }
-            ForEach(meetings, id: \.objectID) { m in
+            // 反馈⑬④:还没开始的见面(planned)不算「一次见面」,不进按次筛选
+            ForEach(meetings.filter { $0.statusRaw != MeetingStatus.planned.rawValue }, id: \.objectID) { m in
                 Button("第 \(m.index) 次见面") { selectMeeting(m.index) }
             }
         } label: {
@@ -155,7 +156,7 @@ struct PlacesMapView: View {
             HStack(spacing: 6) {
                 meetingMenu
                 chip(title: "全部", selected: filter == .all) { filter = .all }
-                ForEach(PlaceCategory.allCases, id: \.rawValue) { cat in
+                ForEach(PlaceCategory.displayCases, id: \.rawValue) { cat in
                     chip(title: cat.label, selected: filter == .category(cat)) {
                         filter = filter == .category(cat) ? .all : .category(cat)
                     }

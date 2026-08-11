@@ -86,6 +86,7 @@ extension MomentType {
         case .scenery: self = .sight
         case .shopping, .show: self = .activity
         case .stay: self = .stay
+        case .travel: self = .activity   // 反馈⑬③:出行类计划转回忆归「活动」
         case .other: self = .other
         }
     }
