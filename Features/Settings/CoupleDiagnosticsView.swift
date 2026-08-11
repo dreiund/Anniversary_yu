@@ -61,6 +61,8 @@ struct CoupleDiagnosticsView: View {
         let entries = (couple.ledgerEntries as? Set<CDLedgerEntry>)?.count ?? 0
         let todos = (couple.todos as? Set<CDTodoItem>)?.count ?? 0
         let cycles = (couple.cycles as? Set<CDCycle>)?.count ?? 0
+        let moods = (couple.dailyMoods as? Set<CDDailyMood>)?.count ?? 0
+        let intimacy = (couple.intimacyRecords as? Set<CDIntimacyRecord>)?.count ?? 0
 
         GroupedSection {
             VStack(alignment: .leading, spacing: 6) {
@@ -80,7 +82,8 @@ struct CoupleDiagnosticsView: View {
                 }
                 Text("成员:\(partners.compactMap(\.name).joined(separator: "、").isEmpty ? "—" : partners.compactMap(\.name).joined(separator: "、"))")
                     .dsFootnote()
-                Text(empty ? "没有任何数据" : "见面 \(meetings) · 地点 \(places) · 小本本 \(entries) · 待办 \(todos) · 周期 \(cycles)")
+                // 计数与 hasAnyData 同口径列全七类——漏列会出现「显示全 0 却判非空」的困惑(构建16实况)
+                Text(empty ? "没有任何数据" : "见面 \(meetings) · 地点 \(places) · 小本本 \(entries) · 待办 \(todos) · 周期 \(cycles) · 心情 \(moods) · 亲密 \(intimacy)")
                     .dsFootnote()
                 // 删除即选择(用户定稿):非当前空间一律可删;当前使用的永不可删(误删=两人数据全没)
                 if !isActive {
@@ -104,7 +107,9 @@ struct CoupleDiagnosticsView: View {
         let entries = (couple.ledgerEntries as? Set<CDLedgerEntry>)?.count ?? 0
         let todos = (couple.todos as? Set<CDTodoItem>)?.count ?? 0
         let cycles = (couple.cycles as? Set<CDCycle>)?.count ?? 0
-        return "它名下的数据会一并删除(见面 \(meetings) · 地点 \(places) · 小本本 \(entries) · 待办 \(todos) · 周期 \(cycles)),并同步到 iCloud,无法恢复。"
+        let moods = (couple.dailyMoods as? Set<CDDailyMood>)?.count ?? 0
+        let intimacy = (couple.intimacyRecords as? Set<CDIntimacyRecord>)?.count ?? 0
+        return "它名下的数据会一并删除(见面 \(meetings) · 地点 \(places) · 小本本 \(entries) · 待办 \(todos) · 周期 \(cycles) · 心情 \(moods) · 亲密 \(intimacy)),并同步到 iCloud,无法恢复。"
     }
 
     /// 级联删除整个空间;删除前取消名下待办与日程的本机提醒(不留野闹钟)
