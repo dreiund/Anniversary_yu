@@ -12,6 +12,8 @@ struct SettingsView: View {
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
     @State private var showDiagnostics = false
+    @State private var showInviteShare = false
+    @State private var inviteCopied = false
     @State private var confirmPrunePlaces = false
     @State private var orphanPlaces = 0
     @State private var partnerName = ""
@@ -127,7 +129,8 @@ struct SettingsView: View {
                                 creatingShare = true
                                 Task {
                                     defer { creatingShare = false }
-                                    _ = try? await sharing.ensureShare(for: couple)
+                                    // 反馈⑮bug1:成功直接弹分享面板(此前只是行文案静默变化,像没反应);失败设 lastError 可见
+                                    if await sharing.generateInvite(for: couple) { showInviteShare = true }
                                 }
                             } label: {
                                 GroupedRow(title: "还没配对", value: creatingShare ? "生成中…" : "生成邀请 ›",
@@ -137,21 +140,30 @@ struct SettingsView: View {
                             .disabled(creatingShare)
                         case .invited:
                             if let url = sharing.share?.url {
-                                ShareLink(item: url) {
+                                // 反馈⑮bug3:载荷=带指引文字(微信内置浏览器打不开配对,须 Safari/信息)
+                                ShareLink(item: SharingManager.inviteMessage(url: url)) {
                                     GroupedRow(title: "邀请链接", value: "发出邀请 ›", valueColor: DS.actionBlue)
+                                }
+                                .buttonStyle(.plain)
+                                Button {
+                                    UIPasteboard.general.string = SharingManager.inviteMessage(url: url)
+                                    inviteCopied = true
+                                } label: {
+                                    GroupedRow(title: "或复制邀请文字", value: inviteCopied ? "已复制 ✓" : "复制 ›",
+                                               valueColor: inviteCopied ? DS.dsGreen : DS.actionBlue)
                                 }
                                 .buttonStyle(.plain)
                             }
                         case .connected:
                             if sharing.share?.publicPermission != CKShare.ParticipantPermission.none {
                                 if let url = sharing.share?.url {
-                                    ShareLink(item: url) {
+                                    ShareLink(item: SharingManager.inviteMessage(url: url)) {
                                         GroupedRow(title: "邀请链接", value: "发出邀请 ›", valueColor: DS.actionBlue)
                                     }
                                     .buttonStyle(.plain)
                                 }
                                 Button {
-                                    Task { await sharing.lockInvites() }
+                                    Task { await sharing.lockInvites(for: couple) }
                                 } label: {
                                     GroupedRow(title: "对方已加入", value: "锁定邀请 ›", valueColor: DS.actionBlue)
                                 }
@@ -178,6 +190,10 @@ struct SettingsView: View {
                             .padding(.horizontal, 14).padding(.bottom, 8)
                     }
                 }
+                if pairingStatus == .invited {
+                    Text("对方在微信里收到后:长按链接 → 选「在 Safari 打开」;或让 TA 从「信息」App 里点开。微信里直接点会停在 iCloud 网页,完不成配对。")
+                        .dsFootnote().padding(.horizontal, 4)
+                }
                 if pairingStatus == .connected {
                     Text(isParticipant
                          ? "解除配对后你的手机会清空这段空间；TA 的记录不受影响。"
@@ -202,6 +218,12 @@ struct SettingsView: View {
             accountAvailable = status == .available
         }
         .sheet(isPresented: $showDiagnostics) { CoupleDiagnosticsView() }
+        .sheet(isPresented: $showInviteShare) {
+            if let url = sharing.share?.url {
+                InviteActivityView(text: SharingManager.inviteMessage(url: url))
+                    .presentationDetents([.medium, .large])
+            }
+        }
         .onAppear { orphanPlaces = PlacePruner.orphanCount(context: context) }
         .alert("清理 \(orphanPlaces) 个无引用地点?", isPresented: $confirmPrunePlaces) {
             Button("清理", role: .destructive) {
@@ -286,4 +308,14 @@ struct SettingsView: View {
             ? "解除后你的手机会清空这段空间并回到引导页；TA 那边的记录不受影响。想复合就让 TA 重新发邀请。"
             : "解除后 TA 的手机会清空这段空间并回到引导页；你的记录全部保留，重新发邀请可恢复。"
     }
+}
+
+
+/// 反馈⑮bug1:生成邀请成功后直接弹出的系统分享面板(UIKit 桥;ShareLink 无法程序化触发)
+private struct InviteActivityView: UIViewControllerRepresentable {
+    let text: String
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [text], applicationActivities: nil)
+    }
+    func updateUIViewController(_: UIActivityViewController, context: Context) {}
 }

@@ -73,18 +73,40 @@ final class SharingManager: ObservableObject {
         return newShare
     }
 
+    /// 反馈⑮bug1:生成邀请的 UI 入口——失败不再静默(设 lastError),成功返回 true 让调用方直接弹分享面板
+    func generateInvite(for couple: CDCouple) async -> Bool {
+        lastError = nil
+        do {
+            _ = try await ensureShare(for: couple)
+            return true
+        } catch {
+            lastError = "生成邀请失败 · 检查网络与 iCloud 登录后重试"
+            return false
+        }
+    }
+
     /// 她加入后关门：新人无法再经链接加入，既有参与者不受影响。
-    func lockInvites() async {
+    /// 反馈⑮bug2:锁定成功后必须从云端重拉 share 真相——persist 返回的本地对象参与者列表
+    /// 可能不完整,状态机会把「已锁+看似无参与者」误判回未配对,用户再点生成邀请就会
+    /// 走「同链接复活」分支把刚锁的门重新打开(实测表现=「锁定后配对被取消」)。
+    func lockInvites(for couple: CDCouple) async {
         lastError = nil
         guard let share, let store = controller.privateStore else { return }
         let original = share.publicPermission
         share.publicPermission = .none
         do {
-            self.share = try await controller.container.persistUpdatedShare(share, in: store)
+            _ = try await controller.container.persistUpdatedShare(share, in: store)
+            await loadShare(for: couple)   // 云端真相刷新参与者列表
         } catch {
             share.publicPermission = original  // 回滚：云端未锁成，本地不得谎报已锁
             lastError = "锁定失败，请重试"
         }
+    }
+
+    /// 反馈⑮bug3:分享载荷=带指引的文字(链接在微信内置浏览器只能到 iCloud 网页、无法唤起
+    /// 系统接受流程——平台限制;指引对方用 Safari/信息打开是唯一通路)
+    nonisolated static func inviteMessage(url: URL) -> String {
+        "和我配对「我们的纪念空间」:\n\(url.absoluteString)\n\n⚠️ 请复制此链接到 Safari 浏览器打开(或直接在「信息」里点开)——在微信里直接点开会停在 iCloud 网页,无法完成配对。"
     }
 
     /// 受邀方 delegate 入口（T7）。接受后镜像自动把共享 zone 导入共享库，

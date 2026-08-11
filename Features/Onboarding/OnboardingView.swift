@@ -110,7 +110,8 @@ private struct AcceptInviteGuideSheet: View {
             Text("加入 TA 的空间").dsPageTitle()
             VStack(alignment: .leading, spacing: 10) {
                 Text("1. 让 TA 打开 App 设置 → 配对与同步，点「发出邀请」发给你").dsBody()
-                Text("2. 在微信里点开那条链接，选择用本 App 打开").dsBody()
+                Text("2. 微信里收到后:长按链接 → 「在 Safari 打开」;或从「信息」里直接点开").dsBody()
+                Text("   (微信里直接点开会停在 iCloud 网页,完不成配对)").dsFootnote()
                 Text("3. 回到这里稍等片刻，空间同步完成会自动进入").dsBody()
             }
             .padding(.horizontal, DS.Spacing.md)
