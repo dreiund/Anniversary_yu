@@ -70,7 +70,8 @@ struct CoupleRepository {
     /// 还核对了 places/dailyMoods/intimacyRecords 三类(覆盖更宽只会让判定更保守、更不容易删，
     /// 不会引入误删)。moments 不单独查：它是 meeting→dateDay→moment 派生的三级子关系，
     /// 结构上不可能在 meetings 为空时非空(没有 meeting 就没有能挂它的 dateDay)，单独查是死代码。
-    private func hasAnyData(_ couple: CDCouple) -> Bool {
+    /// 空判定口径(prune 与诊断页共用):七类用户数据任一非空即视为有数据
+    func hasAnyData(_ couple: CDCouple) -> Bool {
         let meetings = (couple.meetings as? Set<CDMeeting>) ?? []
         let places = (couple.places as? Set<CDPlace>) ?? []
         let dailyMoods = (couple.dailyMoods as? Set<CDDailyMood>) ?? []

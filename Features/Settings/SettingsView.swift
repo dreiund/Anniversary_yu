@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("footprintsCycleTintOn") private var footprintsCycleTintOn = true
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @State private var myName = ""
+    @State private var showDiagnostics = false
     @State private var partnerName = ""
     @State private var anniversary = Date()
     @State private var loadedAnniversary: Date?
@@ -102,7 +103,10 @@ struct SettingsView: View {
                     // P6-B1:双 couple 歧义防线的最后一道——理论上 pruneEmptyLocalCouple 该已经
                     // 自愈掉多余空间，这行只在自愈没跑到/没赶上时兜底，提示用户找开发者别自己瞎点。
                     if couples.count > 1 {
-                        GroupedRow(title: "检测到重复空间", value: "联系开发者处理", valueColor: DS.dsOrange)
+                        Button { showDiagnostics = true } label: {
+                            GroupedRow(title: "检测到重复空间", value: "点击诊断 ›", valueColor: DS.dsOrange)
+                        }
+                        .buttonStyle(.plain)
                     }
                     GroupedRow(title: "配对状态", value: pairingStatus.label,
                                valueColor: pairingStatus == .connected ? DS.dsGreen : DS.inkMuted)
@@ -187,6 +191,7 @@ struct SettingsView: View {
             let status = try? await CKContainer(identifier: PersistenceController.cloudContainerID).accountStatus()
             accountAvailable = status == .available
         }
+        .sheet(isPresented: $showDiagnostics) { CoupleDiagnosticsView() }
         .sheet(isPresented: $showTrackedPicker) {
             if let couple = couples.first {
                 TrackedPickerView(couple: couple, requireChoice: false)
