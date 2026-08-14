@@ -13,6 +13,7 @@ struct TimelineListView: View {
     let meeting: CDMeeting
     let selecting: Bool
     @Binding var selected: Set<NSManagedObjectID>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest private var momentsFetch: FetchedResults<CDMoment>
     @FetchRequest private var daysFetch: FetchedResults<CDDateDay>
     @FetchRequest private var evalsFetch: FetchedResults<CDEvaluation>
@@ -53,7 +54,12 @@ struct TimelineListView: View {
         let isOngoing = meeting.statusRaw == MeetingStatus.ongoing.rawValue
         let isFinished = meeting.statusRaw == MeetingStatus.finished.rawValue
         let showPlans = isOngoing || isFinished
-        let allPlans = showPlans ? Array(plansFetch) : []
+        let myID = couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+        // R18 隐身面单一咽喉点:对方私密日程在已备/散插/tail/灰卡(乃至备忘)全体隐形
+        let allPlans = (showPlans ? Array(plansFetch) : []).filter {
+            LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                  visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }
         // 反馈⑨T4:备忘(day == nil)从主时间线剥离——已备组/散插/tail/灰卡从此只含日程；
         // 备忘改在 MeetingDetailView 的左缘侧签弹窗里独立展示(纯划线,永不转化，见 MemoListSheet)
         let memos = allPlans.filter { $0.day == nil }

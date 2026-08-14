@@ -44,6 +44,13 @@ struct PlanTodoCard: View {
                 }
             }
             Spacer(minLength: 0)
+            if let thumb = PlanItemRepository(context: context).evidencesSorted(item).first?.thumbnailData,
+               let ui = UIImage(data: thumb) {
+                Image(uiImage: ui).resizable().scaledToFill()
+                    .frame(width: 22, height: 22)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .allowsHitTesting(false)
+            }
             if state == .missed {
                 Text("没做成 · 下次再来")
                     .font(.system(size: 10))
@@ -65,6 +72,9 @@ struct PlanTodoCard: View {
             let text = item.time == nil ? Fmt.monthDayWeek.string(from: moment)
                 : "\(Fmt.monthDayWeek.string(from: moment)) \(Fmt.hm.string(from: moment))"
             parts.append(prefix + text)
+        }
+        if item.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue, item.revealedAt == nil {
+            parts.append("🔒")
         }
         if let placeName = item.place?.name ?? item.placeText, !placeName.isEmpty {
             parts.append(placeName)

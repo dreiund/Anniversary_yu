@@ -180,9 +180,13 @@ struct MeetingsView: View {
         }
     }
 
+    private var myID: UUID? {
+        couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+    }
+
     @ViewBuilder
     private func plannedCard(_ meeting: CDMeeting) -> some View {
-        let stats = PlanItemRepository(context: context).stats(for: meeting)
+        let stats = PlanItemRepository(context: context).stats(for: meeting, visibleTo: myID)
         let days = meeting.plannedStart.map {
             HomeLogic.countdownDays(to: $0, from: Date(), calendar: .current)
         }

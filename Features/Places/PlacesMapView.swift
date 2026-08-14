@@ -47,7 +47,10 @@ struct PlacesMapView: View {
     private func hasActivePlan(_ place: CDPlace) -> Bool {
         ((place.planItems as? Set<CDPlanItem>) ?? []).contains {
             guard $0.day != nil, let meeting = $0.meeting else { return false }
+            // R18:私密日程的地点不成计划钉(anyVisible 防泄露先例)
             return meeting.statusRaw != MeetingStatus.finished.rawValue
+                && LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                         visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
         }
     }
 

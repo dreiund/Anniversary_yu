@@ -4,6 +4,7 @@ import CoreData
 struct PlanView: View {
     @Environment(\.managedObjectContext) private var context
     let meeting: CDMeeting
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @FetchRequest private var items: FetchedResults<CDPlanItem>
     @FetchRequest(
         sortDescriptors: [],
@@ -41,8 +42,16 @@ struct PlanView: View {
     private var content: some View {
         let _ = items.count  // 注册 FetchRequest 依赖：任何 CDPlanItem 变更触发本视图刷新
         let repo = PlanItemRepository(context: context)
-        let sections = repo.sections(for: meeting, calendar: .current)
-        let stats = repo.stats(for: meeting)
+        let myID = couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+        let raw = repo.sections(for: meeting, calendar: .current)
+        let isVisible: (CDPlanItem) -> Bool = {
+            LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                  visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }
+        let sections = PlanSections(
+            dated: raw.dated.map { ($0.day, $0.items.filter(isVisible)) }.filter { !$0.items.isEmpty },
+            undated: raw.undated.filter(isVisible))
+        let stats = repo.stats(for: meeting, visibleTo: myID)
 
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.md) {
@@ -229,6 +238,9 @@ struct PlanView: View {
                         .foregroundStyle(DS.actionBlue)
                     Text(item.title ?? "").dsBody()
                         .strikethrough(item.isDone, color: DS.inkMuted)
+                    if item.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue, item.revealedAt == nil {
+                        Text("🔒").font(.system(size: 11))
+                    }
                 }
                 if let note = item.note, !note.isEmpty {
                     Text(note).dsFootnote()
@@ -246,6 +258,13 @@ struct PlanView: View {
                 }
             }
             Spacer()
+            if let thumb = PlanItemRepository(context: context).evidencesSorted(item).first?.thumbnailData,
+               let ui = UIImage(data: thumb) {
+                Image(uiImage: ui).resizable().scaledToFill()
+                    .frame(width: 22, height: 22)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .allowsHitTesting(false)
+            }
             AvatarInitial(name: authorName(item.authorPartnerID), size: 20)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)

@@ -128,7 +128,7 @@ struct HomeView: View {
             .buttonStyle(DSPressEffect())
         } else if showCountdown, let planned, let start = planned.plannedStart {
             let days = HomeLogic.countdownDays(to: start, from: Date(), calendar: .current)
-            let stats = PlanItemRepository(context: context).stats(for: planned)
+            let stats = PlanItemRepository(context: context).stats(for: planned, visibleTo: myID)
             NavigationLink {
                 PlanView(meeting: planned)
             } label: {
@@ -203,6 +203,8 @@ struct HomeView: View {
             .filter { $0.statusRaw != MeetingStatus.finished.rawValue }
             .flatMap { meeting in
                 (((meeting.planItems as? Set<CDPlanItem>) ?? []))
+                    .filter { LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                                    visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt) }
                     .filter { $0.day.map { Calendar.current.isDate($0, inSameDayAs: today) } ?? false }
                     .sorted { ($0.time ?? .distantFuture) < ($1.time ?? .distantFuture) }
                     .map { (meeting, $0) }
