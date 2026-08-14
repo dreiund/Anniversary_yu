@@ -54,6 +54,21 @@ struct DarkUtilityButtonStyle: ButtonStyle {
     }
 }
 
+/// 小尺寸行动蓝药丸(R17 §三共享化):详情页地点行内联「导航」钮专用紧凑尺寸
+/// (BluePillButtonStyle 是大号 CTA;行前日程查看页/小本本四段详情共用本样式)
+struct SmallBluePillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 14)
+            .background(Capsule().fill(DS.actionBlue))
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
 #Preview {
     VStack(spacing: 16) {
         Button("添加日程") {}.buttonStyle(BluePillButtonStyle())

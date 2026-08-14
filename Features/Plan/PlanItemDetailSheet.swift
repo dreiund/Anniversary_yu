@@ -93,21 +93,6 @@ struct PlanItemDetailSheet: View {
     }
 }
 
-/// 小尺寸行动蓝药丸:DSButtons 里的 BluePillButtonStyle 是大号 CTA 尺寸(17pt/11·22 内边距),
-/// 查看页地点行内联「导航」按钮需要紧凑尺寸,自绘一个小号版本。
-private struct SmallBluePillButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.vertical, 6)
-            .padding(.horizontal, 14)
-            .background(Capsule().fill(DS.actionBlue))
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
 /// 反馈⑨终审修:导航统一走 AmapNavigator(高德优先,未装退苹果地图;GCJ-02 国内坐标坑见该文件注释)——
 /// 原先这里直跳苹果地图,与地点档案页「导航到这里」形成同屏两套导航标准,现收敛为一套(小地图/日程查看页共用)
 @MainActor

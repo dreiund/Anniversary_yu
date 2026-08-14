@@ -11,6 +11,7 @@ struct LedgerDetailView: View {
     @State private var confirmReveal = false
     @State private var confirmDelete = false
     @State private var showEdit = false
+    @State private var showMiniMap = false
     @State private var viewerIndex: Int?
 
     private var myID: UUID? {
@@ -62,12 +63,33 @@ struct LedgerDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                // 信息行：记录人 / 事发 / 地点 / 可见性
+                // 信息行：记录人 / 事发 / 可见性
                 GroupedSection {
                     ForEach(Array(infoRows.enumerated()), id: \.offset) { i, row in
                         GroupedRow(title: row.title, value: row.value,
                                    valueColor: row.color,
                                    showsDivider: i < infoRows.count - 1)
+                    }
+                }
+
+                if let place = entry.place {
+                    GroupedSection {
+                        HStack {
+                            Button {
+                                if place.latitude != 0 || place.longitude != 0 { showMiniMap = true }
+                            } label: {
+                                Text("📍 \(place.name ?? "")").dsBody()
+                                    .foregroundStyle(place.latitude != 0 || place.longitude != 0
+                                                     ? DS.actionBlue : DS.inkMuted)
+                            }
+                            .buttonStyle(.plain)
+                            Spacer()
+                            if place.latitude != 0 || place.longitude != 0 {
+                                Button("导航") { openInMapsNavigation(place: place) }
+                                    .buttonStyle(SmallBluePillButtonStyle())
+                            }
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 10)
                     }
                 }
 
@@ -149,15 +171,15 @@ struct LedgerDetailView: View {
             set: { viewerIndex = $0?.id })) { index in
             EvidenceViewer(evidences: evidences, index: index.id)
         }
+        .sheet(isPresented: $showMiniMap) {
+            if let place = entry.place { PlaceMiniMapSheet(place: place) }
+        }
     }
 
     private var infoRows: [(title: String, value: String, color: Color)] {
         var rows: [(String, String, Color)] = [("记录人", authorName.isEmpty ? "—" : authorName, DS.inkMuted)]
         if let at = entry.happenedAt {
             rows.append(("事发", Fmt.monthDay.string(from: at), DS.inkMuted))
-        }
-        if let placeName = entry.place?.name, !placeName.isEmpty {
-            rows.append(("地点", placeName, DS.inkMuted))
         }
         if entry.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue {
             if let revealedAt = entry.revealedAt {
@@ -183,8 +205,8 @@ private struct EvidenceIndex: Identifiable {
     let id: Int
 }
 
-/// 证据全屏浏览（轻量版 PhotoViewerView，CDEvidence 专用）
-private struct EvidenceViewer: View {
+/// 证据全屏浏览（轻量版 PhotoViewerView，CDEvidence 专用）(R17:待办详情共用)
+struct EvidenceViewer: View {
     @Environment(\.dismiss) private var dismiss
     let evidences: [CDEvidence]
     @State var index: Int
