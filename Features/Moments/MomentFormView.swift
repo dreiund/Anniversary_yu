@@ -253,6 +253,8 @@ struct MomentFormView: View {
             // spec §四:时刻在未来或无时刻(全天项无时刻，视同无时刻)时用当下
             let planned = item.time != nil ? repo.plannedMoment(of: item) : nil
             happenedAt = min(planned ?? Date(), Date())
+            // R18 3A:日程照片随转化带进回忆(转化删源会级联删日程照片,不带走就丢了)
+            photoDatas = repo.evidencesSorted(item).compactMap(\.imageData)
             if let place = item.place {
                 locationName = place.name ?? ""
                 if place.latitude != 0 || place.longitude != 0 {

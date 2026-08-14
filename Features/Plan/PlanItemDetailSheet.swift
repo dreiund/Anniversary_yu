@@ -8,6 +8,7 @@ struct PlanItemDetailSheet: View {
     let item: CDPlanItem
     @State private var showEdit = false
     @State private var showMiniMap = false
+    @State private var viewerIndex: Int?
 
     var body: some View {
         NavigationStack {
@@ -49,6 +50,41 @@ struct PlanItemDetailSheet: View {
                                 .padding(.horizontal, 14).padding(.vertical, 10)
                         }
                     }
+                    if item.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue {
+                        GroupedSection {
+                            HStack {
+                                Text("可见性").dsBody()
+                                Spacer()
+                                Text(item.revealedAt.map { "\(Fmt.monthDay.string(from: $0)) 已公开" }
+                                     ?? "仅自己可见 🔒")
+                                    .dsCaption()
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 10)
+                        }
+                    }
+                    let evidences = PlanItemRepository(context: context).evidencesSorted(item)
+                    if !evidences.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text("照片").dsSectionTitle()
+                                Text("\(evidences.count) 张 · 点开大图").dsFootnote()
+                            }
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(Array(evidences.enumerated()), id: \.element.objectID) { i, evidence in
+                                        if let data = evidence.thumbnailData, let ui = UIImage(data: data) {
+                                            Image(uiImage: ui).resizable().scaledToFill()
+                                                .frame(width: 110, height: 110)
+                                                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                                                .dsPhotoShadow()
+                                                .onTapGesture { viewerIndex = i }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 2).padding(.vertical, 8)
+                            }
+                        }
+                    }
                     if let note = item.note, !note.isEmpty {
                         GroupedSection {
                             VStack(alignment: .leading, spacing: 4) {
@@ -81,6 +117,12 @@ struct PlanItemDetailSheet: View {
             }
             .sheet(isPresented: $showMiniMap) {
                 if let place = item.place { PlaceMiniMapSheet(place: place) }
+            }
+            .fullScreenCover(item: Binding(
+                get: { viewerIndex.map { EvidenceIndex(id: $0) } },
+                set: { viewerIndex = $0?.id })) { index in
+                EvidenceViewer(evidences: PlanItemRepository(context: context).evidencesSorted(item),
+                               index: index.id)
             }
         }
     }

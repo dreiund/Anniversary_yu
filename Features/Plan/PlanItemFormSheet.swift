@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import CoreData
 
 enum PlanFormMode { case schedule, memo }
 
@@ -20,11 +22,27 @@ struct PlanItemFormSheet: View {
     @State private var moment = Date()
     @State private var remindOn = false
     @State private var remindDate = Date()
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var photoDatas: [Data] = []
+    @State private var evidencesToDelete: [CDEvidence] = []
+    @State private var visibility: EntryVisibility = .sharedImmediately
+    @State private var confirmReveal = false
 
     init(meeting: CDMeeting, item: CDPlanItem?, initialMode: PlanFormMode? = nil) {
         self.meeting = meeting
         self.item = item
         self.initialMode = initialMode
+    }
+
+    private var existingEvidences: [CDEvidence] {
+        guard let item else { return [] }
+        return PlanItemRepository(context: context).evidencesSorted(item)
+            .filter { !evidencesToDelete.contains($0) }
+    }
+    /// 已公开条目锁定(同小本本口径)
+    private var visibilityLocked: Bool {
+        guard let item else { return false }
+        return LedgerRules.isRevealed(visibilityRaw: item.visibilityRaw, revealedAt: item.revealedAt)
     }
 
     var body: some View {
@@ -96,6 +114,57 @@ struct PlanItemFormSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    if formMode == .schedule {
+                        GroupedSection {
+                            PhotosPicker(selection: $pickerItems, maxSelectionCount: 9, matching: .images) {
+                                HStack {
+                                    Text("照片").dsBody()
+                                    Spacer()
+                                    Text(photoDatas.isEmpty && existingEvidences.isEmpty
+                                         ? "＋ 添加" : "已有 \(existingEvidences.count + photoDatas.count) 张")
+                                        .dsCaption()
+                                }
+                                .padding(.horizontal, 14).padding(.vertical, 11)
+                            }
+                            if !existingEvidences.isEmpty || !photoDatas.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(existingEvidences, id: \.objectID) { evidence in
+                                            evidenceThumb(evidence)
+                                        }
+                                        ForEach(Array(photoDatas.enumerated()), id: \.offset) { _, data in
+                                            if let ui = UIImage(data: data) {
+                                                Image(uiImage: ui).resizable().scaledToFill()
+                                                    .frame(width: 52, height: 52)
+                                                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 14).padding(.bottom, 11)
+                                }
+                            }
+                        }
+                    }
+                    if formMode == .schedule {
+                        GroupedSection {
+                            Toggle("私密", isOn: Binding(
+                                get: { visibility == .privateUntilRevealed },
+                                set: { newValue in
+                                    if !newValue, item != nil, !visibilityLocked,
+                                       visibility == .privateUntilRevealed {
+                                        confirmReveal = true
+                                    } else {
+                                        visibility = newValue ? .privateUntilRevealed : .sharedImmediately
+                                    }
+                                }))
+                                .disabled(visibilityLocked)
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                        }
+                        Text(visibilityLocked
+                             ? "已公开，不可改回私密"
+                             : "开着=公开前只有你看得到；转化成回忆的那一刻会自动公开")
+                            .dsFootnote().padding(.horizontal, 4)
+                    }
                     if let item {
                         Button("删除此项") {
                             let id = item.id
@@ -136,6 +205,23 @@ struct PlanItemFormSheet: View {
                     linkedPlaceID = picked.existingPlaceID
                 }
             }
+            .onChange(of: pickerItems) {
+                Task {
+                    var datas: [Data] = []
+                    for item in pickerItems {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            datas.append(data)
+                        }
+                    }
+                    photoDatas = datas
+                }
+            }
+            .alert("公开给 TA？", isPresented: $confirmReveal) {
+                Button("公开") { visibility = .sharedImmediately }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("公开后 TA 会看到这条日程，且不可撤回。")
+            }
         }
     }
 
@@ -169,11 +255,35 @@ struct PlanItemFormSheet: View {
             }
         }
         if let r = item.remindAt { remindOn = true; remindDate = r }
+        visibility = visibilityLocked ? .sharedImmediately
+            : (EntryVisibility(rawValue: item.visibilityRaw) ?? .sharedImmediately)
     }
 
     private func defaultRemindDate() -> Date {
         let cal = Calendar.current
         return cal.date(bySettingHour: 9, minute: 0, second: 0, of: moment) ?? Date()
+    }
+
+    private func evidenceThumb(_ evidence: CDEvidence) -> some View {
+        Group {
+            if let data = evidence.thumbnailData, let ui = UIImage(data: data) {
+                Image(uiImage: ui).resizable().scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.canvas)
+            }
+        }
+        .frame(width: 52, height: 52)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+        .overlay(alignment: .topTrailing) {
+            Button {
+                evidencesToDelete.append(evidence)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white, .black.opacity(0.5))
+            }
+            .offset(x: 4, y: -4)
+        }
     }
 
     private func save() {
@@ -207,12 +317,23 @@ struct PlanItemFormSheet: View {
             try? repo.update(item, day: dayValue, time: timeValue, title: title,
                              note: noteValue, placeText: placeValue, remindAt: remindValue,
                              place: place)
+            // 编辑关私密=等效公开;既有私密日程切成备忘保存=恒公开(spec §五)
+            if !visibilityLocked,
+               item.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue,
+               isMemo || visibility == .sharedImmediately {
+                try? repo.reveal(item, at: Date())
+            }
             savedItem = item
         } else {
             let authorID = couple.flatMap { couples.currentPartnerID(of: $0) }
             savedItem = try? repo.add(to: meeting, day: dayValue, time: timeValue, title: title,
                                       note: noteValue, placeText: placeValue, authorID: authorID,
-                                      remindAt: remindValue, place: place)
+                                      remindAt: remindValue, place: place,
+                                      visibility: isMemo ? .sharedImmediately : visibility)
+        }
+        if formMode == .schedule {
+            for evidence in evidencesToDelete { try? repo.deleteEvidence(evidence) }
+            if !photoDatas.isEmpty, let savedItem { try? repo.addEvidences(savedItem, datas: photoDatas) }
         }
         // 备忘模式 remindValue 恒为 nil → shouldSchedule(remindAt: nil, ...) 恒 false →
         // 下面必然落到 else 分支 cancel(取消原提醒)。这里没有显式写 isMemo 分支，
