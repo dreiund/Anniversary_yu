@@ -224,7 +224,7 @@ struct LedgerListView: View {
         if sorted.isEmpty {
             emptyHint
         } else {
-            ForEach(sorted, id: \.objectID) { todoRow($0) }
+            ForEach(sorted, id: \.objectID) { todoRowEntry($0) }
         }
     }
 
@@ -262,67 +262,21 @@ struct LedgerListView: View {
         }
     }
 
-    /// 待办行：勾选圈占新卡图标位 + 内容，外观同 newCard（白卡+hairline 描边+圆角 14）；
-    /// 左滑删仅作者，点行→作者编辑/非作者只读详情（行为不变，反馈⑨只换壳）
+    /// 待办行外层包装：左滑删仅作者，点行→作者编辑/非作者只读详情（行为不变，反馈⑨只换壳）；
+    /// 行体本身换成 TodoRow（R17 §五根修：行级 @ObservedObject 订阅，见文件底部）
     @ViewBuilder
-    private func todoRow(_ todo: CDTodoItem) -> some View {
+    private func todoRowEntry(_ todo: CDTodoItem) -> some View {
         let canEdit = TodoRules.canEdit(authorID: todo.authorPartnerID, myID: myID)
-        let row = HStack(alignment: .top, spacing: 10) {
-            Button {
-                if TodoRules.canToggleDone(authorID: todo.authorPartnerID,
-                                           assigneeID: todo.assigneePartnerID, myID: myID) {
-                    try? TodoRepository(context: context).setDone(todo, done: !todo.isDone, at: Date())
-                    if todo.isDone, let id = todo.id {
-                        ReminderScheduler.cancel(id: ReminderPlanner.todoID(id))   // 完成即取消提醒
-                    }
-                }
-            } label: {
-                ZStack {
-                    Circle().fill(DS.parchment).frame(width: 34, height: 34)
-                    Image(systemName: todo.isDone ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 15))
-                        .foregroundStyle(todo.isDone ? DS.actionBlue : DS.chipBorder)
-                }
-            }
-            .buttonStyle(DSPressEffect())
-            VStack(alignment: .leading, spacing: 3) {
-                Text(todo.title ?? "")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(todo.isDone ? DS.inkMuted : DS.ink)
-                    .strikethrough(todo.isDone, color: DS.inkMuted)
-                    .lineLimit(1)
-                Text(todoMeta(todo)).dsFootnote()
-            }
-            Spacer()
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
-        .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if canEdit { editingTodo = todo } else { viewingTodo = todo }
+        let row = TodoRow(todo: todo, myID: myID) {
+            if canEdit { editingTodo = todo } else { viewingTodo = todo }   // Task 4 改接详情
         }
         if canEdit {
             SwipeDeleteRow(id: todo.objectID, openID: $openSwipeID) {
                 pendingDeleteTodo = todo
-            } content: {
-                row
-            }
+            } content: { row }
         } else {
             row
         }
-    }
-
-    private func todoMeta(_ todo: CDTodoItem) -> String {
-        var parts: [String] = []
-        if let due = todo.dueAt { parts.append(Fmt.monthDay.string(from: due)) }
-        if !LedgerRules.isRevealed(visibilityRaw: todo.visibilityRaw, revealedAt: todo.revealedAt) {
-            parts.append("🔒")
-        }
-        if todo.isDone { parts.append("已完成") }
-        parts.append(todo.assigneePartnerID == myID ? "我做" : "Ta做")
-        return parts.joined(separator: " · ")
     }
 
     private var emptyHint: some View {
@@ -383,6 +337,64 @@ struct LedgerListView: View {
         let repo = CoupleRepository(context: context)
         if id == repo.currentPartnerID(of: couple) { return "我" }
         return repo.otherPartner(of: couple)?.name ?? "TA"
+    }
+}
+
+/// R17 §五根修：行级 @ObservedObject 订阅对象变更——父视图重算与否都能重绘
+/// (R12 MemoRow 同款；此前 todoRow 是内联 builder，isDone 翻转不改 todoItems.count，行不刷新)
+private struct TodoRow: View {
+    @ObservedObject var todo: CDTodoItem
+    let myID: UUID?
+    var onTap: () -> Void
+    @Environment(\.managedObjectContext) private var context
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button {
+                if TodoRules.canToggleDone(authorID: todo.authorPartnerID,
+                                           assigneeID: todo.assigneePartnerID, myID: myID) {
+                    try? TodoRepository(context: context).setDone(todo, done: !todo.isDone, at: Date())
+                    if todo.isDone, let id = todo.id {
+                        ReminderScheduler.cancel(id: ReminderPlanner.todoID(id))   // 完成即取消提醒
+                    }
+                }
+            } label: {
+                ZStack {
+                    Circle().fill(DS.parchment).frame(width: 34, height: 34)
+                    Image(systemName: todo.isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(todo.isDone ? DS.actionBlue : DS.chipBorder)
+                }
+            }
+            .buttonStyle(DSPressEffect())
+            .accessibilityLabel("\(todo.isDone ? "取消完成" : "完成") \(todo.title ?? "")")
+            VStack(alignment: .leading, spacing: 3) {
+                Text(todo.title ?? "")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(todo.isDone ? DS.inkMuted : DS.ink)
+                    .strikethrough(todo.isDone, color: DS.inkMuted)
+                    .lineLimit(1)
+                Text(meta).dsFootnote()
+            }
+            Spacer()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: DS.Radius.darkCard).fill(DS.canvas))
+        .overlay(RoundedRectangle(cornerRadius: DS.Radius.darkCard).stroke(DS.hairline, lineWidth: 1))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+    }
+
+    private var meta: String {
+        var parts: [String] = []
+        if let due = todo.dueAt { parts.append(Fmt.monthDay.string(from: due)) }
+        if !LedgerRules.isRevealed(visibilityRaw: todo.visibilityRaw, revealedAt: todo.revealedAt) {
+            parts.append("🔒")
+        }
+        if todo.isDone { parts.append("已完成") }
+        parts.append(todo.assigneePartnerID == myID ? "我做" : "Ta做")
+        return parts.joined(separator: " · ")
     }
 }
 

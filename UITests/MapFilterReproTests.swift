@@ -416,6 +416,29 @@ final class MapFilterReproTests: XCTestCase {
         attach(app, name: "M1-小地图")
     }
 
+    /// R17 §五:完成开关点按后行必须立刻重绘(R12 MemoRow 同族回归)。
+    /// 断言锚点=勾选圈显式 label 翻转(完成 x ↔ 取消完成 x),双击验证第二次点按仍重绘。
+    @MainActor
+    func testTodoToggleRedrawsRow() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        app.buttons["小本本"].tap()
+        let todosTab = app.buttons["待办"]
+        XCTAssertTrue(todosTab.waitForExistence(timeout: 8), "小本本四段未出现")
+        todosTab.tap()
+
+        let toggle = app.buttons["完成 查演出票"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "勾选圈未带显式 label")
+        toggle.tap()
+        XCTAssertTrue(app.buttons["取消完成 查演出票"].waitForExistence(timeout: 3),
+                      "第一次点按后行未重绘")
+        app.buttons["取消完成 查演出票"].tap()
+        XCTAssertTrue(app.buttons["完成 查演出票"].waitForExistence(timeout: 3),
+                      "第二次点按后行未重绘(R12 同族值缓存)")
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
