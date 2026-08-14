@@ -135,4 +135,17 @@ final class ModelSchemaTests: XCTestCase {
         let inverse = model.entitiesByName["CDEvidence"]!.relationshipsByName["todoItem"]!
         XCTAssertEqual(inverse.inverseRelationship?.name, "evidences")
     }
+
+    func testR18PlanItemAdditions() {
+        let model = ModelSchema.model
+        let plan = model.entitiesByName["CDPlanItem"]!
+        XCTAssertNotNil(plan.attributesByName["visibilityRaw"])
+        XCTAssertFalse(plan.attributesByName["visibilityRaw"]!.isOptional)
+        XCTAssertNotNil(plan.attributesByName["revealedAt"])
+        let evidences = plan.relationshipsByName["evidences"]!
+        XCTAssertEqual(evidences.destinationEntity?.name, "CDEvidence")
+        XCTAssertEqual(evidences.deleteRule, .cascadeDeleteRule)
+        XCTAssertEqual(model.entitiesByName["CDEvidence"]!
+            .relationshipsByName["planItem"]!.inverseRelationship?.name, "evidences")
+    }
 }

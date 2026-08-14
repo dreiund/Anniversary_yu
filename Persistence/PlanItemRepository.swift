@@ -11,7 +11,7 @@ struct PlanItemRepository {
     @discardableResult
     func add(to meeting: CDMeeting, day: Date?, time: Date?, title: String,
              note: String?, placeText: String?, authorID: UUID?, remindAt: Date? = nil,
-             place: CDPlace? = nil) throws -> CDPlanItem {
+             place: CDPlace? = nil, visibility: EntryVisibility = .sharedImmediately) throws -> CDPlanItem {
         let maxSort = ((meeting.planItems as? Set<CDPlanItem>) ?? [])
             .map(\.sortIndex).max() ?? -1
         let item = CDPlanItem(context: context)
@@ -24,6 +24,7 @@ struct PlanItemRepository {
         item.authorPartnerID = authorID
         item.remindAt = remindAt
         item.sortIndex = maxSort + 1
+        item.visibilityRaw = visibility.rawValue
         item.place = place
         item.meeting = meeting
         try context.save()
@@ -32,6 +33,36 @@ struct PlanItemRepository {
 
     func toggleDone(_ item: CDPlanItem) throws {
         item.isDone.toggle()
+        try context.save()
+    }
+
+    /// 公开仪式:一次性置戳(同小本本 reveal 语义),不碰 visibilityRaw
+    func reveal(_ item: CDPlanItem, at date: Date) throws {
+        guard item.revealedAt == nil else { return }
+        item.revealedAt = date
+        try context.save()
+    }
+
+    func evidencesSorted(_ item: CDPlanItem) -> [CDEvidence] {
+        ((item.evidences as? Set<CDEvidence>) ?? [])
+            .sorted { $0.sortIndex < $1.sortIndex }
+    }
+
+    func addEvidences(_ item: CDPlanItem, datas: [Data]) throws {
+        let start = (evidencesSorted(item).last?.sortIndex).map { $0 + 1 } ?? 0
+        for (i, data) in datas.enumerated() {
+            let evidence = CDEvidence(context: context)
+            evidence.id = UUID()
+            evidence.imageData = data
+            evidence.thumbnailData = Thumbnailer.thumbnailData(from: data)
+            evidence.sortIndex = start + Int32(i)
+            evidence.planItem = item
+        }
+        try context.save()
+    }
+
+    func deleteEvidence(_ evidence: CDEvidence) throws {
+        context.delete(evidence)
         try context.save()
     }
 
@@ -87,8 +118,15 @@ struct PlanItemRepository {
         return PlanSections(dated: dated, undated: undated)
     }
 
-    func stats(for meeting: CDMeeting) -> (planned: Int, done: Int) {
-        let all = ((meeting.planItems as? Set<CDPlanItem>) ?? [])
+    /// R18 spec §三.5:统计按观看者可见口径(nil=全量;私密未公开只计作者)
+    func stats(for meeting: CDMeeting, visibleTo myID: UUID? = nil) -> (planned: Int, done: Int) {
+        var all = Array(((meeting.planItems as? Set<CDPlanItem>) ?? []))
+        if let myID {
+            all = all.filter {
+                LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                      visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+            }
+        }
         return (all.count, all.filter(\.isDone).count)
     }
 

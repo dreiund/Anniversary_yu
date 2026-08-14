@@ -146,6 +146,7 @@ final class CDEvidence: NSManagedObject {
     @NSManaged var sortIndex: Int32
     @NSManaged var ledgerEntry: CDLedgerEntry?
     @NSManaged var todoItem: CDTodoItem?
+    @NSManaged var planItem: CDPlanItem?
 }
 
 @objc(CDCycle)
@@ -192,8 +193,11 @@ final class CDPlanItem: NSManagedObject {
     @NSManaged var sortIndex: Int32
     @NSManaged var placeText: String?
     @NSManaged var remindAt: Date?
+    @NSManaged var visibilityRaw: Int16
+    @NSManaged var revealedAt: Date?
     @NSManaged var meeting: CDMeeting?
     @NSManaged var place: CDPlace?
+    @NSManaged var evidences: NSSet?
 }
 
 @objc(CDTodoItem)

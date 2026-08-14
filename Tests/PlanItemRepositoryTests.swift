@@ -1,4 +1,5 @@
 import XCTest
+import CoreData
 @testable import Anniversary
 
 final class PlanItemRepositoryTests: XCTestCase {
@@ -103,5 +104,58 @@ final class PlanItemRepositoryTests: XCTestCase {
                          title: "早餐", note: nil, placeText: nil, authorID: nil)
         let s = repo.sections(for: meeting, calendar: cal)
         XCTAssertEqual(s.dated[0].items.map(\.title), ["早餐", "起飞"])
+    }
+
+    func testAddDefaultsToSharedAndExplicitPrivate() throws {
+        let a = try repo.add(to: meeting, day: Date(), time: nil, title: "公开项",
+                             note: nil, placeText: nil, authorID: nil)
+        XCTAssertEqual(a.visibilityRaw, EntryVisibility.sharedImmediately.rawValue)
+        let b = try repo.add(to: meeting, day: Date(), time: nil, title: "私密项",
+                             note: nil, placeText: nil, authorID: nil,
+                             visibility: .privateUntilRevealed)
+        XCTAssertEqual(b.visibilityRaw, EntryVisibility.privateUntilRevealed.rawValue)
+        XCTAssertNil(b.revealedAt)
+    }
+
+    func testRevealIsIdempotent() throws {
+        let item = try repo.add(to: meeting, day: Date(), time: nil, title: "x",
+                                note: nil, placeText: nil, authorID: nil,
+                                visibility: .privateUntilRevealed)
+        let t1 = Date(timeIntervalSince1970: 100)
+        try repo.reveal(item, at: t1)
+        XCTAssertEqual(item.revealedAt, t1)
+        try repo.reveal(item, at: Date(timeIntervalSince1970: 200))
+        XCTAssertEqual(item.revealedAt, t1)   // 时戳留痕,不可覆盖
+    }
+
+    func testEvidenceAddSortDeleteCascade() throws {
+        let item = try repo.add(to: meeting, day: Date(), time: nil, title: "带照片",
+                                note: nil, placeText: nil, authorID: nil)
+        try repo.addEvidences(item, datas: [Data([0x1]), Data([0x2])])
+        try repo.addEvidences(item, datas: [Data([0x3])])
+        XCTAssertEqual(repo.evidencesSorted(item).map(\.sortIndex), [0, 1, 2])
+        try repo.deleteEvidence(repo.evidencesSorted(item)[1])
+        XCTAssertEqual(repo.evidencesSorted(item).count, 2)
+        try repo.delete(item)
+        let fetch = NSFetchRequest<CDEvidence>(entityName: "CDEvidence")
+        XCTAssertEqual((try pc.viewContext.fetch(fetch)).count, 0)   // 删父级联删照片
+    }
+
+    /// 统计按观看者可见口径(spec §三.5):nil=全量;私密未公开只计作者侧
+    func testStatsVisibleTo() throws {
+        let me = UUID(), other = UUID()
+        _ = try repo.add(to: meeting, day: Date(), time: nil, title: "公开",
+                         note: nil, placeText: nil, authorID: me)
+        let mine = try repo.add(to: meeting, day: Date(), time: nil, title: "我的私密",
+                                note: nil, placeText: nil, authorID: me,
+                                visibility: .privateUntilRevealed)
+        try repo.toggleDone(mine)
+        XCTAssertEqual(repo.stats(for: meeting).planned, 2)            // nil=全量
+        XCTAssertEqual(repo.stats(for: meeting, visibleTo: me).planned, 2)
+        XCTAssertEqual(repo.stats(for: meeting, visibleTo: me).done, 1)
+        XCTAssertEqual(repo.stats(for: meeting, visibleTo: other).planned, 1)  // 对方看不见我的私密
+        XCTAssertEqual(repo.stats(for: meeting, visibleTo: other).done, 0)
+        try repo.reveal(mine, at: Date())
+        XCTAssertEqual(repo.stats(for: meeting, visibleTo: other).planned, 2)  // 公开后计入
     }
 }

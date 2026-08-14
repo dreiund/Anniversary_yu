@@ -192,6 +192,8 @@ enum ModelSchema {
             attr("sortIndex", .integer32AttributeType, optional: false, defaultValue: 0),
             attr("placeText", .stringAttributeType),
             attr("remindAt", .dateAttributeType),
+            attr("visibilityRaw", .integer16AttributeType, optional: false, defaultValue: 0),  // R18 日程私密
+            attr("revealedAt", .dateAttributeType),
         ])
 
         let todo = entity("CDTodoItem", CDTodoItem.self, [
@@ -230,6 +232,7 @@ enum ModelSchema {
         oneToMany(place, "todoItems", todo, "place", cascade: false)
         oneToMany(ledger, "evidences", evidence, "ledgerEntry")
         oneToMany(todo, "evidences", evidence, "todoItem")
+        oneToMany(planItem, "evidences", evidence, "planItem")
         oneToMany(cycle, "dayLogs", cycleLog, "cycle")
 
         let model = NSManagedObjectModel()
