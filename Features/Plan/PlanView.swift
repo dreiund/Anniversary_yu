@@ -177,6 +177,7 @@ struct PlanView: View {
             Text([meeting.city, meeting.title].compactMap { $0 }.joined(separator: " · ")
                  .isEmpty ? "第 \(meeting.index) 次见面" : [meeting.city, meeting.title].compactMap { $0 }.joined(separator: " · "))
                 .dsPageTitle()
+            if meeting.isPrivateUnrevealed { MeetingPrivacyChip() }
             if let start = meeting.plannedStart {
                 let days = HomeLogic.countdownDays(to: start, from: Date(), calendar: .current)
                 Text("距出发还有 \(days) 天").dsCaption()

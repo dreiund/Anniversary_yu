@@ -146,6 +146,14 @@ enum DebugSeeder {
                                  dueAt: day(3), assigneeID: herID, authorID: myID,
                                  visibility: .privateUntilRevealed, place: nil, remindAt: nil,
                                  calendar: cal)
+
+        // R17 私密计划种子:我的私密(列表见🔒chip)+ 对方的私密(全面不可见的验证样本)
+        _ = try? meetings.createPlanned(couple: couple, title: "演示惊喜", city: "南京",
+                                        plannedStart: day(20), plannedEnd: day(22),
+                                        authorID: myID, visibility: .privateUntilRevealed)
+        _ = try? meetings.createPlanned(couple: couple, title: "演示他方私密", city: "杭州",
+                                        plannedStart: day(30), plannedEnd: day(31),
+                                        authorID: herID, visibility: .privateUntilRevealed)
     }
 
     /// 清空整库：逐实体逐对象删除。CloudKit 店不支持 NSBatchDeleteRequest（绕过历史追踪会被拒），
