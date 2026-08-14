@@ -19,12 +19,6 @@ struct MeetingsView: View {
     @State private var segment = 0
     @State private var selectedDay: SelectedCalendarDay?
 
-    private var myID: UUID? {
-        couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
-    }
-    /// R17 私密计划过滤(spec §四):对方未公开的私密计划整条不出现——列表/空态/批量/toolbar 全走这份
-    private var visibleMeetings: [CDMeeting] { meetings.filter { $0.isVisible(to: myID) } }
-
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -54,7 +48,7 @@ struct MeetingsView: View {
             selected = []
         }
         .toolbar {
-            if segment == 0 && !visibleMeetings.isEmpty {
+            if segment == 0 && !meetings.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(selecting ? "完成" : "管理") {
                         selecting.toggle()
@@ -74,7 +68,7 @@ struct MeetingsView: View {
         }
         .alert("删除所选 \(selected.count) 项？", isPresented: $confirmBatch) {
             Button("删除所选", role: .destructive) {
-                let picked = visibleMeetings.filter { selected.contains($0.objectID) }
+                let picked = meetings.filter { selected.contains($0.objectID) }
                 let ids = picked.flatMap { (($0.planItems as? Set<CDPlanItem>) ?? []).compactMap(\.id) }
                 try? MeetingRepository(context: context).delete(Array(picked))
                 ReminderScheduler.cancelPlans(ids)
@@ -114,7 +108,7 @@ struct MeetingsView: View {
     private var listContent: some View {
         ScrollView {
             VStack(spacing: DS.Spacing.md) {
-                ForEach(visibleMeetings, id: \.objectID) { meeting in
+                ForEach(meetings, id: \.objectID) { meeting in
                     if selecting {
                         Button {
                             toggleSelection(meeting.objectID)
@@ -133,7 +127,7 @@ struct MeetingsView: View {
                         }
                     }
                 }
-                if visibleMeetings.isEmpty {
+                if meetings.isEmpty {
                     Text("还没有见面记录").dsCaption().padding(.top, 48)
                 }
                 Button("计划见面") { showForm = true }
@@ -194,10 +188,7 @@ struct MeetingsView: View {
         }
         return ParchmentCard {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Text("第 \(meeting.index) 次见面 · 计划中").dsFootnote()
-                    if meeting.isPrivateUnrevealed { MeetingPrivacyChip() }
-                }
+                Text("第 \(meeting.index) 次见面 · 计划中").dsFootnote()
                 Text([meeting.city, meeting.title].compactMap { $0 }.joined(separator: " · ")
                      .isEmpty ? "未命名的见面" : [meeting.city, meeting.title].compactMap { $0 }.joined(separator: " · "))
                     .dsPageTitle()

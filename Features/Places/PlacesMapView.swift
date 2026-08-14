@@ -48,7 +48,6 @@ struct PlacesMapView: View {
         ((place.planItems as? Set<CDPlanItem>) ?? []).contains {
             guard $0.day != nil, let meeting = $0.meeting else { return false }
             return meeting.statusRaw != MeetingStatus.finished.rawValue
-                && meeting.isVisible(to: myID)   // R17:私密计划的钉不能泄露(anyVisible 同理)
         }
     }
 

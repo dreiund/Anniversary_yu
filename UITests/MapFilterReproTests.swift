@@ -480,30 +480,6 @@ final class MapFilterReproTests: XCTestCase {
         app.buttons["取消"].tap()
     }
 
-    /// R17 §四:私密计划——自己的带🔒chip 可见,对方的全面隐形(列表);表单开关锁定文案
-    @MainActor
-    func testPrivatePlannedMeetingVisibility() throws {
-        let app = XCUIApplication()
-        app.launchArguments += ["--seed-map-demo"]
-        app.launch()
-
-        app.buttons["足迹"].tap()
-        XCTAssertTrue(app.staticTexts["南京 · 演示惊喜"].waitForExistence(timeout: 8),
-                      "我的私密计划该出现在列表")
-        XCTAssertTrue(app.staticTexts["🔒 私密"].exists, "私密计划卡缺🔒chip")
-        XCTAssertFalse(app.staticTexts["杭州 · 演示他方私密"].exists,
-                       "对方的私密计划不该出现在列表")
-
-        // 进行前计划页:头部同款 chip;编辑表单里私密开关存在且开着
-        app.staticTexts["南京 · 演示惊喜"].tap()
-        XCTAssertTrue(app.staticTexts["🔒 私密"].waitForExistence(timeout: 5), "行前页头部缺 chip")
-        app.navigationBars.buttons["编辑"].tap()   // 行前页 toolbar 编辑(区别于日程行内编辑钮)
-        let toggle = app.switches["私密"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "计划见面表单缺私密开关")
-        XCTAssertEqual(toggle.value as? String, "1", "私密开关应为开")
-        app.buttons["取消"].tap()
-    }
-
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())

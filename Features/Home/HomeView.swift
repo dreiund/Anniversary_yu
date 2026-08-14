@@ -107,12 +107,7 @@ struct HomeView: View {
         let repo = MeetingRepository(context: context)
         let ongoing = meetings.first { $0.statusRaw == MeetingStatus.ongoing.rawValue }
         let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
-        // R17 私密计划(spec §四):对方未公开的私密计划不进「距下次见面」倒计时——语义=原函数+可见性过滤
-        let today = Calendar.current.startOfDay(for: Date())
-        let planned = meetings
-            .filter { $0.statusRaw == MeetingStatus.planned.rawValue && $0.isVisible(to: myID) }
-            .filter { ($0.plannedStart ?? .distantFuture) >= today }
-            .min { ($0.plannedStart ?? .distantFuture) < ($1.plannedStart ?? .distantFuture) }
+        let planned = try? repo.nextPlannedMeeting(couple: couple, after: Calendar.current.startOfDay(for: Date()))
 
         if let ongoing {
             let dayIndex = (try? repo.daysSorted(in: ongoing).last?.dayIndex) ?? 0
@@ -204,9 +199,8 @@ struct HomeView: View {
     private func todayCard(_ couple: CDCouple) -> some View {
         let today = Calendar.current.startOfDay(for: Date())
         let myID = CoupleRepository(context: context).currentPartnerID(of: couple)
-        // R17 私密计划(spec §四):对方未公开的私密计划不进「今天」行(与地图钉/statusCard 同口径)
         let planRows: [(CDMeeting, CDPlanItem)] = meetings
-            .filter { $0.statusRaw != MeetingStatus.finished.rawValue && $0.isVisible(to: myID) }
+            .filter { $0.statusRaw != MeetingStatus.finished.rawValue }
             .flatMap { meeting in
                 (((meeting.planItems as? Set<CDPlanItem>) ?? []))
                     .filter { $0.day.map { Calendar.current.isDate($0, inSameDayAs: today) } ?? false }
