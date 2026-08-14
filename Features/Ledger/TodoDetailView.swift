@@ -1,14 +1,14 @@
 import SwiftUI
 import CoreData
 
-/// 小本本详情（spec §五，小样选 A 底部仪式钮）
-struct LedgerDetailView: View {
-    @ObservedObject var entry: CDLedgerEntry
+/// 待办详情(R17 §二,1A 推入式):版式照 LedgerDetailView——主体卡+信息行+地点行+照片区,
+/// 作者右上「⋯」编辑/删除,canToggle 者底部完成大钮;公开仍走表单开关,本页不设公开钮(spec §八)
+struct TodoDetailView: View {
+    @ObservedObject var todo: CDTodoItem
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
 
-    @State private var confirmReveal = false
     @State private var confirmDelete = false
     @State private var showEdit = false
     @State private var showMiniMap = false
@@ -17,53 +17,48 @@ struct LedgerDetailView: View {
     private var myID: UUID? {
         couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
     }
-    private var isMine: Bool { LedgerRules.canEdit(authorID: entry.authorPartnerID, myID: myID) }
-    private var revealed: Bool {
-        LedgerRules.isRevealed(visibilityRaw: entry.visibilityRaw, revealedAt: entry.revealedAt)
+    private var isMine: Bool { TodoRules.canEdit(authorID: todo.authorPartnerID, myID: myID) }
+    private var canToggle: Bool {
+        TodoRules.canToggleDone(authorID: todo.authorPartnerID,
+                                assigneeID: todo.assigneePartnerID, myID: myID)
     }
-    private var category: LedgerCategory { LedgerCategory(rawValue: entry.categoryRaw) ?? .praise }
-    private var accent: Color {
-        switch category {
-        case .praise, .like: return DS.dsGreen
-        case .complaint, .trigger: return DS.dsOrange
-        }
+    private var revealed: Bool {
+        LedgerRules.isRevealed(visibilityRaw: todo.visibilityRaw, revealedAt: todo.revealedAt)
     }
 
     var body: some View {
-        if entry.managedObjectContext == nil || entry.isDeleted {
-            Color.clear.onAppear { dismiss() }
+        if todo.managedObjectContext == nil || todo.isDeleted {
+            Color.clear.onAppear { dismiss() }   // 对方远程删除守卫(P6 F-2 同款)
         } else {
             content
         }
     }
 
     private var content: some View {
-        let evidences = LedgerRepository(context: context).evidencesSorted(entry)
+        let evidences = TodoRepository(context: context).evidencesSorted(todo)
         return ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.md) {
-                // 主体卡：实底类别徽章 + 标题 + 正文
                 ParchmentCard {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text(category.title)
+                            Text("待办 · \(todo.assigneePartnerID == myID ? "我做" : "Ta做")")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(accent)
+                                .foregroundStyle(DS.actionBlue)
                                 .padding(.vertical, 4).padding(.horizontal, 10)
-                                .background(Capsule().fill(accent.opacity(0.14)))
+                                .background(Capsule().fill(DS.actionBlue.opacity(0.14)))
                             Spacer()
                             if !revealed {
                                 Text("🔒 仅自己可见").dsFootnote()
                             }
                         }
-                        Text(entry.title ?? "").dsPageTitle()
-                        if let detail = entry.detail, !detail.isEmpty {
+                        Text(todo.title ?? "").dsPageTitle()
+                        if let detail = todo.detail, !detail.isEmpty {
                             Text(detail).dsBody().lineSpacing(5)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                // 信息行：记录人 / 事发 / 可见性
                 GroupedSection {
                     ForEach(Array(infoRows.enumerated()), id: \.offset) { i, row in
                         GroupedRow(title: row.title, value: row.value,
@@ -72,7 +67,7 @@ struct LedgerDetailView: View {
                     }
                 }
 
-                if let place = entry.place {
+                if let place = todo.place {
                     GroupedSection {
                         HStack {
                             Button {
@@ -96,7 +91,7 @@ struct LedgerDetailView: View {
                 if !evidences.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("证据").dsSectionTitle()
+                            Text("照片").dsSectionTitle()
                             Text("\(evidences.count) 张 · 点开大图").dsFootnote()
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -112,7 +107,7 @@ struct LedgerDetailView: View {
                                 }
                             }
                             .padding(.horizontal, 2)
-                            .padding(.vertical, 8)   // 给照片投影留出呼吸空间
+                            .padding(.vertical, 8)
                         }
                     }
                 }
@@ -120,7 +115,7 @@ struct LedgerDetailView: View {
             .padding(DS.Spacing.md)
         }
         .background(DS.canvas)
-        .navigationTitle(category.title)
+        .navigationTitle("待办")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if isMine {
@@ -131,58 +126,52 @@ struct LedgerDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                    .accessibilityLabel("待办详情菜单")
                 }
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if isMine && !revealed {
-                VStack(spacing: 6) {
-                    Button("公开给 TA") { confirmReveal = true }
-                        .buttonStyle(BluePillButtonStyle(fullWidth: true))
-                    Text("公开后 TA 会收到轻通知，且不可撤回").dsFootnote()
+            if canToggle {
+                Button(todo.isDone ? "取消完成" : "完成") {
+                    try? TodoRepository(context: context).setDone(todo, done: !todo.isDone, at: Date())
+                    if todo.isDone, let id = todo.id {
+                        ReminderScheduler.cancel(id: ReminderPlanner.todoID(id))   // 完成即取消提醒
+                    }
                 }
+                .buttonStyle(BluePillButtonStyle(fullWidth: true))
                 .padding(.horizontal, DS.Spacing.md)
                 .padding(.vertical, 10)
                 .background(.ultraThinMaterial)
             }
         }
-        .alert("公开给 TA？", isPresented: $confirmReveal) {
-            Button("公开") { try? LedgerRepository(context: context).reveal(entry, at: Date()) }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("公开后 TA 会收到轻通知，且不可撤回。")
-        }
-        .alert("删除这条记录？", isPresented: $confirmDelete) {
+        .alert("删除这条待办？", isPresented: $confirmDelete) {
             Button("删除", role: .destructive) {
-                try? LedgerRepository(context: context).delete(entry)
+                let id = todo.id
+                try? TodoRepository(context: context).delete(todo)
+                if let id { ReminderScheduler.cancel(id: ReminderPlanner.todoID(id)) }
                 dismiss()
             }
             Button("取消", role: .cancel) {}
         }
-        .sheet(isPresented: $showEdit) {
-            if category == .praise || category == .complaint {
-                LedgerFormView(mode: .edit(entry))
-            } else {
-                QuickLedgerSheet(mode: .edit(entry))
-            }
+        .sheet(isPresented: $showEdit) { TodoFormView(mode: .edit(todo)) }
+        .sheet(isPresented: $showMiniMap) {
+            if let place = todo.place { PlaceMiniMapSheet(place: place) }
         }
         .fullScreenCover(item: Binding(
             get: { viewerIndex.map { EvidenceIndex(id: $0) } },
             set: { viewerIndex = $0?.id })) { index in
             EvidenceViewer(evidences: evidences, index: index.id)
         }
-        .sheet(isPresented: $showMiniMap) {
-            if let place = entry.place { PlaceMiniMapSheet(place: place) }
-        }
     }
 
     private var infoRows: [(title: String, value: String, color: Color)] {
         var rows: [(String, String, Color)] = [("记录人", authorName.isEmpty ? "—" : authorName, DS.inkMuted)]
-        if let at = entry.happenedAt {
-            rows.append(("事发", Fmt.monthDay.string(from: at), DS.inkMuted))
+        rows.append(("目标日", todo.dueAt.map { Fmt.monthDay.string(from: $0) } ?? "—", DS.inkMuted))
+        if let remindAt = todo.remindAt {
+            rows.append(("提醒", Fmt.monthDayHM.string(from: remindAt), DS.inkMuted))
         }
-        if entry.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue {
-            if let revealedAt = entry.revealedAt {
+        if todo.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue {
+            if let revealedAt = todo.revealedAt {
                 rows.append(("可见性", "\(Fmt.monthDay.string(from: revealedAt)) 已公开", DS.dsGreen))
             } else {
                 rows.append(("可见性", "仅自己可见 🔒", DS.inkMuted))
@@ -190,53 +179,14 @@ struct LedgerDetailView: View {
         } else {
             rows.append(("可见性", "双方可见", DS.dsGreen))
         }
+        rows.append(("完成态", todo.isDone ? "已完成" : "未完成", todo.isDone ? DS.dsGreen : DS.inkMuted))
         return rows
     }
 
     private var authorName: String {
-        guard let id = entry.authorPartnerID, let couple = couples.first else { return "" }
+        guard let id = todo.authorPartnerID, let couple = couples.first else { return "" }
         let repo = CoupleRepository(context: context)
         if id == repo.currentPartnerID(of: couple) { return "我" }
         return repo.otherPartner(of: couple)?.name ?? "TA"
-    }
-}
-
-struct EvidenceIndex: Identifiable {
-    let id: Int
-}
-
-/// 证据全屏浏览（轻量版 PhotoViewerView，CDEvidence 专用）(R17:待办详情共用)
-struct EvidenceViewer: View {
-    @Environment(\.dismiss) private var dismiss
-    let evidences: [CDEvidence]
-    @State var index: Int
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            Color.black.ignoresSafeArea()
-            TabView(selection: $index) {
-                ForEach(Array(evidences.enumerated()), id: \.element.objectID) { i, evidence in
-                    Group {
-                        if let data = evidence.imageData, let ui = UIImage(data: data) {
-                            Image(uiImage: ui).resizable().scaledToFit()
-                        } else {
-                            Color.black
-                        }
-                    }
-                    .tag(i)
-                }
-            }
-            .tabViewStyle(.page)
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(.black.opacity(0.4)))
-            }
-            .padding(.top, 8).padding(.leading, 14)
-        }
     }
 }

@@ -198,11 +198,16 @@ final class MapFilterReproTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["帮她带充电宝"].waitForExistence(timeout: 3), "待办段条目未出现")
         attach(app, name: "R2-待办段")
 
-        // R4：记得做表单开关态。⊕ 弹层里的「记得做」格是图标+文字合成的无障碍标签，坐标/标签定位都不稳，
-        // 降级走更稳的路径：点自己写的条目（"查演出票"，种子里 authorID=我，可编辑）直接进编辑表单截同款。
+        // R4：待办编辑表单开关态。⊕ 弹层里的「记得做」格是图标+文字合成的无障碍标签，坐标/标签定位都不稳，
+        // 降级走更稳的路径：点自己写的条目（"查演出票"，种子里 authorID=我，可编辑）进详情截同款。
+        // (R17 T4:点行统一推入详情,作者也不再直达编辑表单,多一步「⋯」菜单——同 testTodoDetailUnified)
         let myTodo = app.staticTexts["查演出票"]
         XCTAssertTrue(myTodo.waitForExistence(timeout: 3), "自建待办条目未出现")
         myTodo.tap()
+        let detailMenu = app.buttons["待办详情菜单"]
+        XCTAssertTrue(detailMenu.waitForExistence(timeout: 3), "待办详情菜单未出现")
+        detailMenu.tap()
+        app.buttons["编辑"].tap()
         XCTAssertTrue(app.navigationBars["编辑待办"].waitForExistence(timeout: 3), "待办编辑表单未弹出")
         XCTAssertTrue(app.switches["私密"].waitForExistence(timeout: 2) || app.staticTexts["私密"].exists,
                       "私密开关未出现")
@@ -437,6 +442,42 @@ final class MapFilterReproTests: XCTestCase {
         app.buttons["取消完成 查演出票"].tap()
         XCTAssertTrue(app.buttons["完成 查演出票"].waitForExistence(timeout: 3),
                       "第二次点按后行未重绘(R12 同族值缓存)")
+    }
+
+    /// R17 §二:待办点行(作者/非作者同路)推入详情;作者见「⋯」菜单;完成大钮翻转;带坐标地点出导航钮
+    @MainActor
+    func testTodoDetailUnified() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        app.buttons["小本本"].tap()
+        let todosTab = app.buttons["待办"]
+        XCTAssertTrue(todosTab.waitForExistence(timeout: 8))
+        todosTab.tap()
+
+        // 非作者条目(帮她带充电宝,作者=对方,assignee=我):推入详情,无编辑菜单,有完成钮+导航钮
+        app.staticTexts["帮她带充电宝"].tap()
+        // 地点行 Text 包在 Button 里(同 LedgerDetailView 既有范式,见 testMiniMapPinRepro 同款用 buttons 查询)
+        // ,SwiftUI 把 Button+Text 合并成单个 Button 无障碍元素,不作为独立 staticText 暴露——查询类型改 buttons。
+        XCTAssertTrue(app.buttons["📍 演示花店"].waitForExistence(timeout: 5), "详情未推入或地点行缺失")
+        XCTAssertTrue(app.buttons["导航"].exists, "带坐标地点未出导航钮")
+        XCTAssertFalse(app.buttons["待办详情菜单"].exists, "非作者不该有编辑菜单")
+        let doneBig = app.buttons["完成"]
+        XCTAssertTrue(doneBig.exists, "assignee 该有完成大钮")
+        doneBig.tap()
+        XCTAssertTrue(app.buttons["取消完成"].waitForExistence(timeout: 3), "详情完成钮未翻转")
+        app.buttons["取消完成"].tap()
+        app.navigationBars.buttons.firstMatch.tap()   // 返回列表
+
+        // 作者条目(查演出票):详情有「⋯」菜单,菜单里能进编辑表单
+        app.staticTexts["查演出票"].tap()
+        let menu = app.buttons["待办详情菜单"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "作者详情缺编辑菜单")
+        menu.tap()
+        app.buttons["编辑"].tap()
+        XCTAssertTrue(app.navigationBars["编辑待办"].waitForExistence(timeout: 5), "菜单未进编辑表单")
+        app.buttons["取消"].tap()
     }
 
     @MainActor

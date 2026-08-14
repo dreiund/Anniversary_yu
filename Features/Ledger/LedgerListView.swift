@@ -30,8 +30,7 @@ struct LedgerListView: View {
     @State private var confirmBatch = false
     @State private var openSwipeID: NSManagedObjectID?
     @State private var pendingDelete: CDLedgerEntry?
-    @State private var editingTodo: CDTodoItem?
-    @State private var viewingTodo: CDTodoItem?
+    @State private var pushedTodo: CDTodoItem?
     @State private var pendingDeleteTodo: CDTodoItem?
 
     /// 默认落「好事」段；今天卡等入口可传段直达（如「待办」，反馈⑥ §四机制不变）
@@ -111,8 +110,7 @@ struct LedgerListView: View {
             }
             Button("取消", role: .cancel) { pendingDeleteTodo = nil }
         }
-        .sheet(item: $editingTodo) { TodoFormView(mode: .edit($0)) }
-        .sheet(item: $viewingTodo) { TodoDetailSheet(todo: $0, myID: myID) }
+        .navigationDestination(item: $pushedTodo) { TodoDetailView(todo: $0) }
     }
 
     /// 大标题 + 管理钮自绘头部（原 toolbar 管理钮已删，navigationTitle 置空避免与此重复）；
@@ -262,14 +260,12 @@ struct LedgerListView: View {
         }
     }
 
-    /// 待办行外层包装：左滑删仅作者，点行→作者编辑/非作者只读详情（行为不变，反馈⑨只换壳）；
+    /// 待办行外层包装：左滑删仅作者，点行统一推入详情（R17 §二:作者/非作者同路，不再分叉编辑表单/只读详情）；
     /// 行体本身换成 TodoRow（R17 §五根修：行级 @ObservedObject 订阅，见文件底部）
     @ViewBuilder
     private func todoRowEntry(_ todo: CDTodoItem) -> some View {
         let canEdit = TodoRules.canEdit(authorID: todo.authorPartnerID, myID: myID)
-        let row = TodoRow(todo: todo, myID: myID) {
-            if canEdit { editingTodo = todo } else { viewingTodo = todo }   // Task 4 改接详情
-        }
+        let row = TodoRow(todo: todo, myID: myID) { pushedTodo = todo }
         if canEdit {
             SwipeDeleteRow(id: todo.objectID, openID: $openSwipeID) {
                 pendingDeleteTodo = todo
@@ -395,83 +391,5 @@ private struct TodoRow: View {
         if todo.isDone { parts.append("已完成") }
         parts.append(todo.assigneePartnerID == myID ? "我做" : "Ta做")
         return parts.joined(separator: " · ")
-    }
-}
-
-/// 记得做只读详情（非作者点行，反馈⑥ §四）：GroupedSection 行式全览
-/// + assignee 可用的完成/取消完成大钮（勾选走 repo.setDone，完成时取消提醒）
-private struct TodoDetailSheet: View {
-    @ObservedObject var todo: CDTodoItem
-    let myID: UUID?
-    @Environment(\.managedObjectContext) private var context
-    @Environment(\.dismiss) private var dismiss
-
-    private var canToggle: Bool {
-        TodoRules.canToggleDone(authorID: todo.authorPartnerID,
-                                assigneeID: todo.assigneePartnerID, myID: myID)
-    }
-
-    private var rows: [(title: String, value: String, color: Color)] {
-        var result: [(String, String, Color)] = [("标题", todo.title ?? "—", DS.ink)]
-        if let detail = todo.detail, !detail.isEmpty {
-            result.append(("详情", detail, DS.inkMuted))
-        } else {
-            result.append(("详情", "—", DS.inkMuted))
-        }
-        if let due = todo.dueAt {
-            result.append(("目标日", Fmt.monthDay.string(from: due), DS.inkMuted))
-        } else {
-            result.append(("目标日", "—", DS.inkMuted))
-        }
-        if let placeName = todo.place?.name, !placeName.isEmpty {
-            result.append(("地点", placeName, DS.inkMuted))
-        } else {
-            result.append(("地点", "—", DS.inkMuted))
-        }
-        if todo.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue {
-            if let revealedAt = todo.revealedAt {
-                result.append(("可见性", "\(Fmt.monthDay.string(from: revealedAt)) 已公开", DS.dsGreen))
-            } else {
-                result.append(("可见性", "仅自己可见 🔒", DS.inkMuted))
-            }
-        } else {
-            result.append(("可见性", "双方可见", DS.dsGreen))
-        }
-        result.append(("完成态", todo.isDone ? "已完成" : "未完成", todo.isDone ? DS.dsGreen : DS.inkMuted))
-        return result
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                GroupedSection {
-                    ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
-                        GroupedRow(title: row.title, value: row.value, valueColor: row.color,
-                                   showsDivider: i < rows.count - 1)
-                    }
-                }
-                .padding(DS.Spacing.md)
-            }
-            .background(DS.canvas)
-            .navigationTitle("待办")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
-            }
-            .safeAreaInset(edge: .bottom) {
-                if canToggle {
-                    Button(todo.isDone ? "取消完成" : "完成") {
-                        try? TodoRepository(context: context).setDone(todo, done: !todo.isDone, at: Date())
-                        if todo.isDone, let id = todo.id {
-                            ReminderScheduler.cancel(id: ReminderPlanner.todoID(id))   // 完成即取消提醒
-                        }
-                    }
-                    .buttonStyle(BluePillButtonStyle(fullWidth: true))
-                    .padding(.horizontal, DS.Spacing.md)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial)
-                }
-            }
-        }
     }
 }
