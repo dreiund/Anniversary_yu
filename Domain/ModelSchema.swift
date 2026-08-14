@@ -82,6 +82,9 @@ enum ModelSchema {
             attr("endedAt", .dateAttributeType),
             attr("statusRaw", .integer16AttributeType, optional: false, defaultValue: 0),
             attr("coverPhotoID", .UUIDAttributeType),
+            attr("authorPartnerID", .UUIDAttributeType),                                   // R17 私密计划
+            attr("visibilityRaw", .integer16AttributeType, optional: false, defaultValue: 0),
+            attr("revealedAt", .dateAttributeType),
         ])
 
         let dateDay = entity("CDDateDay", CDDateDay.self, [
@@ -226,6 +229,7 @@ enum ModelSchema {
         oneToMany(place, "planItems", planItem, "place", cascade: false)
         oneToMany(place, "todoItems", todo, "place", cascade: false)
         oneToMany(ledger, "evidences", evidence, "ledgerEntry")
+        oneToMany(todo, "evidences", evidence, "todoItem")
         oneToMany(cycle, "dayLogs", cycleLog, "cycle")
 
         let model = NSManagedObjectModel()

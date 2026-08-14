@@ -42,6 +42,9 @@ final class CDMeeting: NSManagedObject {
     @NSManaged var endedAt: Date?
     @NSManaged var statusRaw: Int16
     @NSManaged var coverPhotoID: UUID?
+    @NSManaged var authorPartnerID: UUID?
+    @NSManaged var visibilityRaw: Int16
+    @NSManaged var revealedAt: Date?
     @NSManaged var couple: CDCouple?
     @NSManaged var dateDays: NSSet?
     @NSManaged var planItems: NSSet?
@@ -142,6 +145,7 @@ final class CDEvidence: NSManagedObject {
     @NSManaged var thumbnailData: Data?
     @NSManaged var sortIndex: Int32
     @NSManaged var ledgerEntry: CDLedgerEntry?
+    @NSManaged var todoItem: CDTodoItem?
 }
 
 @objc(CDCycle)
@@ -208,6 +212,7 @@ final class CDTodoItem: NSManagedObject {
     @NSManaged var createdAt: Date?
     @NSManaged var couple: CDCouple?
     @NSManaged var place: CDPlace?
+    @NSManaged var evidences: NSSet?
 }
 
 extension CDPlanItem: Identifiable {}

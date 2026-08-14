@@ -120,4 +120,19 @@ final class ModelSchemaTests: XCTestCase {
         XCTAssertFalse(attr!.isOptional)
         XCTAssertEqual(attr!.defaultValue as? Int16, 0)
     }
+
+    func testR17SchemaAdditions() {
+        let model = ModelSchema.model
+        let meeting = model.entitiesByName["CDMeeting"]!
+        XCTAssertNotNil(meeting.attributesByName["authorPartnerID"])
+        XCTAssertNotNil(meeting.attributesByName["visibilityRaw"])
+        XCTAssertFalse(meeting.attributesByName["visibilityRaw"]!.isOptional)
+        XCTAssertNotNil(meeting.attributesByName["revealedAt"])
+        let todo = model.entitiesByName["CDTodoItem"]!
+        let evidences = todo.relationshipsByName["evidences"]!
+        XCTAssertEqual(evidences.destinationEntity?.name, "CDEvidence")
+        XCTAssertEqual(evidences.deleteRule, .cascadeDeleteRule)
+        let inverse = model.entitiesByName["CDEvidence"]!.relationshipsByName["todoItem"]!
+        XCTAssertEqual(inverse.inverseRelationship?.name, "evidences")
+    }
 }

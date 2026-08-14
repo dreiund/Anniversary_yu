@@ -57,4 +57,27 @@ struct TodoRepository {
         ((couple.todos as? Set<CDTodoItem>) ?? [])
             .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
     }
+
+    func evidencesSorted(_ todo: CDTodoItem) -> [CDEvidence] {
+        ((todo.evidences as? Set<CDEvidence>) ?? [])
+            .sorted { $0.sortIndex < $1.sortIndex }
+    }
+
+    func addEvidences(_ todo: CDTodoItem, datas: [Data]) throws {
+        let start = (evidencesSorted(todo).last?.sortIndex).map { $0 + 1 } ?? 0
+        for (i, data) in datas.enumerated() {
+            let evidence = CDEvidence(context: context)
+            evidence.id = UUID()
+            evidence.imageData = data
+            evidence.thumbnailData = Thumbnailer.thumbnailData(from: data)
+            evidence.sortIndex = start + Int32(i)
+            evidence.todoItem = todo
+        }
+        try context.save()
+    }
+
+    func deleteEvidence(_ evidence: CDEvidence) throws {
+        context.delete(evidence)
+        try context.save()
+    }
 }

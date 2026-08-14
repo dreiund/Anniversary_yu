@@ -9,7 +9,9 @@ struct MeetingRepository {
 
     @discardableResult
     func createPlanned(couple: CDCouple, title: String?, city: String?,
-                       plannedStart: Date?, plannedEnd: Date?) throws -> CDMeeting {
+                       plannedStart: Date?, plannedEnd: Date?,
+                       authorID: UUID? = nil,
+                       visibility: EntryVisibility = .sharedImmediately) throws -> CDMeeting {
         let maxIndex = ((couple.meetings as? Set<CDMeeting>) ?? [])
             .map(\.index).max() ?? 0
         let meeting = CDMeeting(context: context)
@@ -20,12 +22,26 @@ struct MeetingRepository {
         meeting.plannedStart = plannedStart
         meeting.plannedEnd = plannedEnd
         meeting.statusRaw = MeetingStatus.planned.rawValue
+        meeting.authorPartnerID = authorID          // R17 私密计划:作者+可见性(默认口径=旧行为)
+        meeting.visibilityRaw = visibility.rawValue
         meeting.couple = couple
         try context.save()
         return meeting
     }
 
+    /// 公开给 TA:一次性置戳(同小本本 reveal 语义),不碰 visibilityRaw
+    func reveal(_ meeting: CDMeeting, at date: Date) throws {
+        guard meeting.revealedAt == nil else { return }
+        meeting.revealedAt = date
+        try context.save()
+    }
+
     func start(_ meeting: CDMeeting, at date: Date) throws {
+        // 开始见面=自动公开(R17 spec §四单点收口):私密未公开先置戳,同一保存
+        if meeting.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue,
+           meeting.revealedAt == nil {
+            meeting.revealedAt = date
+        }
         meeting.statusRaw = MeetingStatus.ongoing.rawValue
         meeting.startedAt = date
         try context.save()

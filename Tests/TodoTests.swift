@@ -68,4 +68,27 @@ final class TodoTests: XCTestCase {
         try repo.delete(todo)
         XCTAssertTrue(repo.todos(couple: couple).isEmpty)
     }
+
+    func testEvidenceAddSortDelete() throws {
+        let todo = try repo.create(couple: couple, title: "带充电宝", detail: nil, dueAt: d(10),
+                                   assigneeID: nil, authorID: nil, visibility: .sharedImmediately,
+                                   place: nil, remindAt: nil, calendar: cal)
+        XCTAssertEqual(repo.evidencesSorted(todo).count, 0)
+        try repo.addEvidences(todo, datas: [Data([0x1]), Data([0x2])])
+        try repo.addEvidences(todo, datas: [Data([0x3])])
+        let sorted = repo.evidencesSorted(todo)
+        XCTAssertEqual(sorted.map(\.sortIndex), [0, 1, 2])   // 二次追加续排不重叠
+        try repo.deleteEvidence(sorted[1])
+        XCTAssertEqual(repo.evidencesSorted(todo).count, 2)
+    }
+
+    func testDeleteTodoCascadesEvidences() throws {
+        let todo = try repo.create(couple: couple, title: "x", detail: nil, dueAt: d(1),
+                                   assigneeID: nil, authorID: nil, visibility: .sharedImmediately,
+                                   place: nil, remindAt: nil, calendar: cal)
+        try repo.addEvidences(todo, datas: [Data([0x1])])
+        try repo.delete(todo)
+        let fetch = NSFetchRequest<CDEvidence>(entityName: "CDEvidence")
+        XCTAssertEqual((try pc.viewContext.fetch(fetch)).count, 0)   // 删父级联删照片
+    }
 }
