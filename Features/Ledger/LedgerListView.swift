@@ -382,7 +382,6 @@ private struct TodoRow: View {
                     }
                 }
             }
-            Spacer()
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
