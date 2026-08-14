@@ -370,7 +370,17 @@ private struct TodoRow: View {
                     .foregroundStyle(todo.isDone ? DS.inkMuted : DS.ink)
                     .strikethrough(todo.isDone, color: DS.inkMuted)
                     .lineLimit(1)
-                Text(meta).dsFootnote()
+                HStack(spacing: 8) {
+                    Text(meta).dsFootnote()
+                    Spacer()
+                    if let thumb = TodoRepository(context: context).evidencesSorted(todo).first?.thumbnailData,
+                       let ui = UIImage(data: thumb) {
+                        Image(uiImage: ui).resizable().scaledToFill()
+                            .frame(width: 26, height: 26)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .allowsHitTesting(false)
+                    }
+                }
             }
             Spacer()
         }

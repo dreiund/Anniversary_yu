@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import CoreData
 
 enum TodoFormMode {
@@ -25,6 +26,9 @@ struct TodoFormView: View {
     @State private var showPlacePicker = false
     @State private var remindOn = false
     @State private var remindAt = Date()
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var photoDatas: [Data] = []
+    @State private var evidencesToDelete: [CDEvidence] = []
     @State private var confirmReveal = false
     @State private var confirmDelete = false
     @State private var loaded = false
@@ -48,6 +52,12 @@ struct TodoFormView: View {
     private var visibilityLocked: Bool {
         guard let todo = editingTodo else { return false }
         return LedgerRules.isRevealed(visibilityRaw: todo.visibilityRaw, revealedAt: todo.revealedAt)
+    }
+
+    private var existingEvidences: [CDEvidence] {
+        guard let todo = editingTodo else { return [] }
+        return TodoRepository(context: context).evidencesSorted(todo)
+            .filter { !evidencesToDelete.contains($0) }
     }
 
     private var canSave: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -116,6 +126,36 @@ struct TodoFormView: View {
                         .dsFootnote().padding(.horizontal, 4)
 
                     GroupedSection {
+                        PhotosPicker(selection: $pickerItems, maxSelectionCount: 9, matching: .images) {
+                            HStack {
+                                Text("照片").dsBody()
+                                Spacer()
+                                Text(photoDatas.isEmpty && existingEvidences.isEmpty
+                                     ? "＋ 添加" : "已有 \(existingEvidences.count + photoDatas.count) 张")
+                                    .dsCaption()
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 11)
+                        }
+                        if !existingEvidences.isEmpty || !photoDatas.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(existingEvidences, id: \.objectID) { evidence in
+                                        evidenceThumb(evidence)
+                                    }
+                                    ForEach(Array(photoDatas.enumerated()), id: \.offset) { _, data in
+                                        if let ui = UIImage(data: data) {
+                                            Image(uiImage: ui).resizable().scaledToFill()
+                                                .frame(width: 52, height: 52)
+                                                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 14).padding(.bottom, 11)
+                            }
+                        }
+                    }
+
+                    GroupedSection {
                         Toggle("提醒我", isOn: Binding(
                             get: { remindOn },
                             set: { newValue in
@@ -178,6 +218,17 @@ struct TodoFormView: View {
                 Button("删除", role: .destructive) { delete() }
                 Button("取消", role: .cancel) {}
             }
+            .onChange(of: pickerItems) {
+                Task {
+                    var datas: [Data] = []
+                    for item in pickerItems {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            datas.append(data)
+                        }
+                    }
+                    photoDatas = datas
+                }
+            }
             .onAppear(perform: loadIfNeeded)
         }
     }
@@ -202,6 +253,28 @@ struct TodoFormView: View {
     private func defaultRemindAt() -> Date {
         let cal = Calendar.current
         return cal.date(bySettingHour: 9, minute: 0, second: 0, of: cal.startOfDay(for: dueAt)) ?? dueAt
+    }
+
+    private func evidenceThumb(_ evidence: CDEvidence) -> some View {
+        Group {
+            if let data = evidence.thumbnailData, let ui = UIImage(data: data) {
+                Image(uiImage: ui).resizable().scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: DS.Radius.image).fill(DS.canvas)
+            }
+        }
+        .frame(width: 52, height: 52)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+        .overlay(alignment: .topTrailing) {
+            Button {
+                evidencesToDelete.append(evidence)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white, .black.opacity(0.5))
+            }
+            .offset(x: 4, y: -4)
+        }
     }
 
     private func loadIfNeeded() {
@@ -276,6 +349,9 @@ struct TodoFormView: View {
             }
             savedTodo = todo
         }
+
+        for evidence in evidencesToDelete { try? repo.deleteEvidence(evidence) }
+        if !photoDatas.isEmpty, let savedTodo { try? repo.addEvidences(savedTodo, datas: photoDatas) }
 
         if let id = savedTodo?.id {
             let key = ReminderPlanner.todoID(id)
