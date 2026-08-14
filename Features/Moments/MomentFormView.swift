@@ -19,6 +19,8 @@ struct MomentFormView: View {
     @State private var happenedAt = Date()
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var photoDatas: [Data] = []
+    /// 转化带走的日程照片走独立状态——photoDatas 会被 Picker onChange 整体替换,直塞会在追加时丢图(R18-T3 评审)
+    @State private var carriedOverPhotoDatas: [Data] = []
     @State private var stars = 0
     @State private var moodEmoji: String?
     @State private var comment = ""
@@ -128,7 +130,9 @@ struct MomentFormView: View {
     private var photoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             PhotosPicker(selection: $pickerItems, maxSelectionCount: 9, matching: .images) {
-                Text(photoDatas.isEmpty ? (isEdit ? "追加照片" : "选择照片") : "已选 \(photoDatas.count) 张")
+                Text(carriedOverPhotoDatas.isEmpty && photoDatas.isEmpty
+                     ? (isEdit ? "追加照片" : "选择照片")
+                     : "已选 \(carriedOverPhotoDatas.count + photoDatas.count) 张")
                     .font(.system(size: 15))
                     .foregroundStyle(DS.actionBlue)
             }
@@ -165,9 +169,18 @@ struct MomentFormView: View {
                     Text("已标记删除 \(photosToDelete.count) 张 · 保存后生效").dsFootnote()
                 }
             }
-            if !photoDatas.isEmpty {
+            if !carriedOverPhotoDatas.isEmpty || !photoDatas.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
+                        // 带走的日程照片:无删除标记(转化后可在回忆里删,本轮不做逐张移除)
+                        ForEach(Array(carriedOverPhotoDatas.enumerated()), id: \.offset) { _, data in
+                            if let ui = UIImage(data: data) {
+                                Image(uiImage: ui)
+                                    .resizable().scaledToFill()
+                                    .frame(width: 52, height: 52)
+                                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
+                            }
+                        }
                         ForEach(Array(photoDatas.enumerated()), id: \.offset) { _, data in
                             if let ui = UIImage(data: data) {
                                 Image(uiImage: ui)
@@ -254,7 +267,7 @@ struct MomentFormView: View {
             let planned = item.time != nil ? repo.plannedMoment(of: item) : nil
             happenedAt = min(planned ?? Date(), Date())
             // R18 3A:日程照片随转化带进回忆(转化删源会级联删日程照片,不带走就丢了)
-            photoDatas = repo.evidencesSorted(item).compactMap(\.imageData)
+            carriedOverPhotoDatas = repo.evidencesSorted(item).compactMap(\.imageData)
             if let place = item.place {
                 locationName = place.name ?? ""
                 if place.latitude != 0 || place.longitude != 0 {
@@ -341,7 +354,7 @@ struct MomentFormView: View {
         let created = try? MomentRepository(context: context).create(
             in: meeting, type: type, title: title,
             body: bodyText.isEmpty ? nil : bodyText,
-            happenedAt: happenedAt, photoDatas: photoDatas,
+            happenedAt: happenedAt, photoDatas: carriedOverPhotoDatas + photoDatas,
             myEvaluation: evaluation, authorID: authorID, place: place,
             sealNewPastDayAt: sealNewPastDayAt)
         if created != nil, case let .fromPlan(item) = mode {
