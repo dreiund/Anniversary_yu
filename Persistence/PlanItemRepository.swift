@@ -123,11 +123,19 @@ struct PlanItemRepository {
         var all = Array(((meeting.planItems as? Set<CDPlanItem>) ?? []))
         if let myID {
             all = all.filter {
-                LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
-                                      visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+                isVisibleIsomorphic(authorID: $0.authorPartnerID, myID: myID,
+                                    visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
             }
         }
         return (all.count, all.filter(\.isDone).count)
+    }
+
+    /// 与 LedgerRules.isVisible 同构(Persistence 层避免依赖 Features 层,HistoryMonitor 先例;
+    /// 两处口径必须一致,改任一处须同步另一处)
+    private func isVisibleIsomorphic(authorID: UUID?, myID: UUID,
+                                     visibilityRaw: Int16, revealedAt: Date?) -> Bool {
+        if let authorID, authorID == myID { return true }
+        return visibilityRaw == EntryVisibility.sharedImmediately.rawValue || revealedAt != nil
     }
 
     /// 计划时刻合成:有时间用日期的年月日+时间的时分;全天用当日 00:00;无日期(备忘)nil
