@@ -515,6 +515,45 @@ final class MapFilterReproTests: XCTestCase {
         app.buttons["取消"].tap()
     }
 
+    /// R18 热修回归:①行前计划勾选圈点按即时重绘(R12/R17 同族——行级 @ObservedObject 根修)
+    /// ②私密日程在表单里公开后,查看页不退出即时显示已公开(@ObservedObject 订阅根修)
+    @MainActor
+    func testPlanRowToggleAndRevealRefresh() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        app.buttons["足迹"].tap()
+        let card = app.staticTexts["南京 · 演示行前"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), "计划卡未出现")
+        card.tap()
+
+        // ① 勾选圈双击回归:label 翻转=行真的重绘了
+        let toggle = app.buttons["完成 取门票"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "勾选圈未带显式 label")
+        toggle.tap()
+        XCTAssertTrue(app.buttons["取消完成 取门票"].waitForExistence(timeout: 3),
+                      "第一次点按后行未重绘")
+        app.buttons["取消完成 取门票"].tap()
+        XCTAssertTrue(app.buttons["完成 取门票"].waitForExistence(timeout: 3),
+                      "第二次点按后行未重绘(R12 同族值缓存)")
+
+        // ② 公开即时刷新:查看页开着,表单里关私密→确认公开→保存→不退出断言已公开
+        app.staticTexts["惊喜环节"].tap()
+        XCTAssertTrue(app.staticTexts["仅自己可见 🔒"].waitForExistence(timeout: 5), "查看页缺可见性行")
+        app.navigationBars["日程"].buttons["编辑"].tap()
+        let privacyToggle = app.switches["私密"]
+        XCTAssertTrue(privacyToggle.waitForExistence(timeout: 5), "表单缺私密开关")
+        privacyToggle.tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3), "关私密未弹公开确认")
+        app.alerts.firstMatch.buttons["公开"].tap()
+        app.buttons["保存"].tap()
+        let revealed = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "已公开")).firstMatch
+        XCTAssertTrue(revealed.waitForExistence(timeout: 5),
+                      "公开保存后查看页未即时刷新(需退出重进才对=旧 bug)")
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())

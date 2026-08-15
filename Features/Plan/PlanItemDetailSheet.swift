@@ -5,12 +5,22 @@ import CoreData
 struct PlanItemDetailSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
-    let item: CDPlanItem
+    // R18 热修:@ObservedObject 订阅对象变更——表单里公开/改动后查看页即时刷新(原 let 持有不感知)
+    @ObservedObject var item: CDPlanItem
     @State private var showEdit = false
     @State private var showMiniMap = false
     @State private var viewerIndex: Int?
 
     var body: some View {
+        // 对象删除守卫(P6 F-2 同款):表单里删除后本页对象失效,立即退场
+        if item.managedObjectContext == nil || item.isDeleted {
+            Color.clear.onAppear { dismiss() }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.md) {

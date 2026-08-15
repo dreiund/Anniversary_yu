@@ -212,23 +212,85 @@ struct PlanView: View {
     }
 
     private func planRow(_ item: CDPlanItem) -> some View {
+        PlanScheduleRow(
+            item: item,
+            selecting: selecting,
+            isSelected: selected.contains(item.objectID),
+            authorLabel: authorName(item.authorPartnerID),
+            onToggleDone: {
+                try? PlanItemRepository(context: context).toggleDone(item)
+                // 反馈⑧终审:勾掉即取消提醒，对齐"记得做"(LedgerListView)的 toggle 处理；
+                // 取消勾选不恢复提醒——同构，不做重新排程
+                if item.isDone, let id = item.id {
+                    ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+                }
+            },
+            onTap: {
+                if selecting { toggleSelection(item.objectID) } else { viewingItem = item }
+            },
+            onTapPlace: {
+                // 反馈⑦ 1A：点日程地点弹临时小地图——见面结束后仍可定位，不进地图页
+                if !selecting, let place = item.place,
+                   place.latitude != 0 || place.longitude != 0 {
+                    miniMapPlace = place
+                }
+            })
+    }
+
+    private func memoRow(_ item: CDPlanItem) -> some View {
+        PlanMemoRow(
+            item: item,
+            selecting: selecting,
+            isSelected: selected.contains(item.objectID),
+            onToggle: { toggleMemo(item) },
+            onTap: {
+                if selecting { toggleSelection(item.objectID) } else { toggleMemo(item) }
+            },
+            onEdit: { editingItem = item },
+            onDelete: {
+                let id = item.id
+                try? PlanItemRepository(context: context).delete(item)
+                if let id { ReminderScheduler.cancelPlans([id]) }
+            })
+    }
+
+    /// 备忘勾选:划掉即取消提醒(取消勾选不恢复提醒，同 planRow 口径)
+    private func toggleMemo(_ item: CDPlanItem) {
+        try? PlanItemRepository(context: context).toggleDone(item)
+        if item.isDone, let id = item.id {
+            ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
+        }
+    }
+
+    private func toggleSelection(_ id: NSManagedObjectID) {
+        if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
+    }
+}
+
+/// 行前日程行(R18 热修:行级 @ObservedObject 订阅——勾选/公开翻转即时重绘;
+/// R12 MemoRow/R17 TodoRow 同族:原内联 builder 下 isDone 翻转不改 items.count,行不刷新)
+private struct PlanScheduleRow: View {
+    @ObservedObject var item: CDPlanItem
+    let selecting: Bool
+    let isSelected: Bool
+    let authorLabel: String
+    var onToggleDone: () -> Void
+    var onTap: () -> Void
+    var onTapPlace: () -> Void
+    @Environment(\.managedObjectContext) private var context
+
+    var body: some View {
         HStack(spacing: 10) {
             if selecting {
-                SelectionCircle(isOn: selected.contains(item.objectID), size: 20)
+                SelectionCircle(isOn: isSelected, size: 20)
             } else {
-                Button {
-                    try? PlanItemRepository(context: context).toggleDone(item)
-                    // 反馈⑧终审:勾掉即取消提醒，对齐"记得做"(LedgerListView)的 toggle 处理；
-                    // 取消勾选不恢复提醒——同构，不做重新排程
-                    if item.isDone, let id = item.id {
-                        ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
-                    }
-                } label: {
+                Button(action: onToggleDone) {
                     Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20))
                         .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
                 }
                 .buttonStyle(DSPressEffect())
+                .accessibilityLabel("\(item.isDone ? "取消完成" : "完成") \(item.title ?? "")")
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -248,13 +310,7 @@ struct PlanView: View {
                 if let placeLabel = item.place?.name ?? item.placeText, !placeLabel.isEmpty {
                     Text(placeLabel)
                         .font(.system(size: 12)).foregroundStyle(DS.actionBlue)
-                        .onTapGesture {
-                            // 反馈⑦ 1A：点日程地点弹临时小地图——见面结束后仍可定位，不进地图页
-                            if !selecting, let place = item.place,
-                               place.latitude != 0 || place.longitude != 0 {
-                                miniMapPlace = place
-                            }
-                        }
+                        .onTapGesture(perform: onTapPlace)
                 }
             }
             Spacer()
@@ -265,28 +321,36 @@ struct PlanView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .allowsHitTesting(false)
             }
-            AvatarInitial(name: authorName(item.authorPartnerID), size: 20)
+            AvatarInitial(name: authorLabel, size: 20)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .contentShape(Rectangle())
-        .onTapGesture {
-            if selecting { toggleSelection(item.objectID) } else { viewingItem = item }
-        }
+        .onTapGesture(perform: onTap)
     }
+}
 
-    private func memoRow(_ item: CDPlanItem) -> some View {
+/// 备忘行(R18 热修:同款行级订阅,勾选即时划线)
+private struct PlanMemoRow: View {
+    @ObservedObject var item: CDPlanItem
+    let selecting: Bool
+    let isSelected: Bool
+    var onToggle: () -> Void
+    var onTap: () -> Void
+    var onEdit: () -> Void
+    var onDelete: () -> Void
+
+    var body: some View {
         HStack(spacing: 10) {
             if selecting {
-                SelectionCircle(isOn: selected.contains(item.objectID), size: 20)
+                SelectionCircle(isOn: isSelected, size: 20)
             } else {
-                Button {
-                    toggleMemo(item)
-                } label: {
+                Button(action: onToggle) {
                     Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20))
                         .foregroundStyle(item.isDone ? DS.actionBlue : DS.chipBorder)
                 }
                 .buttonStyle(DSPressEffect())
+                .accessibilityLabel("\(item.isDone ? "取消完成" : "完成") \(item.title ?? "")")
             }
             Text(item.title ?? "")
                 .font(.system(size: 14))
@@ -301,28 +365,10 @@ struct PlanView: View {
         .contentShape(Rectangle())
         // P6-T6:备忘正文点击=勾选——非管理态点整行(不止圆圈)即 toggle,同圈逻辑含勾掉取消提醒；
         // 圆圈本身是独立 Button 会吃掉自己的点击，不会与本行 onTapGesture 重复触发
-        .onTapGesture {
-            if selecting { toggleSelection(item.objectID) } else { toggleMemo(item) }
-        }
+        .onTapGesture(perform: onTap)
         .contextMenu {
-            Button("编辑") { editingItem = item }
-            Button("删除", role: .destructive) {
-                let id = item.id
-                try? PlanItemRepository(context: context).delete(item)
-                if let id { ReminderScheduler.cancelPlans([id]) }
-            }
+            Button("编辑", action: onEdit)
+            Button("删除", role: .destructive, action: onDelete)
         }
-    }
-
-    /// 备忘勾选:划掉即取消提醒(取消勾选不恢复提醒，同 planRow 口径)
-    private func toggleMemo(_ item: CDPlanItem) {
-        try? PlanItemRepository(context: context).toggleDone(item)
-        if item.isDone, let id = item.id {
-            ReminderScheduler.cancel(id: ReminderPlanner.planID(id))
-        }
-    }
-
-    private func toggleSelection(_ id: NSManagedObjectID) {
-        if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
     }
 }
