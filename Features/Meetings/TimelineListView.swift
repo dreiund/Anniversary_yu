@@ -342,6 +342,7 @@ struct MemoListSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     let meeting: CDMeeting
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     // 反馈⑩bug2:自持 FetchRequest——之前接收父层传入的数组快照,行内勾选写库后无任何观察者,
     // 界面不重画(重进才见划线)。FetchRequest 对属性变化(isDone)也响应,勾选即时上屏
     @FetchRequest private var memosFetch: FetchedResults<CDPlanItem>
@@ -355,9 +356,16 @@ struct MemoListSheet: View {
     }
 
     var body: some View {
+        let myID = couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+        // R18-T4 评审 Important:备忘恒公开是常态(PlanItemFormSheet 落库前已 reveal)——这层
+        // isVisible 过滤是纵深防御,兜历史坏数据/两段式保存的极端窗口态,不是主判定路径
+        let visibleMemos = memosFetch.filter {
+            LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                  visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt)
+        }
         NavigationStack {
             List {
-                ForEach(memosFetch, id: \.objectID) { item in
+                ForEach(visibleMemos, id: \.objectID) { item in
                     MemoRow(item: item) { editingItem = item }
                 }
             }

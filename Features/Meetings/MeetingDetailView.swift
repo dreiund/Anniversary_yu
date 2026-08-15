@@ -19,6 +19,7 @@ struct MeetingDetailView: View {
     // 反馈⑨T4:备忘侧签——独立 FetchRequest 挂在这一层(ScrollView 容器外)，
     // 侧签才能贴着屏幕左缘常驻，不会像挂在 TimelineListView 的 LazyVStack 上那样随时间线滚走
     @FetchRequest private var plansFetch: FetchedResults<CDPlanItem>
+    @FetchRequest(sortDescriptors: [SortDescriptor(\CDCouple.createdAt)]) private var couples: FetchedResults<CDCouple>
     @State private var showMemos = false
 
     init(meeting: CDMeeting) {
@@ -31,10 +32,20 @@ struct MeetingDetailView: View {
     private var showPlans: Bool {
         meeting.statusRaw == MeetingStatus.ongoing.rawValue || meeting.statusRaw == MeetingStatus.finished.rawValue
     }
+    private var myID: UUID? {
+        couples.first.flatMap { CoupleRepository(context: context).currentPartnerID(of: $0) }
+    }
     // 反馈⑨终审修(M-3):按 sortIndex 排序,与 PlanView 备忘区(PlanItemRepository.sections 的 undated)口径一致——
     // FetchRequest 本身未设 sortDescriptors,不排序时行序跨启动不稳
+    // R18-T4 评审 Important:备忘恒公开是常态(PlanItemFormSheet 落库前已 reveal)——这层
+    // isVisible 过滤是纵深防御,兜历史坏数据/两段式保存的极端窗口态;侧签徽标计数与开关
+    // 都不该数进对方私密未公开的备忘
     private var memos: [CDPlanItem] {
-        showPlans ? plansFetch.filter { $0.day == nil }.sorted { $0.sortIndex < $1.sortIndex } : []
+        guard showPlans else { return [] }
+        return plansFetch.filter { $0.day == nil }
+            .filter { LedgerRules.isVisible(authorID: $0.authorPartnerID, myID: myID,
+                                            visibilityRaw: $0.visibilityRaw, revealedAt: $0.revealedAt) }
+            .sorted { $0.sortIndex < $1.sortIndex }
     }
 
     var body: some View {

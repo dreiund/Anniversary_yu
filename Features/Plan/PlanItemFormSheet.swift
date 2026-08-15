@@ -314,15 +314,19 @@ struct PlanItemFormSheet: View {
         }
         var savedItem: CDPlanItem?
         if let item {
-            try? repo.update(item, day: dayValue, time: timeValue, title: title,
-                             note: noteValue, placeText: placeValue, remindAt: remindValue,
-                             place: place)
             // 编辑关私密=等效公开;既有私密日程切成备忘保存=恒公开(spec §五)
+            // R18-T4 评审 Important:reveal 挪到 update 之前——两次 save 若先落 day=nil
+            // 再落 revealedAt,中间会留一个「day==nil 且私密未公开」的坏态窗口(可能被
+            // CloudKit 同步到对方,MemoListSheet/侧签徽标会完整渲染标题)。条件不变:
+            // 读的 item.visibilityRaw/visibilityLocked/isMemo 都不受 update 影响。
             if !visibilityLocked,
                item.visibilityRaw == EntryVisibility.privateUntilRevealed.rawValue,
                isMemo || visibility == .sharedImmediately {
                 try? repo.reveal(item, at: Date())
             }
+            try? repo.update(item, day: dayValue, time: timeValue, title: title,
+                             note: noteValue, placeText: placeValue, remindAt: remindValue,
+                             place: place)
             savedItem = item
         } else {
             let authorID = couple.flatMap { couples.currentPartnerID(of: $0) }
