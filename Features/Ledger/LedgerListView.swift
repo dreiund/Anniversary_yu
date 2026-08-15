@@ -132,34 +132,33 @@ struct LedgerListView: View {
                     .background(Capsule().fill(DS.canvas))
                     .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
                 }
-                Picker("小本本分段", selection: $segment) {
-                    ForEach(LedgerSegment.allCases, id: \.self) { seg in
-                        Text(seg.label).tag(seg)
-                    }
-                }
-                .pickerStyle(.segmented)
+                DSSegmented(selection: $segment,
+                            options: LedgerSegment.allCases.map { ($0, $0.label) })
             }
             .padding(.horizontal, DS.Spacing.md)
             .padding(.top, 10).padding(.bottom, 14)
             DS.hairline.frame(height: 1)
-            HStack(spacing: 16) {
+            HStack(spacing: 20) {
                 ForEach(LedgerFilter.allCases, id: \.label) { f in
                     Button { filter = f } label: {
-                        VStack(spacing: 3) {
+                        // R19-① 反馈修:字 12→14 + 竖向垫高热区(整块可点),小字筛选不再难按
+                        VStack(spacing: 4) {
                             Text(f.label)
-                                .font(.system(size: 12, weight: filter == f ? .semibold : .regular))
+                                .font(.system(size: 14, weight: filter == f ? .semibold : .regular))
                                 .foregroundStyle(filter == f ? DS.actionBlue : DS.inkMuted)
                             Rectangle().fill(filter == f ? DS.actionBlue : .clear)
                                 .frame(height: 2).clipShape(Capsule())
                         }
                         .fixedSize()
+                        .padding(.vertical, 5)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
                 Spacer()
             }
             .padding(.horizontal, DS.Spacing.md)
-            .padding(.top, 10).padding(.bottom, 8)
+            .padding(.top, 6).padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DS.parchment)

@@ -108,12 +108,8 @@ struct MeetingsView: View {
                         .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
                     }
                 }
-                Picker("足迹分段", selection: $segment) {
-                    Text("列表").tag(0)
-                    Text("日历").tag(1)
-                    Text("地图").tag(2)
-                }
-                .pickerStyle(.segmented)
+                DSSegmented(selection: $segment,
+                            options: [(0, "列表"), (1, "日历"), (2, "地图")])
             }
             .padding(.horizontal, DS.Spacing.md)
             .padding(.top, 10).padding(.bottom, 14)
