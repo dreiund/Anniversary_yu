@@ -115,35 +115,33 @@ struct LedgerListView: View {
 
     /// 大标题 + 管理钮自绘头部（原 toolbar 管理钮已删，navigationTitle 置空避免与此重复）；
     /// 段 chips 下再是下划线二级筛选，四段都显示（反馈⑨换壳）
+    /// R19 头部分界:大标题+管理胶囊 → iOS 原生分段器(标准件自带容器感,四段不再与筛选灰字混淆)
+    /// → 全宽发丝线分区 → 下划线筛选(内容区第一行,全页唯一行动蓝)。足迹页同款结构。
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("小本本").dsPageTitle()
-                Spacer()
-                Button(selecting ? "完成" : "管理") {
-                    selecting.toggle(); selected = []; openSwipeID = nil
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(DS.ink)
-                .padding(.vertical, 6).padding(.horizontal, 14)
-                .background(Capsule().fill(DS.canvas))
-                .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
-            }
-            HStack(spacing: 6) {
-                ForEach(LedgerSegment.allCases, id: \.label) { seg in
-                    Button { segment = seg } label: {
-                        Text(seg.label)
-                            .font(.system(size: 14, weight: segment == seg ? .semibold : .regular))
-                            .foregroundStyle(segment == seg ? DS.ink : DS.inkMuted)
-                            .padding(.vertical, 7).padding(.horizontal, 14)
-                            .background(RoundedRectangle(cornerRadius: 10)
-                                .fill(segment == seg ? DS.canvas : .clear))
-                            .overlay(RoundedRectangle(cornerRadius: 10)
-                                .stroke(segment == seg ? DS.hairline : .clear, lineWidth: 1))
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("小本本").dsPageTitle()
+                    Spacer()
+                    Button(selecting ? "完成" : "管理") {
+                        selecting.toggle(); selected = []; openSwipeID = nil
                     }
-                    .buttonStyle(DSPressEffect())
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.ink)
+                    .padding(.vertical, 6).padding(.horizontal, 14)
+                    .background(Capsule().fill(DS.canvas))
+                    .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
                 }
+                Picker("小本本分段", selection: $segment) {
+                    ForEach(LedgerSegment.allCases, id: \.self) { seg in
+                        Text(seg.label).tag(seg)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.top, 10).padding(.bottom, 14)
+            DS.hairline.frame(height: 1)
             HStack(spacing: 16) {
                 ForEach(LedgerFilter.allCases, id: \.label) { f in
                     Button { filter = f } label: {
@@ -160,8 +158,9 @@ struct LedgerListView: View {
                 }
                 Spacer()
             }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.top, 10).padding(.bottom, 8)
         }
-        .padding(.horizontal, DS.Spacing.md).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DS.parchment)
     }

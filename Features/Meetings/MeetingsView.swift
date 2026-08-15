@@ -21,13 +21,7 @@ struct MeetingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                SelectableChip(title: "列表", isSelected: segment == 0) { segment = 0 }
-                SelectableChip(title: "日历", isSelected: segment == 1) { segment = 1 }
-                SelectableChip(title: "地图", isSelected: segment == 2) { segment = 2 }
-            }
-            .padding(.horizontal, DS.Spacing.md)
-            .padding(.vertical, 8)
+            header
 
             switch segment {
             case 1:
@@ -41,23 +35,11 @@ struct MeetingsView: View {
             }
         }
         .background(DS.canvas)
-        .navigationTitle("足迹")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: segment) { _, _ in
             selecting = false
             selected = []
-        }
-        .toolbar {
-            if segment == 0 && !meetings.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(selecting ? "完成" : "管理") {
-                        selecting.toggle()
-                        selected = []
-                        openSwipeID = nil
-                    }
-                    .font(.system(size: 14))
-                }
-            }
         }
         .safeAreaInset(edge: .bottom) {
             if selecting && segment == 0 {
@@ -103,6 +85,42 @@ struct MeetingsView: View {
                  ? "行前计划的日程会一起删除。"
                  : "这次见面的所有约会日、记忆和照片会一并删除，无法恢复。")
         }
+    }
+
+    /// R19 头部分界(与小本本同款结构):大标题+管理胶囊(仅列表段且有内容)→ 原生分段器 → 全宽发丝线。
+    /// 原 navigationTitle 居中小字+SelectableChip 行+toolbar 管理钮由此取代。
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("足迹").dsPageTitle()
+                    Spacer()
+                    if segment == 0 && !meetings.isEmpty {
+                        Button(selecting ? "完成" : "管理") {
+                            selecting.toggle()
+                            selected = []
+                            openSwipeID = nil
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DS.ink)
+                        .padding(.vertical, 6).padding(.horizontal, 14)
+                        .background(Capsule().fill(DS.canvas))
+                        .overlay(Capsule().stroke(DS.hairline, lineWidth: 1))
+                    }
+                }
+                Picker("足迹分段", selection: $segment) {
+                    Text("列表").tag(0)
+                    Text("日历").tag(1)
+                    Text("地图").tag(2)
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.top, 10).padding(.bottom, 14)
+            DS.hairline.frame(height: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.canvas)
     }
 
     private var listContent: some View {
