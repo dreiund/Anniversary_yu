@@ -20,7 +20,7 @@
 
 > P6-T2 起 CDCycle 新增 `authorPartnerID` 字段（一字段增量，无新实体）：上传 1.0.0 构建前重跑一次本节（-InitCloudKitSchema → Deploy to Production，增量、老数据不动，旧 CDCycle 记录该字段留空按「响」处理不受影响）。
 
-> R17 起 CD_Meeting 新增 `authorPartnerID`、`visibilityRaw`、`revealedAt` 三字段，CD_Evidence 新增 `CD_todoItem` 引用字段：发布含此改动的构建前，重跑一次本节（-InitCloudKitSchema → Deploy to Production，增量、老数据不动）。测试需在开发环境真机跑一遍（建私密计划+待办加照片）生成 schema。;R18 增 CD_PlanItem.visibilityRaw/revealedAt 与 CD_Evidence 的 CD_planItem 引用——与 R17 字段合并为同一次部署。
+> R17 起 CD_Meeting 新增 `authorPartnerID`、`visibilityRaw`、`revealedAt` 三字段，CD_Evidence 新增 `CD_todoItem` 引用字段（开发环境已生成）；R18 增 CD_PlanItem.visibilityRaw/revealedAt 与 CD_Evidence 的 CD_planItem 引用（真机 debug 建一条**私密带照片的日程**再公开一次即可生成）；两轮字段合并为同一次 Console Deploy。前置条件：私密日程的隐身仅在双端都升到含 R18 的构建后生效，老构建（≤23）会照常显示私密日程。
 
 ## 二、App Store Connect 建 App
 
@@ -88,7 +88,7 @@
 29. 前台通知可见（P6-B5）：给一条计划或待办勾「提醒我」设 1 分钟后 → App 保持前台等到点，顶部必须弹横幅提醒（不能只锁屏/后台才响，前台也不能静默吞掉）。
 30. 配对接受失败提示（P6-B4）：开飞行模式 → 点一条邀请链接 → 必弹「接受邀请失败」提示（检查网络后重试，或让对方重新发一次邀请）；关飞行模式后重新点链接应能正常加入。
 31. 见面详情即时刷新（P6-T6）：见面进行中，你端停在该见面详情页不动 → 她端把这次见面结束掉 → 几秒内你端 chips 与工具栏自动变「已结束」态（结束见面按钮消失等），不需要退出重进这个页面。
-32. 私密日程（R18-T6）：A 机在计划见面里建私密日程 → B 机行前列表/时间线/今天卡/地图计划钉/「行前计划 x/y」计数全不含它;A 机行尾见 🔒。
+32. 私密日程（R18-T6）：A 机在计划见面里建私密日程 → B 机行前列表/时间线/今天卡/地图计划钉/「行前计划 x/y」计数全不含它;A 机行尾见 🔒；前置：私密日程的隐身仅在双端都升到含 R18 的构建后生效，老构建（≤23）会照常显示私密日程。
 33. 手动公开（R18-T6）：A 机编辑该日程关掉私密(确认弹窗)→ B 机该日程出现;A 机再进编辑,开关锁定灰显。
 34. 转化即公开（R18-T6）：见面进行中 A 机把私密日程转化成回忆 → B 机时间线立刻可见该回忆(含照片);私密日程本体消失。
 35. 待办详情（R17-T7）：任一方点待办行进详情（非编辑）；作者「⋯」可编辑删除；照片加 9 张、详情横滑可看大图；带坐标地点「导航」跳高德/苹果地图;日程照片:表单加 9 张、查看页横滑大图、转化后照片随回忆。

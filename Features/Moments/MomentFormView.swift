@@ -177,7 +177,7 @@ struct MomentFormView: View {
                             if let ui = UIImage(data: data) {
                                 Image(uiImage: ui)
                                     .resizable().scaledToFill()
-                                    .frame(width: 52, height: 52)
+                                    .frame(width: 72, height: 72)
                                     .clipShape(RoundedRectangle(cornerRadius: DS.Radius.image))
                             }
                         }
