@@ -146,6 +146,22 @@ enum DebugSeeder {
                                  dueAt: day(3), assigneeID: herID, authorID: myID,
                                  visibility: .privateUntilRevealed, place: nil, remindAt: nil,
                                  calendar: cal)
+
+        // R18 日程级私密种子:公开计划见面 + 公开项/我方私密带照片/对方私密(全隐验证样本)
+        if let trip = try? meetings.createPlanned(couple: couple, title: "演示行前", city: "南京",
+                                                  plannedStart: day(20), plannedEnd: day(22)) {
+            let planRepo = PlanItemRepository(context: context)
+            _ = try? planRepo.add(to: trip, day: day(20), time: nil, title: "取门票",
+                                  note: nil, placeText: nil, authorID: myID)
+            if let secret = try? planRepo.add(to: trip, day: day(20), time: nil, title: "惊喜环节",
+                                              note: nil, placeText: nil, authorID: myID,
+                                              visibility: .privateUntilRevealed) {
+                try? planRepo.addEvidences(secret, datas: [solidImageData(.systemIndigo)])
+            }
+            _ = try? planRepo.add(to: trip, day: day(21), time: nil, title: "演示他方私密项",
+                                  note: nil, placeText: nil, authorID: herID,
+                                  visibility: .privateUntilRevealed)
+        }
     }
 
     /// 清空整库：逐实体逐对象删除。CloudKit 店不支持 NSBatchDeleteRequest（绕过历史追踪会被拒），

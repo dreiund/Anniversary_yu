@@ -480,6 +480,41 @@ final class MapFilterReproTests: XCTestCase {
         app.buttons["取消"].tap()
     }
 
+    /// R18 §三:单条日程私密——我的带🔒可见,对方的全隐,计数按可见口径;表单开关在编辑里
+    @MainActor
+    func testPrivatePlanItemVisibility() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--seed-map-demo"]
+        app.launch()
+
+        app.buttons["足迹"].tap()
+        let card = app.staticTexts["南京 · 演示行前"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8), "计划卡未出现")
+        // 本机视角可见=取门票+惊喜环节(对方私密项隐形)→ 计数 0/2
+        XCTAssertTrue(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "行前计划 0/2")).firstMatch.exists,
+            "计数应按可见口径 0/2")
+        card.tap()
+
+        XCTAssertTrue(app.staticTexts["取门票"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["惊喜环节"].exists, "我的私密项该可见")
+        XCTAssertTrue(app.staticTexts["🔒"].firstMatch.exists, "私密项缺🔒标识")
+        XCTAssertFalse(app.staticTexts["演示他方私密项"].exists, "对方的私密项不该出现")
+
+        // 点行进查看页:可见性行 + 照片区;编辑表单私密开关开
+        app.staticTexts["惊喜环节"].tap()
+        XCTAssertTrue(app.staticTexts["仅自己可见 🔒"].waitForExistence(timeout: 5), "查看页缺可见性行")
+        XCTAssertTrue(app.staticTexts["照片"].exists, "查看页缺照片区")
+        // 「演示行前」是计划中见面,PlanView 自身也有「编辑」(编辑整趟见面)——它的导航栏留在
+        // 无障碍树里(被本 sheet 盖住但没移除),裸 app.navigationBars.buttons["编辑"] 命中两个,
+        // 必须按 sheet 自己的导航栏标题「日程」(PlanItemDetailSheet.navigationTitle)限定域
+        app.navigationBars["日程"].buttons["编辑"].tap()
+        let toggle = app.switches["私密"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "日程表单缺私密开关")
+        XCTAssertEqual(toggle.value as? String, "1", "私密开关应为开")
+        app.buttons["取消"].tap()
+    }
+
     @MainActor
     private func attach(_ app: XCUIApplication, name: String) {
         let shot = XCTAttachment(screenshot: app.screenshot())
