@@ -39,16 +39,6 @@ struct CalendarView: View {
             .padding(DS.Spacing.md)
         }
         .background(DS.canvas)
-        .toolbar {
-            if !isCurrentMonth {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("今天") {
-                        withAnimation(.snappy) { monthOffset = 0 }
-                    }
-                    .font(.system(size: 14))
-                }
-            }
-        }
     }
 
     private var monthTitle: String {
@@ -57,17 +47,32 @@ struct CalendarView: View {
     }
 
     /// 月份标题 + ‹ › 步进钮（反馈⑥ T7 补件：与她页 HerView.calendarCard 顶行同款样式，和滑动/回今天共用 monthOffset 自动同步）
+    /// R19-② 反馈修:「回今天」从 toolbar(会撑起空导航栏致整页下移)挪到本行右端,
+    /// 始终占位仅切透明度——出现/消失零布局位移
     private var monthTitleRow: some View {
-        HStack(spacing: DS.Spacing.sm) {
-            Button { stepMonth(-1) } label: {
-                Text("‹").font(.system(size: 20, weight: .semibold))
+        ZStack {
+            HStack(spacing: DS.Spacing.sm) {
+                Button { stepMonth(-1) } label: {
+                    Text("‹").font(.system(size: 20, weight: .semibold))
+                }
+                .foregroundStyle(DS.actionBlue)
+                Text(monthTitle).dsCaption()
+                Button { stepMonth(1) } label: {
+                    Text("›").font(.system(size: 20, weight: .semibold))
+                }
+                .foregroundStyle(DS.actionBlue)
             }
-            .foregroundStyle(DS.actionBlue)
-            Text(monthTitle).dsCaption()
-            Button { stepMonth(1) } label: {
-                Text("›").font(.system(size: 20, weight: .semibold))
+            HStack {
+                Spacer()
+                Button("回今天") {
+                    withAnimation(.snappy) { monthOffset = 0 }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(DS.actionBlue)
+                .opacity(isCurrentMonth ? 0 : 1)
+                .disabled(isCurrentMonth)
+                .animation(.easeOut(duration: 0.15), value: isCurrentMonth)
             }
-            .foregroundStyle(DS.actionBlue)
         }
     }
 

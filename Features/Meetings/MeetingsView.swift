@@ -35,8 +35,10 @@ struct MeetingsView: View {
             }
         }
         .background(DS.canvas)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        // R19-② 反馈修:根页导航栏彻底隐藏,页头由自绘 header 全权接管——此前日历段把「今天」
+        // 塞进 toolbar,按钮出现即撑起空导航栏整页下移;三段切换的 toolbar 差异也让地图段顶部跳动。
+        // 只影响足迹根页;push 出去的子页(时间线/行前/档案)各自的导航栏照常显示。
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: segment) { _, _ in
             selecting = false
             selected = []
