@@ -122,7 +122,7 @@ struct SettingsView: View {
                     Toggle("足迹日历周期底色", isOn: $footprintsCycleTintOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
-                Text("记满 2 个完整周期后，预测自动按 TA 的实际记录校准（显示「按记录」）；设置值在数据不足时生效。")
+                Text("手动选定天数后始终按所选值预测；选「自动」则记满 2 个完整周期按 TA 的实际记录推算（显示「按记录」），数据不足时用默认 28/7。")
                     .dsFootnote()
                     .padding(.horizontal, 14)
 
@@ -325,15 +325,20 @@ struct SettingsView: View {
         return CycleRepository(context: context).trackedPartner(couple: couple)?.name ?? "未设置"
     }
 
-    /// R20:行上显示当前生效值——数据不足=种子(设置或 28/7),记满 2 个完整周期=「按记录 · n 天」
+    /// R20-②:行上显示当前生效值与来源——手动=「n 天」;自动挡=「按记录 · n 天」(满 2 个完整周期)
+    /// 或「默认 · 28/7 天」(数据不足)
     private func cyclePrefValue(isCycle: Bool) -> String {
         guard let couple = couples.first else { return "—" }
+        let stored = isCycle ? couple.cycleLengthPref : couple.periodLengthPref
+        if stored > 0 { return "\(stored) 天" }
         let inputs = CycleRepository(context: context).cyclesSorted(couple: couple)
             .compactMap { c -> (start: Date, end: Date?)? in c.startDate.map { ($0, c.endDate) } }
         let p = CyclePredictor.predict(cycles: inputs, prefs: couple.cyclePrefs,
                                        today: Date(), calendar: .current)
-        let n = isCycle ? p.cycleLength : p.periodLength
-        return p.isDefault ? "\(n) 天" : "按记录 · \(n) 天"
+        if let learned = isCycle ? p.learnedCycleLength : p.learnedPeriodLength {
+            return "按记录 · \(learned) 天"
+        }
+        return "默认 · \(isCycle ? 28 : 7) 天"
     }
 
     private var isParticipant: Bool {
@@ -400,13 +405,14 @@ private struct CyclePrefPickerSheet: View {
             .padding(.horizontal, DS.Spacing.md)
             .padding(.top, 18)
             Picker(isCycle ? "月经周期" : "经期长度", selection: $value) {
+                Text("自动 · 按记录").tag(0)                    // 0=自动挡:满 2 个完整周期按记录,不足用 28/7
                 ForEach(range, id: \.self) { Text("\($0) 天").tag($0) }
             }
             .pickerStyle(.wheel)
             .frame(maxHeight: 190)
             Text(isCycle
-                 ? "从这次月经第一天到下次第一天的间隔。排卵按「下次开始日 − 14 天」推算，周期多长都科学适配。"
-                 : "每次行经持续的天数，用于画预测区间的长短。")
+                 ? "从这次月经第一天到下次第一天的间隔。手动选定始终生效;排卵按「下次开始日 − 14 天」推算，周期多长都科学适配。"
+                 : "每次行经持续的天数，用于画预测区间的长短。手动选定始终生效。")
                 .dsFootnote()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.md)
@@ -414,8 +420,7 @@ private struct CyclePrefPickerSheet: View {
         }
         .background(DS.canvas)
         .onAppear {
-            let stored = isCycle ? couple.cycleLengthPref : couple.periodLengthPref
-            value = stored > 0 ? Int(stored) : (isCycle ? 28 : 7)
+            value = Int(isCycle ? couple.cycleLengthPref : couple.periodLengthPref)   // 0=自动
         }
     }
 }

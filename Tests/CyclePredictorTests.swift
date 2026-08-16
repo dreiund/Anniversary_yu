@@ -19,6 +19,7 @@ final class CyclePredictorTests: XCTestCase {
     func testDefaultsWhenFewerThanTwoCompleted() {
         let p = CyclePredictor.predict(cycles: [(start: d(0), end: nil)], today: d(2), calendar: cal)
         XCTAssertTrue(p.isDefault)
+        XCTAssertNil(p.learnedCycleLength)
         XCTAssertEqual(p.cycleLength, 28)
         XCTAssertEqual(p.periodLength, 7)
         XCTAssertEqual(p.nextStarts, [d(28), d(56), d(84)])   // 基准=最近开始日 d0
@@ -30,6 +31,8 @@ final class CyclePredictorTests: XCTestCase {
     func testMeansUseLastSixIntervalsAndDurations() {
         let p = CyclePredictor.predict(cycles: threeCompleted, today: d(70), calendar: cal)
         XCTAssertFalse(p.isDefault)
+        XCTAssertEqual(p.learnedCycleLength, 28)
+        XCTAssertEqual(p.learnedPeriodLength, 6)
         XCTAssertEqual(p.cycleLength, 28)
         XCTAssertEqual(p.periodLength, 6)                     // (5+7+6)/3
         XCTAssertEqual(p.nextStarts.first, d(84))             // 56 + 28
@@ -66,24 +69,44 @@ final class CyclePredictorTests: XCTestCase {
         XCTAssertEqual(p.ongoingEnd, d(9))                    // 表定 d6 已过
     }
 
-    // MARK: - R20 设置种子
+    // MARK: - R20-② 设置取值:手动 > 记录均值 > 28/7
 
-    func testPrefsSeedWhenDataInsufficient() {
-        // 完整周期 <2:设置值替换 28/7 种子(排卵窗挂 nextStarts−14,自动跟着科学推算)
+    func testManualPrefsWinWhenDataInsufficient() {
+        // 完整周期 <2:手动值直接生效(排卵窗挂 nextStarts−14,自动跟着科学推算)
         let p = CyclePredictor.predict(cycles: [(d(0), d(4))], prefs: (35, 5),
                                        today: d(10), calendar: cal)
-        XCTAssertTrue(p.isDefault)
+        XCTAssertFalse(p.isDefault)                           // 两分量均手动,无兜底
         XCTAssertEqual(p.cycleLength, 35)
         XCTAssertEqual(p.periodLength, 5)
         XCTAssertEqual(p.nextStarts.first, d(35))
     }
 
-    func testActualRecordsOverridePrefs() {
-        // 记满 2 个完整周期:实际记录接管,设置退回种子角色
+    func testManualPrefsOverrideLearnedRecords() {
+        // R20-② 反馈修:手动设置始终生效,不被记录均值压住(31/7 卡死案)
         let p = CyclePredictor.predict(cycles: threeCompleted, prefs: (35, 5),
                                        today: d(70), calendar: cal)
-        XCTAssertEqual(p.cycleLength, 28)
+        XCTAssertEqual(p.cycleLength, 35)
+        XCTAssertEqual(p.periodLength, 5)
+        XCTAssertEqual(p.learnedCycleLength, 28)              // 学习值仍算出(设置页展示)
+        XCTAssertEqual(p.nextStarts.first, d(91))             // 56 + 35
+    }
+
+    func testMixedManualCycleAutoPeriod() {
+        // 分量独立:周期手动 35,经期自动挡吃记录均值 6
+        let p = CyclePredictor.predict(cycles: threeCompleted, prefs: (35, nil),
+                                       today: d(70), calendar: cal)
+        XCTAssertEqual(p.cycleLength, 35)
         XCTAssertEqual(p.periodLength, 6)
+        XCTAssertFalse(p.isDefault)
+    }
+
+    func testAutoComponentFallsBackWhenDataInsufficient() {
+        // 经期手动 5、周期自动挡且数据不足:周期回落 28,仍标「数据积累中」
+        let p = CyclePredictor.predict(cycles: [(d(0), d(4))], prefs: (nil, 5),
+                                       today: d(10), calendar: cal)
+        XCTAssertEqual(p.cycleLength, 28)
+        XCTAssertEqual(p.periodLength, 5)
+        XCTAssertTrue(p.isDefault)
     }
 
     // MARK: - 既有口径

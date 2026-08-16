@@ -21,7 +21,7 @@ final class CDCouple: NSManagedObject {
 }
 
 extension CDCouple {
-    /// 经期预测种子（0=未设置 → nil，引擎回落 28/7；记满 2 个完整周期后实际记录接管）
+    /// 经期预测设置（R20-②:手动值始终生效;0=自动挡 → nil,引擎按记录均值、不足回落 28/7）
     var cyclePrefs: (cycleLength: Int?, periodLength: Int?) {
         (cycleLengthPref > 0 ? Int(cycleLengthPref) : nil,
          periodLengthPref > 0 ? Int(periodLengthPref) : nil)

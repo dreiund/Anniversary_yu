@@ -3,14 +3,17 @@ import Foundation
 struct CyclePrediction: Equatable {
     let cycleLength: Int
     let periodLength: Int
-    let isDefault: Bool
+    let isDefault: Bool           // 有分量落在 28/7 兜底上(自动挡且数据不足)→「数据积累中」
+    let learnedCycleLength: Int?  // 记满 2 个完整周期后的近 6 次均值(nil=数据不足;设置页展示用)
+    let learnedPeriodLength: Int?
     let nextStarts: [Date]        // 3 个预测开始日(已顺延:无进行中段时首个不早于今天)
     let scheduledNextStart: Date? // 表定下次开始(未顺延)——落库「当时预测」/偏差统计的口径依据
     let overdueDays: Int?         // 已推迟 n 天(仅 n>0:无进行中段且今天已过表定开始日)
     let ongoingEnd: Date?         // 进行中段预计结束日(不早于今天)
 }
 
-/// 预测引擎（spec §五 / 主 spec §5.3）：完整周期 <2 用种子（用户设置值，缺省 28/7）。
+/// 预测引擎（spec §五 / 主 spec §5.3）。周期/经期天数逐分量取值：手动设置 > 记录均值(满 2 个
+/// 完整周期,近 6 次) > 缺省 28/7——R20-② 反馈修:手动值始终生效(原「记录接管」压住设置,用户否决)。
 /// R20：预测不留在过去——表定开始日已过而经期未来时，三个预测窗整体顺延锚到今天，
 /// 后续月份与排卵窗（挂在 nextStarts 上）随之重算；「当时预测」仍记表定日，偏差/准时率口径不受顺延污染。
 enum CyclePredictor {
@@ -27,11 +30,14 @@ enum CyclePredictor {
             (calendar.dateComponents([.day], from: calendar.startOfDay(for: $0.start),
                                      to: calendar.startOfDay(for: $0.end!)).day ?? 0) + 1
         }
-        let isDefault = completed.count < 2
-        let cycleLength = isDefault ? (prefs.cycleLength ?? 28)
-            : Int((Double(intervals.suffix(6).reduce(0, +)) / Double(intervals.suffix(6).count)).rounded())
-        let periodLength = isDefault ? (prefs.periodLength ?? 7)
-            : Int((Double(durations.suffix(6).reduce(0, +)) / Double(durations.suffix(6).count)).rounded())
+        let learnedCycle = completed.count >= 2
+            ? Int((Double(intervals.suffix(6).reduce(0, +)) / Double(intervals.suffix(6).count)).rounded()) : nil
+        let learnedPeriod = completed.count >= 2
+            ? Int((Double(durations.suffix(6).reduce(0, +)) / Double(durations.suffix(6).count)).rounded()) : nil
+        let cycleLength = prefs.cycleLength ?? learnedCycle ?? 28
+        let periodLength = prefs.periodLength ?? learnedPeriod ?? 7
+        let isDefault = (prefs.cycleLength == nil && learnedCycle == nil)
+            || (prefs.periodLength == nil && learnedPeriod == nil)
         let todayStart = calendar.startOfDay(for: today)
         var nextStarts: [Date] = []
         var scheduledNextStart: Date?
@@ -54,7 +60,9 @@ enum CyclePredictor {
             }
         }
         return CyclePrediction(cycleLength: cycleLength, periodLength: periodLength,
-                               isDefault: isDefault, nextStarts: nextStarts,
+                               isDefault: isDefault,
+                               learnedCycleLength: learnedCycle, learnedPeriodLength: learnedPeriod,
+                               nextStarts: nextStarts,
                                scheduledNextStart: scheduledNextStart,
                                overdueDays: overdueDays, ongoingEnd: ongoingEnd)
     }
