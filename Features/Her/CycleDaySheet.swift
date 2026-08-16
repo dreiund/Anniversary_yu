@@ -179,8 +179,10 @@ struct CycleDaySheet: View {
         let inputs = repo.cyclesSorted(couple: couple).compactMap { c -> (Date, Date?)? in
             c.startDate.map { ($0, c.endDate) }
         }
+        // 「当时预测」记表定日（未顺延），偏差徽标/准时率才能量出真实的迟早（R20 口径）
         let predicted = inputs.isEmpty ? nil
-            : CyclePredictor.predict(cycles: inputs, calendar: cal).nextStarts.first
+            : CyclePredictor.predict(cycles: inputs, prefs: couple.cyclePrefs,
+                                     today: Date(), calendar: cal).scheduledNextStart
         do {
             _ = try repo.start(couple: couple, on: day, predictedStart: predicted,
                                today: Date(), calendar: cal)

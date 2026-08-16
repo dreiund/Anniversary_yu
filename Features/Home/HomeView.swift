@@ -215,10 +215,8 @@ struct HomeView: View {
         }
         let cycleOngoing = cycleRepo.ongoing(couple: couple)
         let cycleDelay = cycleInputs.isEmpty ? nil
-            : CyclePredictor.predict(cycles: cycleInputs, calendar: .current).nextStarts.first.flatMap {
-                CyclePredictor.delayDays(nextStart: $0, hasOngoing: cycleOngoing != nil,
-                                         today: Date(), calendar: .current)
-            }
+            : CyclePredictor.predict(cycles: cycleInputs, prefs: couple.cyclePrefs,
+                                     today: Date(), calendar: .current).overdueDays
         let dueTodos = TodoRepository(context: context).todos(couple: couple).filter {
             !$0.isDone
             && ($0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: today) } ?? false)

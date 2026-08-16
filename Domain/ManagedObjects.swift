@@ -8,6 +8,8 @@ final class CDCouple: NSManagedObject {
     @NSManaged var id: UUID?
     @NSManaged var anniversaryDate: Date?
     @NSManaged var createdAt: Date?
+    @NSManaged var cycleLengthPref: Int16      // R20 经期设置:0=未设置(预测用 28/7 种子)
+    @NSManaged var periodLengthPref: Int16
     @NSManaged var partners: NSSet?
     @NSManaged var meetings: NSSet?
     @NSManaged var places: NSSet?
@@ -16,6 +18,14 @@ final class CDCouple: NSManagedObject {
     @NSManaged var cycles: NSSet?
     @NSManaged var intimacyRecords: NSSet?
     @NSManaged var todos: NSSet?
+}
+
+extension CDCouple {
+    /// 经期预测种子（0=未设置 → nil，引擎回落 28/7；记满 2 个完整周期后实际记录接管）
+    var cyclePrefs: (cycleLength: Int?, periodLength: Int?) {
+        (cycleLengthPref > 0 ? Int(cycleLengthPref) : nil,
+         periodLengthPref > 0 ? Int(periodLengthPref) : nil)
+    }
 }
 
 @objc(CDPartner)

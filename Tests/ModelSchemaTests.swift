@@ -136,6 +136,16 @@ final class ModelSchemaTests: XCTestCase {
         XCTAssertEqual(inverse.inverseRelationship?.name, "evidences")
     }
 
+    func testR20CyclePrefFields() {
+        let couple = ModelSchema.model.entitiesByName["CDCouple"]!
+        for name in ["cycleLengthPref", "periodLengthPref"] {
+            let attr = couple.attributesByName[name]
+            XCTAssertNotNil(attr, name)
+            XCTAssertFalse(attr!.isOptional, name)
+            XCTAssertEqual(attr!.defaultValue as? Int16, 0, name)   // 0=未设置(种子回落 28/7)
+        }
+    }
+
     func testR18PlanItemAdditions() {
         let model = ModelSchema.model
         let plan = model.entitiesByName["CDPlanItem"]!

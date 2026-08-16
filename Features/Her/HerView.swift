@@ -31,12 +31,10 @@ struct HerView: View {
         let inputs = repo.cyclesSorted(couple: couple).compactMap { c -> (start: Date, end: Date?)? in
             c.startDate.map { ($0, c.endDate) }
         }
-        let prediction = CyclePredictor.predict(cycles: inputs, calendar: cal)
+        let prediction = CyclePredictor.predict(cycles: inputs, prefs: couple.cyclePrefs,
+                                                today: Date(), calendar: cal)
         let ongoing = repo.ongoing(couple: couple)
-        let delay = prediction.nextStarts.first.flatMap {
-            CyclePredictor.delayDays(nextStart: $0, hasOngoing: ongoing != nil,
-                                     today: Date(), calendar: cal)
-        }
+        let delay = prediction.overdueDays
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.md) {
                 if let delay {
@@ -83,7 +81,7 @@ struct HerView: View {
             } else if let next = prediction.nextStarts.first {
                 let n = cal.dateComponents([.day], from: cal.startOfDay(for: Date()),
                                            to: cal.startOfDay(for: next)).day ?? 0
-                Text("距下次预计还有 \(max(n, 0)) 天")
+                Text(n <= 0 ? "预计今天来" : "距下次预计还有 \(n) 天")
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(DS.roseCycle)
                 Spacer()
                 Text(Fmt.monthDay.string(from: next))
@@ -157,7 +155,8 @@ struct HerView: View {
             c -> (start: Date, end: Date?)? in c.startDate.map { ($0, c.endDate) }
         } ?? []
         let base = "左右滑动换月 · 浅红=经期 · 虚线=预测 · 墨环=今天 · 紫=排卵期"
-        return CyclePredictor.predict(cycles: inputs, calendar: cal).isDefault && !inputs.isEmpty
+        return CyclePredictor.predict(cycles: inputs, prefs: couples.first?.cyclePrefs ?? (nil, nil),
+                                      today: Date(), calendar: cal).isDefault && !inputs.isEmpty
             ? base + " · 数据积累中" : base
     }
 
@@ -171,7 +170,8 @@ struct HerView: View {
         return "\(comp.year ?? 0) 年 \(comp.month ?? 0) 月"
     }
 
-    /// 该月每天的标记：经期/预测/三点/亲密（spec §一.4；预测虚线只画今天之后、且不盖实际经期）
+    /// 该月每天的标记：经期/预测/三点/亲密（spec §一.4；预测虚线只画今天(含)起、且不盖实际经期——
+    /// R20 顺延后预计首日可能就是今天）
     private func marks(for month: Date, couple: CDCouple) -> [Date: CycleDayMarks] {
         var result: [Date: CycleDayMarks] = [:]
         guard let interval = cal.dateInterval(of: .month, for: month) else { return result }
@@ -195,11 +195,12 @@ struct HerView: View {
         let inputs = repo.cyclesSorted(couple: couple).compactMap { c -> (start: Date, end: Date?)? in
             c.startDate.map { ($0, c.endDate) }
         }
-        let prediction = CyclePredictor.predict(cycles: inputs, calendar: cal)
+        let prediction = CyclePredictor.predict(cycles: inputs, prefs: couple.cyclePrefs,
+                                                today: Date(), calendar: cal)
         for predictedStart in prediction.nextStarts {
             for i in 0..<prediction.periodLength {
                 guard let day = cal.date(byAdding: .day, value: i, to: cal.startOfDay(for: predictedStart)),
-                      interval.contains(day), day > today,
+                      interval.contains(day), day >= today,
                       result[day]?.inPeriod != true else { continue }
                 result[day, default: CycleDayMarks()].predicted = true
             }

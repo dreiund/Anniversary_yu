@@ -26,6 +26,13 @@ struct SettingsView: View {
     @State private var creatingShare = false
     @State private var confirmUnpair = false
     @State private var showTrackedPicker = false
+    @State private var editingCyclePref: CyclePrefKind?
+
+    /// R20 经期设置:滚轮 sheet 的目标字段
+    enum CyclePrefKind: String, Identifiable {
+        case cycleLength, periodLength
+        var id: String { rawValue }
+    }
 
     var body: some View {
         ScrollView {
@@ -100,9 +107,24 @@ struct SettingsView: View {
                         GroupedRow(title: "经期归属", value: trackedPartnerName, valueColor: DS.actionBlue)
                     }
                     .buttonStyle(.plain)
+                    Button {
+                        editingCyclePref = .cycleLength
+                    } label: {
+                        GroupedRow(title: "月经周期", value: cyclePrefValue(isCycle: true), valueColor: DS.actionBlue)
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        editingCyclePref = .periodLength
+                    } label: {
+                        GroupedRow(title: "经期长度", value: cyclePrefValue(isCycle: false), valueColor: DS.actionBlue)
+                    }
+                    .buttonStyle(.plain)
                     Toggle("足迹日历周期底色", isOn: $footprintsCycleTintOn)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                 }
+                Text("记满 2 个完整周期后，预测自动按 TA 的实际记录校准（显示「按记录」）；设置值在数据不足时生效。")
+                    .dsFootnote()
+                    .padding(.horizontal, 14)
 
                 Text("配对与同步").dsSectionTitle()
                 GroupedSection {
@@ -252,6 +274,12 @@ struct SettingsView: View {
                 TrackedPickerView(couple: couple, requireChoice: false)
             }
         }
+        .sheet(item: $editingCyclePref) { kind in
+            if let couple = couples.first {
+                CyclePrefPickerSheet(kind: kind, couple: couple)
+                    .presentationDetents([.height(340)])
+            }
+        }
         .alert("解除配对？", isPresented: $confirmUnpair) {
             Button("解除配对", role: .destructive) {
                 guard let couple = couples.first else { return }
@@ -297,6 +325,17 @@ struct SettingsView: View {
         return CycleRepository(context: context).trackedPartner(couple: couple)?.name ?? "未设置"
     }
 
+    /// R20:行上显示当前生效值——数据不足=种子(设置或 28/7),记满 2 个完整周期=「按记录 · n 天」
+    private func cyclePrefValue(isCycle: Bool) -> String {
+        guard let couple = couples.first else { return "—" }
+        let inputs = CycleRepository(context: context).cyclesSorted(couple: couple)
+            .compactMap { c -> (start: Date, end: Date?)? in c.startDate.map { ($0, c.endDate) } }
+        let p = CyclePredictor.predict(cycles: inputs, prefs: couple.cyclePrefs,
+                                       today: Date(), calendar: .current)
+        let n = isCycle ? p.cycleLength : p.periodLength
+        return p.isDefault ? "\(n) 天" : "按记录 · \(n) 天"
+    }
+
     private var isParticipant: Bool {
         guard let couple = couples.first else { return false }
         return CoupleRepository(context: context).isParticipantDevice(couple)
@@ -331,4 +370,52 @@ private struct InviteActivityView: UIViewControllerRepresentable {
         UIActivityViewController(activityItems: [text], applicationActivities: nil)
     }
     func updateUIViewController(_: UIActivityViewController, context: Context) {}
+}
+
+/// R20 经期设置滚轮(月经周期 20–45 天 / 经期长度 2–10 天):存 CDCouple 走 CloudKit,两台手机预测一致
+private struct CyclePrefPickerSheet: View {
+    @Environment(\.managedObjectContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    let kind: SettingsView.CyclePrefKind
+    @ObservedObject var couple: CDCouple
+    @State private var value = 28
+
+    private var isCycle: Bool { kind == .cycleLength }
+    private var range: ClosedRange<Int> { isCycle ? 20...45 : 2...10 }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(isCycle ? "月经周期" : "经期长度").dsSectionTitle()
+                Spacer()
+                Button("完成") {
+                    if isCycle { couple.cycleLengthPref = Int16(value) }
+                    else { couple.periodLengthPref = Int16(value) }
+                    try? context.save()
+                    dismiss()
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(DS.actionBlue)
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.top, 18)
+            Picker(isCycle ? "月经周期" : "经期长度", selection: $value) {
+                ForEach(range, id: \.self) { Text("\($0) 天").tag($0) }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxHeight: 190)
+            Text(isCycle
+                 ? "从这次月经第一天到下次第一天的间隔。排卵按「下次开始日 − 14 天」推算，周期多长都科学适配。"
+                 : "每次行经持续的天数，用于画预测区间的长短。")
+                .dsFootnote()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DS.Spacing.md)
+                .padding(.bottom, 16)
+        }
+        .background(DS.canvas)
+        .onAppear {
+            let stored = isCycle ? couple.cycleLengthPref : couple.periodLengthPref
+            value = stored > 0 ? Int(stored) : (isCycle ? 28 : 7)
+        }
+    }
 }

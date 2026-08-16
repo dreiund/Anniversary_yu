@@ -59,6 +59,8 @@ enum ModelSchema {
             attr("id", .UUIDAttributeType),
             attr("anniversaryDate", .dateAttributeType),
             attr("createdAt", .dateAttributeType),
+            attr("cycleLengthPref", .integer16AttributeType, optional: false, defaultValue: 0),   // R20 经期设置(0=未设置)
+            attr("periodLengthPref", .integer16AttributeType, optional: false, defaultValue: 0),
         ])
 
         let partner = entity("CDPartner", CDPartner.self, [

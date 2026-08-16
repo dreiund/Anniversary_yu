@@ -161,7 +161,8 @@ struct CalendarView: View {
         let inputs = cyclesFetch.compactMap { c -> (start: Date, end: Date?)? in
             c.startDate.map { ($0, c.endDate) }
         }
-        let prediction = CyclePredictor.predict(cycles: inputs, calendar: cal)
+        let prediction = CyclePredictor.predict(cycles: inputs, prefs: couples.first?.cyclePrefs ?? (nil, nil),
+                                                today: Date(), calendar: cal)
         return CyclePredictor.ovulationWindows(cycles: inputs, nextStarts: prediction.nextStarts, calendar: cal)
     }
 
